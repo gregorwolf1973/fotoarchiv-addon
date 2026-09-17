@@ -400,7 +400,16 @@
 {/if}
 
 {#if showImport && info}
-  <ImportPanel {info} onclose={() => (showImport = false)} onchanged={kick} />
+  <ImportPanel
+    {info}
+    onclose={() => (showImport = false)}
+    onchanged={kick}
+    ontask={(task) => {
+      pending.set(task.id, {});
+      tasks = [...tasks, task];
+      kick();
+    }}
+  />
 {/if}
 
 {#if dialog?.type === 'labels'}

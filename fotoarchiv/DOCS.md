@@ -4,12 +4,12 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.03)
+## Funktionen (Version 0.05)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
 - **Duplikaterkennung per MD5.** Bereits vorhandene Dateien werden nicht noch einmal aufgenommen. Beim Ordner-Import landen sie in `_duplikate` im Import-Ordner. Die Prüfsumme vom Import wird dauerhaft gespeichert, damit ein Bild auch nach späterer Bearbeitung noch als Duplikat erkannt wird.
-- **Bibliothek einlesen.** Übernimmt Dateien, die schon in der Bibliothek liegen, ohne sie zu verschieben.
+- **Bibliothek abgleichen.** Übernimmt Dateien, die schon in der Bibliothek liegen, ohne sie zu verschieben, und erkennt von Hand verschobene oder gelöschte Dateien. Siehe [Dateien außerhalb des Fotoarchivs ändern](#dateien-außerhalb-des-fotoarchivs-ändern).
 - **Galerie** mit Tagesgruppen, Zeilen im Blocksatz und flüssigem Scrollen auch bei Zehntausenden Bildern.
 - **Zeitleiste rechts.** Ein fester Balken mit Jahreszahlen und einem Cursor zum Ziehen, der Monat und Jahr anzeigt.
 - **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen.
@@ -71,6 +71,22 @@ Jede Änderung wird **zuerst mit exiftool in die Datei geschrieben**. Danach lie
 - **Bearbeitbar** sind JPEG, PNG, WebP, TIFF, HEIC/HEIF, AVIF, MP4, MOV, M4V und 3GP. GIF, MKV, WebM, AVI und MTS können keine Metadaten speichern und werden nur angezeigt.
 - **HEIC/AVIF lassen sich nicht drehen.** Die Drehung steckt dort in einem Container-Feld, das exiftool nicht schreiben kann, und die EXIF-Orientierung wird von HEIC-Programmen ignoriert. Handyfotos sind in der Regel schon richtig gedreht.
 - Personen, die ein anderes Programm über **Gesichtsmarkierungen** zugeordnet hat, lassen sich hier nicht entfernen. Das kommt mit der Gesichtserkennung.
+
+## Dateien außerhalb des Fotoarchivs ändern
+
+Die Bibliothek besteht aus normalen Dateien. Du kannst sie also auch per Samba oder Dateimanager verschieben, umbenennen oder löschen. Die Datenbank bemerkt das erst beim nächsten **Importieren → Bibliothek abgleichen**:
+
+| Du hast … | Beim Abgleich passiert … |
+|---|---|
+| eine Datei verschoben oder umbenannt | Sie wird über die MD5-Summe ihrem Eintrag **wieder zugeordnet**. Schlagworte, Personen und Papierkorb-Verlauf bleiben erhalten. |
+| eine Datei gelöscht | Der Eintrag wird unter **Dateien fehlen** aufgelistet. Mit **Fehlende Einträge entfernen** löschst du ihn nach einer Bestätigung. |
+| eine neue Datei in die Bibliothek kopiert | Sie wird aufgenommen, ohne verschoben zu werden. |
+
+Bis zum Abgleich erscheint ein von Hand gelöschtes Foto weiter in der Galerie (aus dem Vorschaubild-Cache), lässt sich aber nicht öffnen oder bearbeiten.
+
+Legst du eine von Hand gelöschte Datei später wieder in den Import-Ordner oder lädst sie hoch, übernimmt sie ihren alten Eintrag und wird nicht als Duplikat abgewiesen.
+
+**Schutz vor Datenverlust:** Fehlende Einträge werden nie automatisch entfernt. Ist die Bibliothek leer, etwa weil das Laufwerk gerade nicht eingebunden ist, lehnt das Add-on das Entfernen ab.
 
 ## Karte
 

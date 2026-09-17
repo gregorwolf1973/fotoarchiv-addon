@@ -48,6 +48,7 @@ export const api = {
   batch: (body) => request('api/batch', send('POST', body)),
   tasks: () => request('api/tasks'),
   emptyTrash: () => request('api/trash/empty', { method: 'POST' }),
+  removeMissing: () => request('api/library/remove-missing', { method: 'POST' }),
   importStatus: () => request('api/import'),
   startImport: (mode) => request('api/import', send('POST', { mode })),
 };

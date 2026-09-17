@@ -1,12 +1,17 @@
 <script>
   import { api } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import Confirm from './Confirm.svelte';
   import Icon from './Icon.svelte';
 
-  let { info, onclose, onchanged } = $props();
+  // ontask(task): Hintergrundaufgabe an die App zur Verfolgung übergeben
+  let { info, onclose, onchanged, ontask } = $props();
 
   let job = $state(null);
   let error = $state('');
+  let confirmRemove = $state(false);
+  const count = (key) => formatNumber(job?.counts[key] ?? 0);
+  const plural = (key, one, many) => ((job?.counts[key] ?? 0) === 1 ? one : many);
 
   const sambaPath = $derived.by(() => {
     const m = /^\/(share|media)\/(.*)$/.exec(info.import_dir);
@@ -41,12 +46,22 @@
     }
   }
 
+  async function removeMissing() {
+    confirmRemove = false;
+    try {
+      ontask(await api.removeMissing());
+      onclose();
+    } catch (e) {
+      error = e.message;
+    }
+  }
+
   function copySambaPath() {
     navigator.clipboard?.writeText(sambaPath);
   }
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
+<svelte:window onkeydown={(e) => e.key === 'Escape' && !confirmRemove && onclose()} />
 
 <div class="backdrop" onclick={(e) => e.target === e.currentTarget && onclose()} role="presentation">
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="import-title">
@@ -75,12 +90,13 @@
     </section>
 
     <section>
-      <h3>Bibliothek einlesen</h3>
+      <h3>Bibliothek abgleichen</h3>
       <p>
-        Nimmt Dateien auf, die schon in <code>{info.library}</code> liegen, ohne sie zu verschieben. Nützlich für eine
-        bestehende Sammlung.
+        Vergleicht das Archiv mit den Dateien in <code>{info.library}</code>: Neue Dateien werden ohne Verschieben
+        aufgenommen, von Hand verschobene oder umbenannte Dateien werden ihrem Eintrag wieder zugeordnet, und Einträge,
+        deren Datei gelöscht wurde, werden aufgelistet.
       </p>
-      <button disabled={job?.running} onclick={() => start('library')}>Bibliothek einlesen</button>
+      <button disabled={job?.running} onclick={() => start('library')}>Bibliothek abgleichen</button>
     </section>
 
     {#if error}<p class="error">{error}</p>{/if}
@@ -100,11 +116,41 @@
       <section class="report">
         <h3>{job.running ? 'Bisher' : `Letzter Lauf · ${finished}`}</h3>
         <div class="counts">
-          <span class="count ok">{formatNumber(job.counts.imported)} neu</span>
-          <span class="count warn">{formatNumber(job.counts.duplicate)} Duplikate</span>
-          <span class="count">{formatNumber(job.counts.skipped)} übersprungen</span>
-          <span class="count bad">{formatNumber(job.counts.error)} Fehler</span>
+          <span class="count ok">{count('imported')} neu</span>
+          {#if job.counts.relinked}<span class="count ok">{count('relinked')} wieder zugeordnet</span>{/if}
+          <span class="count warn">{count('duplicate')} Duplikate</span>
+          <span class="count">{count('skipped')} übersprungen</span>
+          <span class="count bad">{count('error')} Fehler</span>
+          {#if job.mode === 'library' && !job.running}<span class="count" class:bad={job.counts.missing}>{count('missing')} {plural('missing', 'Datei fehlt', 'Dateien fehlen')}</span>{/if}
         </div>
+        {#if job.mode === 'library' && !job.running && job.counts.missing}
+          <div class="missing">
+            <p>
+              Für <strong>{count('missing')}</strong> {plural('missing', 'Eintrag', 'Einträge')} liegt keine Datei mehr
+              in der Bibliothek – vermutlich außerhalb des Fotoarchivs gelöscht. Taucht die Datei später wieder auf, wird sie beim nächsten Abgleich
+              oder Import automatisch wieder zugeordnet.
+            </p>
+            <button class="danger" onclick={() => (confirmRemove = true)}>
+              <Icon name="deleteForever" size={18} /> Fehlende Einträge entfernen
+            </button>
+          </div>
+          <details>
+            <summary>Fehlende Dateien</summary>
+            <ul>
+              {#each job.missing as entry}<li>{entry.name}</li>{/each}
+            </ul>
+          </details>
+        {/if}
+        {#if job.relinked?.length}
+          <details>
+            <summary>Wieder zugeordnet</summary>
+            <ul>
+              {#each job.relinked as entry}
+                <li><span>{entry.name}</span> <span class="muted">← vorher {entry.existing}</span></li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
         {#if job.duplicates.length}
           <details>
             <summary>Duplikate</summary>
@@ -138,6 +184,17 @@
     {/if}
   </div>
 </div>
+
+{#if confirmRemove}
+  <Confirm
+    title="Fehlende Einträge entfernen?"
+    text="Die Einträge werden aus dem Archiv entfernt, samt Schlagworten und Personen. Dateien werden dabei nicht angefasst – es werden nur Einträge gelöscht, deren Datei beim Entfernen weiterhin fehlt."
+    confirmLabel="Einträge entfernen"
+    danger
+    onconfirm={removeMissing}
+    oncancel={() => (confirmRemove = false)}
+  />
+{/if}
 
 <style>
   .backdrop {
@@ -241,6 +298,16 @@
   }
   .count.bad {
     color: var(--danger);
+  }
+  .missing {
+    margin: 12px 0;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--danger-bg);
+  }
+  .missing p {
+    margin-bottom: 10px;
+    color: var(--text);
   }
   details {
     margin-top: 10px;

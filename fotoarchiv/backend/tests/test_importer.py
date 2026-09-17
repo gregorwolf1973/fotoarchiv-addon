@@ -18,7 +18,7 @@ def test_import_folder_sorts_deduplicates_and_cleans_up(settings, importer, make
     importer._run("import")
     job = importer.job
 
-    assert job.counts == {"imported": 2, "duplicate": 1, "skipped": 1, "error": 0}
+    assert job.counts == {"imported": 2, "relinked": 0, "duplicate": 1, "skipped": 1, "error": 0, "missing": 0}
     assert (settings.library / "2019" / "05" / "strand.jpg").is_file()
     assert (settings.library / "2020" / "01" / "IMG_20200101_101010.jpg").is_file()
     assert (inbox / DUPLICATE_DIR / "Urlaub" / "strand_kopie.jpg").is_file()
@@ -81,3 +81,48 @@ def test_library_scan_indexes_in_place(settings, importer, make_jpeg):
 def test_safe_name():
     assert safe_name("..\\..\\böse:name?.JPG") == "böse_name_.jpg"
     assert safe_name("../.jpg") == "bild.jpg"
+
+
+def test_reimport_after_manual_delete_relinks_entry(settings, importer, make_jpeg):
+    source = make_jpeg(settings.import_dir / "urlaub.jpg", DateTimeOriginal="2019:05:12 14:03:22", Keywords="Strand")
+    backup = settings.data / "sicherung.jpg"
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(source, backup)
+    first = importer.import_file(source)
+    importer.ensure_preview(first.asset_id)
+    (settings.library / "2019/05/urlaub.jpg").unlink()            # von Hand gelöscht
+
+    again = settings.import_dir / "urlaub-wieder.jpg"
+    shutil.copy(backup, again)
+    result = importer.import_file(again)
+
+    assert (result.status, result.asset_id, result.existing) == ("relinked", first.asset_id, "2019/05/urlaub.jpg")
+    row = importer.db.one("SELECT * FROM assets WHERE id = ?", (first.asset_id,))
+    assert row["path"] == "2019/05/urlaub-wieder.jpg" and row["rev"] == 2
+    assert importer.cache_file(first.asset_id, "thumb").is_file()
+    assert not importer.cache_file(first.asset_id, "preview").exists()   # alte Großansicht verworfen
+    assert importer.db.one("SELECT COUNT(*) AS n FROM assets")["n"] == 1
+
+
+def test_library_sync_relinks_moved_and_reports_missing(settings, importer, make_jpeg):
+    for name in ("bleibt.jpg", "verschoben.jpg", "geloescht.jpg"):
+        importer.import_file(make_jpeg(settings.import_dir / name, DateTimeOriginal="2020:06:01 12:00:00", Keywords=name))
+    # ohne EXIF: Datum kommt nur aus dem Dateinamen
+    importer.import_file(make_jpeg(settings.import_dir / "IMG_20110304_050607.jpg"))
+    shutil.move(settings.library / "2011/03/IMG_20110304_050607.jpg", settings.library / "Ferien.jpg")
+    folder = settings.library / "2020" / "06"
+    (settings.library / "Sortiert").mkdir()
+    shutil.move(folder / "verschoben.jpg", settings.library / "Sortiert" / "neu.jpg")
+    (folder / "geloescht.jpg").unlink()
+
+    importer._run("library")
+    job = importer.job
+
+    assert job.counts["relinked"] == 2 and job.counts["imported"] == 0 and job.counts["duplicate"] == 0
+    assert sorted(e["existing"] for e in job.relinked) == ["2011/03/IMG_20110304_050607.jpg", "2020/06/verschoben.jpg"]
+    renamed = importer.db.one("SELECT taken_at, date_source FROM assets WHERE path = 'Ferien.jpg'")
+    assert (renamed["taken_at"], renamed["date_source"]) == ("2011-03-04T05:06:07", "filename")
+    assert job.counts["missing"] == 1 and job.missing[0]["name"] == "2020/06/geloescht.jpg"
+    moved = importer.db.one("SELECT path FROM assets a JOIN asset_tags l ON l.asset_id = a.id "
+                            "JOIN tags t ON t.id = l.tag_id WHERE t.name = 'verschoben.jpg'")
+    assert moved["path"] == "Sortiert/neu.jpg"                         # Schlagwort blieb erhalten

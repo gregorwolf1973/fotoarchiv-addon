@@ -168,3 +168,22 @@ def test_geo_located_filter_and_batch_location(client, settings, make_jpeg, tmp_
     client.post("/api/batch", json={"ids": [first], "action": "location", "location": None})
     wait_for_tasks(client)
     assert first in ids(located=False)
+
+
+def test_remove_missing_entries_with_safety_check(client, settings, make_jpeg, tmp_path):
+    keep = upload(client, make_jpeg, tmp_path, "keep.jpg", DateTimeOriginal="2021:01:01 10:00:00")
+    gone = upload(client, make_jpeg, tmp_path, "gone.jpg", DateTimeOriginal="2021:01:02 10:00:00")
+    assert client.post("/api/library/remove-missing").status_code == 400      # noch fehlt nichts
+
+    (settings.library / "2021/01/gone.jpg").unlink()
+    task = client.post("/api/library/remove-missing").json()
+    assert task["total"] == 1
+    wait_for_tasks(client)
+    assert [i[0] for i in client.get("/api/assets").json()["items"]] == [keep]
+    assert client.get(f"/api/assets/{gone}").status_code == 404
+
+    # Laufwerk "nicht eingebunden": nichts löschen
+    (settings.library / "2021/01/keep.jpg").unlink()
+    response = client.post("/api/library/remove-missing")
+    assert response.status_code == 409 and "Laufwerk" in response.json()["detail"]
+    assert client.get(f"/api/assets/{keep}").status_code == 200

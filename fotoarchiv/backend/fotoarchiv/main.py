@@ -355,6 +355,19 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
             raise HTTPException(400, "Der Papierkorb ist leer")
         return asdict(tasks.submit(f"Papierkorb leeren ({len(ids)} Dateien)", ids, editor.purge))
 
+    @app.post("/api/library/remove-missing")
+    def remove_missing():
+        """Einträge ohne Datei entfernen – erst nach dem Abgleich und ausdrücklich vom Nutzer ausgelöst."""
+        if importer.job.running:
+            raise HTTPException(409, "Es läuft gerade ein Import oder Abgleich")
+        if not importer.library_reachable():
+            raise HTTPException(409, "Die Bibliothek ist leer oder nicht erreichbar – ist das Laufwerk eingebunden?")
+        ids = [row["id"] for row in importer.missing_assets()]
+        if not ids:
+            raise HTTPException(400, "Es fehlen keine Dateien")
+        label = "1 fehlenden Eintrag entfernen" if len(ids) == 1 else f"{len(ids)} fehlende Einträge entfernen"
+        return asdict(tasks.submit(label, ids, editor.forget))
+
     # ── Import ─────────────────────────────────────────────────────
     @app.get("/api/import")
     def import_status():

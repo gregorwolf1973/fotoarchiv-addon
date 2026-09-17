@@ -21,15 +21,16 @@ log = logging.getLogger(__name__)
 DUPLICATE_DIR = "_duplikate"
 IGNORED_NAMES = {"@eaDir", "#recycle", "Thumbs.db", "desktop.ini"}
 REPORT_LIMIT = 500  # Einträge pro Liste im Bericht
+DATE_RANK = {"mtime": 0, "filename": 1, "exif": 2}  # wie verlässlich die Datumsquelle ist
 
 
 @dataclass
 class Result:
-    status: str                  # imported | duplicate | skipped | error
+    status: str                  # imported | relinked | duplicate | skipped | error
     name: str
     message: str = ""
     asset_id: int | None = None
-    existing: str | None = None  # Pfad des bereits vorhandenen Bildes bei Duplikaten
+    existing: str | None = None  # Duplikat: Pfad des vorhandenen Bildes; wieder zugeordnet: bisheriger Pfad
 
 
 @dataclass
@@ -41,7 +42,10 @@ class Job:
     total: int = 0
     done: int = 0
     current: str = ""
-    counts: dict = field(default_factory=lambda: {"imported": 0, "duplicate": 0, "skipped": 0, "error": 0})
+    counts: dict = field(default_factory=lambda: {
+        "imported": 0, "relinked": 0, "duplicate": 0, "skipped": 0, "error": 0, "missing": 0})
+    relinked: list = field(default_factory=list)
+    missing: list = field(default_factory=list)   # Einträge, deren Datei fehlt (nur beim Abgleich)
     duplicates: list = field(default_factory=list)
     errors: list = field(default_factory=list)
     skipped: list = field(default_factory=list)
@@ -120,10 +124,11 @@ class Importer:
                 return Result("error", name, f"Datei nicht lesbar: {exc}")
 
             existing = self.db.one(
-                "SELECT id, path, deleted_at FROM assets WHERE md5 = ? OR md5_import = ? LIMIT 1",
+                """SELECT id, path, deleted_at, taken_at, date_source, tz_offset FROM assets
+                   WHERE md5 = ? OR md5_import = ? LIMIT 1""",
                 (checksum, checksum),
             )
-            if existing:
+            if existing and (existing["deleted_at"] or (self.settings.library / existing["path"]).is_file()):
                 where = "im Papierkorb" if existing["deleted_at"] else "bereits im Archiv"
                 return Result("duplicate", name, where, existing["id"], existing["path"])
 
@@ -148,16 +153,45 @@ class Importer:
 
             rel = target.relative_to(self.settings.library).as_posix()
             try:
-                asset_id = self._insert(rel, kind, stat.st_size, checksum, meta)
+                if existing:
+                    # Datei des Eintrags fehlt (von Hand gelöscht oder verschoben): Eintrag übernimmt diese Datei.
+                    # Ein umbenanntes Foto ohne EXIF verliert sonst sein Datum aus dem alten Dateinamen.
+                    if DATE_RANK.get(meta.date_source, 0) < DATE_RANK.get(existing["date_source"], 0):
+                        meta.taken = datetime.fromisoformat(existing["taken_at"])
+                        meta.date_source, meta.tz_offset = existing["date_source"], existing["tz_offset"]
+                    asset_id = existing["id"]
+                    self._relink(asset_id, rel, stat.st_size, checksum, meta)
+                else:
+                    asset_id = self._insert(rel, kind, stat.st_size, checksum, meta)
             except Exception as exc:
                 if move:
                     move_file(target, source)
                 log.exception("Eintragen von %s fehlgeschlagen", name)
                 return Result("error", name, f"Datenbankfehler: {exc}")
 
+        if existing:
+            self.drop_cache(asset_id)
+            self.ensure_thumbnail(asset_id)
+            self.db.bump()
+            return Result("relinked", name, f"Eintrag wieder zugeordnet (vorher {existing['path']})", asset_id, existing["path"])
         self.ensure_thumbnail(asset_id)
         self.db.bump()
         return Result("imported", name, rel, asset_id)
+
+    def _relink(self, asset_id: int, rel: str, size: int, checksum: str, meta: metadata.Metadata):
+        """Vorhandenen Eintrag auf eine neue Datei zeigen lassen; ID, Import-Prüfsumme und Import-Datum bleiben."""
+        with self.db.transaction() as conn:
+            conn.execute(
+                """UPDATE assets SET path = ?, size = ?, md5 = ?, taken_at = ?, taken_ts = ?, date_source = ?,
+                       tz_offset = ?, width = ?, height = ?, duration = ?, lat = ?, lon = ?, camera = ?,
+                       rev = rev + 1, thumb_ok = 0
+                   WHERE id = ?""",
+                (rel, size, checksum, meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
+                 meta.width, meta.height, meta.duration, meta.lat, meta.lon, meta.camera, asset_id),
+            )
+            labels.replace(conn, asset_id, "tags", meta.tags)
+            labels.replace(conn, asset_id, "persons", meta.persons)
+            labels.remove_unused(conn)
 
     def _insert(self, rel: str, kind: str, size: int, checksum: str, meta: metadata.Metadata) -> int:
         with self.db.transaction() as conn:
@@ -215,6 +249,17 @@ class Importer:
                 return None
         return target
 
+    # ── Abgleich mit dem Datenträger ───────────────────────────────
+    def missing_assets(self) -> list:
+        """Einträge (auch im Papierkorb), deren Datei nicht mehr auf dem Datenträger liegt."""
+        rows = self.db.query("SELECT id, path, deleted_at FROM assets ORDER BY path")
+        return [row for row in rows if not (self.settings.library / row["path"]).is_file()]
+
+    def library_reachable(self) -> bool:
+        """Schutz vor einem nicht eingebundenen Laufwerk: leere Bibliothek gilt als nicht erreichbar."""
+        root = self.settings.library
+        return root.is_dir() and any(p.is_file() for p in root.rglob("*"))
+
     # ── Upload ─────────────────────────────────────────────────────
     def import_upload(self, temp: Path, name: str, mtime: float | None) -> Result:
         try:
@@ -251,7 +296,8 @@ class Importer:
     def _record(self, result: Result, rel: str):
         job = self.job
         job.counts[result.status] += 1
-        bucket = {"duplicate": job.duplicates, "error": job.errors, "skipped": job.skipped}.get(result.status)
+        bucket = {"duplicate": job.duplicates, "error": job.errors, "skipped": job.skipped,
+                  "relinked": job.relinked}.get(result.status)
         if bucket is not None and len(bucket) < REPORT_LIMIT:
             entry = {"name": rel, "message": result.message}
             if result.existing:
@@ -284,6 +330,11 @@ class Importer:
                 job.done += 1
             if mode == "import":
                 remove_empty_dirs(root)
+            else:
+                job.current = "Fehlende Dateien suchen"
+                missing = self.missing_assets()
+                job.counts["missing"] = len(missing)
+                job.missing = [{"id": r["id"], "name": r["path"]} for r in missing[:REPORT_LIMIT]]
         except Exception as exc:
             log.exception("Import abgebrochen")
             self._record(Result("error", "", f"Import abgebrochen: {exc}"), "")

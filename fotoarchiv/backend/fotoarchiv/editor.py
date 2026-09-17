@@ -282,6 +282,20 @@ class Editor:
                 labels.remove_unused(conn)
             self.db.bump()
 
+    def forget(self, asset_id: int):
+        """Eintrag entfernen, dessen Datei außerhalb des Fotoarchivs gelöscht wurde."""
+        with self._lock:
+            row = self.db.one("SELECT path FROM assets WHERE id = ?", (asset_id,))
+            if row is None:
+                return
+            if (self.settings.library / row["path"]).exists():
+                raise EditError("Die Datei ist wieder vorhanden und bleibt im Archiv")
+            self.importer.drop_cache(asset_id)
+            with self.db.transaction() as conn:
+                conn.execute("DELETE FROM assets WHERE id = ?", (asset_id,))
+                labels.remove_unused(conn)
+            self.db.bump()
+
     def expired(self, days: int) -> list[int]:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
         return [r["id"] for r in self.db.query("SELECT id FROM assets WHERE deleted_at < ?", (cutoff,))]
