@@ -134,3 +134,37 @@ def test_edit_filter_batch_and_trash(client, make_jpeg, tmp_path):
     wait_for_tasks(client)
     assert ids(trash=True) == [] and ids() == [c]
     assert client.post("/api/trash/empty").status_code == 400
+
+
+def test_geo_located_filter_and_batch_location(client, settings, make_jpeg, tmp_path):
+    placed = upload(client, make_jpeg, tmp_path, "da.jpg", DateTimeOriginal="2020:01:01 10:00:00",
+                    GPSLatitude=47.2692, GPSLatitudeRef="N", GPSLongitude=11.4041, GPSLongitudeRef="E")
+    first = upload(client, make_jpeg, tmp_path, "weg1.jpg", DateTimeOriginal="2020:02:01 10:00:00")
+    second = upload(client, make_jpeg, tmp_path, "weg2.jpg", DateTimeOriginal="2020:03:01 10:00:00")
+    gif = settings.import_dir / "anim.gif"
+    gif.parent.mkdir(parents=True, exist_ok=True)
+    import pyvips
+    (pyvips.Image.black(20, 20, bands=3) + 70).cast("uchar").gifsave(str(gif))
+    gif_id = client.app.state.importer.import_file(gif).asset_id
+
+    ids = lambda **params: [item[0] for item in client.get("/api/assets", params=params).json()["items"]]  # noqa: E731
+    assert ids(located=True) == [placed]
+    assert set(ids(located=False)) == {first, second, gif_id}
+    assert ids(located=False, editable=True) == [second, first]
+    assert ids(editable=False) == [gif_id]
+
+    geo = client.get("/api/geo").json()
+    assert geo["fields"][-2:] == ["lat", "lon"]
+    assert [(i[0], round(i[6], 3), round(i[7], 3)) for i in geo["items"]] == [(placed, 47.269, 11.404)]
+
+    assert client.post("/api/batch", json={"ids": [first], "action": "location"}).status_code == 400
+    task = client.post("/api/batch", json={"ids": [first, second, gif_id], "action": "location",
+                                           "location": {"lat": -33.8568, "lon": 151.2153}}).json()
+    assert task["label"] == "Ort bei 3 Dateien setzen"
+    done = wait_for_tasks(client)
+    assert done["done"] == 3 and len(done["failed"]) == 1 and "GIF" in done["failed"][0]["message"]
+    assert {i[0] for i in client.get("/api/geo").json()["items"]} == {placed, first, second}
+
+    client.post("/api/batch", json={"ids": [first], "action": "location", "location": None})
+    wait_for_tasks(client)
+    assert first in ids(located=False)

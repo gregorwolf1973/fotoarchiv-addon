@@ -4,6 +4,7 @@
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import ChipInput from './ChipInput.svelte';
   import DateDialog from './DateDialog.svelte';
+  import LocationDialog from './LocationDialog.svelte';
   import Icon from './Icon.svelte';
 
   let { items, index, trash = false, labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
@@ -14,6 +15,7 @@
   let error = $state('');
   let busy = $state(false);
   let editDate = $state(false);
+  let editLocation = $state(false);
   let loadedKey = $state(null); // Großansicht geladen: Platzhalter ausblenden
 
   const item = $derived(items[index]);
@@ -79,6 +81,10 @@
     editDate = false;
     save(() => api.update(itemId, { taken_at: value }), 'Datum gespeichert');
   }
+  function setLocation(location) {
+    editLocation = false;
+    save(() => api.update(itemId, { location }), 'Ort gespeichert');
+  }
   async function removeLocation() {
     const { lat, lon } = detail;
     const id = itemId;
@@ -96,7 +102,7 @@
   };
 
   function keydown(e) {
-    if (editDate || e.target.closest?.('input, textarea, .modal')) return;
+    if (editDate || editLocation || e.target.closest?.('input, textarea, .modal')) return;
     if (e.key === 'Escape') onclose();
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
@@ -191,11 +197,18 @@
           <dd class="row">
             {#if detail.lat !== null}
               <a href={mapLink(detail)} target="_blank" rel="noopener">{detail.lat.toFixed(5)}, {detail.lon.toFixed(5)}</a>
-              {#if canEdit}
-                <button class="icon small" disabled={busy} onclick={removeLocation} title="Ort entfernen"><Icon name="close" size={18} /></button>
-              {/if}
             {:else}
               <span class="muted">Kein Aufnahmeort</span>
+            {/if}
+            {#if canEdit}
+              <span class="buttons">
+                <button class="icon small" disabled={busy} onclick={() => (editLocation = true)} title={detail.lat !== null ? 'Ort ändern' : 'Ort setzen'}>
+                  <Icon name="pencil" size={18} />
+                </button>
+                {#if detail.lat !== null}
+                  <button class="icon small" disabled={busy} onclick={removeLocation} title="Ort entfernen"><Icon name="close" size={18} /></button>
+                {/if}
+              </span>
             {/if}
           </dd>
 
@@ -250,6 +263,10 @@
     </aside>
   {/if}
 </div>
+
+{#if editLocation && detail}
+  <LocationDialog lat={detail.lat} lon={detail.lon} onsave={setLocation} oncancel={() => (editLocation = false)} />
+{/if}
 
 {#if editDate && detail}
   <DateDialog value={detail.taken_at} onsave={setDate} oncancel={() => (editDate = false)} />
@@ -398,6 +415,10 @@
     margin: 6px 0 0;
     line-height: 1.45;
     overflow-wrap: anywhere;
+  }
+  .buttons {
+    display: flex;
+    flex: none;
   }
   dd.row {
     display: flex;

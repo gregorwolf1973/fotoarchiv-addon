@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.03
+
+- Weltkarte (OpenStreetMap) mit gruppierten Fotos: Titelbild und Anzahl je Gruppe, Klick zoomt hinein oder öffnet die Fotos
+- Fenster „Ohne Ort“: Fotos einzeln oder als Auswahl auf die Karte ziehen (Maus sofort, Touch nach langem Drücken), mit Rückgängig
+- Ortssuche auf der Karte (OpenStreetMap Nominatim)
+- Einzelansicht: Ort setzen oder ändern über eine Karte mit verschiebbarer Stecknadel
+- Karte berücksichtigt die Suchfilter
+- API: `/api/geo`, Filter `located` und `editable`, Mehrfachaktion `location`
+
 ## 0.02
 
 - Suche nach Personen, Schlagworten, Zeitraum und Freitext

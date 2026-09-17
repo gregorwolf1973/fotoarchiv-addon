@@ -10,6 +10,7 @@
   import Icon from './components/Icon.svelte';
   import ImportPanel from './components/ImportPanel.svelte';
   import LabelDialog from './components/LabelDialog.svelte';
+  import MapView from './components/MapView.svelte';
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
   import Uploader from './components/Uploader.svelte';
@@ -23,9 +24,10 @@
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | trash
+  let view = $state('photos'); // photos | map | trash
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
+  let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
   let showImport = $state(false);
   let searchOpen = $state(false);
   let dialog = $state(null);
@@ -41,7 +43,10 @@
     !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
   );
   const indexById = $derived(new Map(items.map((item, i) => [item[0], i])));
-  const openIndex = $derived(openId === null ? -1 : (indexById.get(openId) ?? -1));
+  const viewerItems = $derived(
+    viewerIds ? viewerIds.map((id) => items[indexById.get(id)]).filter(Boolean) : items,
+  );
+  const openIndex = $derived(openId === null ? -1 : viewerItems.findIndex((item) => item[0] === openId));
   const missingTools = $derived(
     info
       ? Object.entries({ libvips: info.tools.vips, exiftool: info.tools.exiftool, ffmpeg: info.tools.ffmpeg })
@@ -128,6 +133,7 @@
   function setView(next) {
     view = next;
     openId = null;
+    viewerIds = null;
     searchOpen = false;
     selected.clear();
     kick();
@@ -168,9 +174,18 @@
   }
 
   const neighbour = (id) => {
-    const i = indexById.get(id);
-    return items[i + 1]?.[0] ?? items[i - 1]?.[0] ?? null;
+    const i = viewerItems.findIndex((item) => item[0] === id);
+    return viewerItems[i + 1]?.[0] ?? viewerItems[i - 1]?.[0] ?? null;
   };
+
+  function openViewer(ids, id) {
+    viewerIds = ids;
+    openId = id;
+  }
+  function closeViewer() {
+    openId = null;
+    viewerIds = null;
+  }
 
   async function deleteOne(id) {
     const next = neighbour(id);
@@ -241,7 +256,7 @@
   }
 
   function keydown(e) {
-    if (openIndex >= 0 || dialog || showImport || e.target.closest?.('input, textarea')) return;
+    if (openIndex >= 0 || dialog || showImport || view === 'map' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     else if (e.key === 'Delete' && selected.size) (trash ? confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
@@ -297,6 +312,10 @@
         <Icon name="images" size={26} />
         <h1>Fotoarchiv</h1>
       </div>
+      <nav class="views">
+        <button class:active={view === 'photos'} onclick={() => setView('photos')} title="Fotos"><Icon name="images" size={20} /><span class="label">Fotos</span></button>
+        <button class:active={view === 'map'} onclick={() => setView('map')} title="Karte"><Icon name="map" size={20} /><span class="label">Karte</span></button>
+      </nav>
       <div class="search-inline"><SearchBar {labels} {filters} onchange={setFilters} /></div>
       <span class="grow"></span>
       <div class="actions">
@@ -333,7 +352,9 @@
     </div>
   {/if}
 
-  {#if items.length}
+  {#if view === 'map'}
+    <MapView {filters} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
+  {:else if items.length}
     {#key listKey}
       <Gallery
         {items}
@@ -365,12 +386,12 @@
 
 {#if openIndex >= 0}
   <Viewer
-    {items}
+    items={viewerItems}
     index={openIndex}
     {trash}
     {labels}
-    onclose={() => (openId = null)}
-    onnavigate={(i) => (openId = items[i][0])}
+    onclose={closeViewer}
+    onnavigate={(i) => (openId = viewerItems[i][0])}
     onchanged={kick}
     ondelete={deleteOne}
     onrestore={restoreOne}
@@ -454,6 +475,26 @@
     font-weight: 500;
     color: var(--text);
     white-space: nowrap;
+  }
+  .views {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 20px;
+    background: var(--chip);
+  }
+  .views button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 17px;
+    background: transparent;
+    color: var(--muted);
+  }
+  .views button.active {
+    background: var(--surface);
+    color: var(--accent);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
   }
   .search-inline {
     flex: 1;
@@ -589,9 +630,14 @@
       display: none;
     }
   }
-  @media (max-width: 479px) {
+  @media (max-width: 1099px) {
     h1 {
       display: none;
+    }
+  }
+  @media (max-width: 479px) {
+    .views button {
+      padding: 0 8px;
     }
     .topbar {
       gap: 4px;

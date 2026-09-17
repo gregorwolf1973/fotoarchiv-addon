@@ -7,12 +7,12 @@ import shutil
 import threading
 import uuid
 from contextlib import asynccontextmanager
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 
 from . import config, labels, media
 from .db import Database
-from .editor import EditError, Editor, capabilities
+from .editor import WRITABLE, EditError, Editor, capabilities
 from .exiftool import ExifTool
 from .importer import Importer, safe_name
 from .tasks import TaskRunner
@@ -57,15 +57,62 @@ class RotateRequest(BaseModel):
 
 class BatchRequest(BaseModel):
     ids: list[int] = Field(min_length=1)
-    action: Literal["tags", "persons", "date", "rotate", "delete", "restore", "purge"]
+    action: Literal["tags", "persons", "date", "location", "rotate", "delete", "restore", "purge"]
     add: list[str] = []
     remove: list[str] = []
     taken_at: datetime | None = None
     degrees: Literal[90, 180, 270] | None = None
+    location: Location | None = None  # bei action=location: null entfernt den Ort
 
 
 def day_start(day: date) -> int:
     return calendar.timegm(day.timetuple())
+
+
+@dataclass
+class AssetFilter:
+    """Suchfilter aus der URL; alle Bedingungen gelten gemeinsam."""
+
+    tag: list[int] = Query([])
+    person: list[int] = Query([])
+    start: date | None = None
+    end: date | None = None
+    q: str = ""
+    trash: bool = False
+    located: bool | None = None   # nur mit / nur ohne Aufnahmeort
+    editable: bool | None = None  # nur Formate, die Metadaten speichern können
+
+    def clause(self) -> tuple[str, list]:
+        where = ["deleted_at IS NOT NULL" if self.trash else "deleted_at IS NULL"]
+        params: list = []
+        for ids, link, column in ((self.tag, "asset_tags", "tag_id"), (self.person, "asset_persons", "person_id")):
+            if ids:
+                unique = sorted(set(ids))
+                marks = ",".join("?" * len(unique))
+                where.append(f"(SELECT COUNT(*) FROM {link} l WHERE l.asset_id = a.id AND l.{column} IN ({marks})) = ?")
+                params += [*unique, len(unique)]
+        if self.start:
+            where.append("taken_ts >= ?")
+            params.append(day_start(self.start))
+        if self.end:
+            where.append("taken_ts < ?")
+            params.append(day_start(self.end + timedelta(days=1)))
+        for word in self.q.split():
+            where.append(
+                """(path LIKE ? OR camera LIKE ?
+                    OR EXISTS (SELECT 1 FROM asset_tags l JOIN tags t ON t.id = l.tag_id
+                               WHERE l.asset_id = a.id AND t.name LIKE ?)
+                    OR EXISTS (SELECT 1 FROM asset_persons l JOIN persons p ON p.id = l.person_id
+                               WHERE l.asset_id = a.id AND p.name LIKE ?))"""
+            )
+            params += [f"%{word}%"] * 4
+        if self.located is not None:
+            where.append("lat IS NOT NULL" if self.located else "lat IS NULL")
+        if self.editable is not None:
+            suffixes = " OR ".join("lower(path) LIKE ?" for _ in WRITABLE)
+            where.append(f"({suffixes})" if self.editable else f"NOT ({suffixes})")
+            params += [f"%{suffix}" for suffix in sorted(WRITABLE)]
+        return " AND ".join(where), params
 
 
 def create_app(settings: config.Settings | None = None) -> FastAPI:
@@ -154,49 +201,31 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
             },
         }
 
-    @app.get("/api/assets")
-    def asset_index(
-        tag: list[int] = Query([]),
-        person: list[int] = Query([]),
-        start: date | None = None,
-        end: date | None = None,
-        q: str = "",
-        trash: bool = False,
-    ):
-        """Kompakte Liste für Galerie und Zeitleiste, neueste zuerst. Filter werden UND-verknüpft."""
-        where = ["deleted_at IS NOT NULL" if trash else "deleted_at IS NULL"]
-        params: list = []
-        for ids, link, column in ((tag, "asset_tags", "tag_id"), (person, "asset_persons", "person_id")):
-            if ids:
-                marks = ",".join("?" * len(set(ids)))
-                where.append(f"(SELECT COUNT(*) FROM {link} l WHERE l.asset_id = a.id AND l.{column} IN ({marks})) = ?")
-                params += [*set(ids), len(set(ids))]
-        if start:
-            where.append("taken_ts >= ?")
-            params.append(day_start(start))
-        if end:
-            where.append("taken_ts < ?")
-            params.append(day_start(end + timedelta(days=1)))
-        for word in q.split():
-            like = f"%{word}%"
-            where.append(
-                """(path LIKE ? OR camera LIKE ?
-                    OR EXISTS (SELECT 1 FROM asset_tags l JOIN tags t ON t.id = l.tag_id
-                               WHERE l.asset_id = a.id AND t.name LIKE ?)
-                    OR EXISTS (SELECT 1 FROM asset_persons l JOIN persons p ON p.id = l.person_id
-                               WHERE l.asset_id = a.id AND p.name LIKE ?))"""
-            )
-            params += [like] * 4
-        rows = db.query(
-            f"""SELECT id, taken_ts, width, height, kind, rev FROM assets a
-                WHERE {' AND '.join(where)} ORDER BY taken_ts DESC, id DESC""",
+    INDEX_FIELDS = ["id", "ts", "w", "h", "video", "rev"]
+
+    def index_rows(filters: AssetFilter, extra: str = "", columns: str = ""):
+        where, params = filters.clause()
+        return db.query(
+            f"""SELECT id, taken_ts, width, height, kind, rev{columns} FROM assets a
+                WHERE {where}{extra} ORDER BY taken_ts DESC, id DESC""",
             params,
         )
-        items = [
-            [r["id"], r["taken_ts"], r["width"] or 0, r["height"] or 0, 1 if r["kind"] == "video" else 0, r["rev"]]
-            for r in rows
-        ]
-        return {"revision": db.revision, "fields": ["id", "ts", "w", "h", "video", "rev"], "items": items}
+
+    def index_item(r) -> list:
+        return [r["id"], r["taken_ts"], r["width"] or 0, r["height"] or 0, 1 if r["kind"] == "video" else 0, r["rev"]]
+
+    @app.get("/api/assets")
+    def asset_index(filters: AssetFilter = Depends()):
+        """Kompakte Liste für Galerie und Zeitleiste, neueste zuerst. Filter werden UND-verknüpft."""
+        items = [index_item(r) for r in index_rows(filters)]
+        return {"revision": db.revision, "fields": INDEX_FIELDS, "items": items}
+
+    @app.get("/api/geo")
+    def asset_geo(filters: AssetFilter = Depends()):
+        """Wie /api/assets, nur Bilder mit Ort und zusätzlich Breite/Länge."""
+        rows = index_rows(filters, " AND lat IS NOT NULL", ", lat, lon")
+        items = [index_item(r) + [r["lat"], r["lon"]] for r in rows]
+        return {"revision": db.revision, "fields": INDEX_FIELDS + ["lat", "lon"], "items": items}
 
     @app.get("/api/labels")
     def label_list():
@@ -297,6 +326,12 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
             if body.taken_at is None:
                 raise HTTPException(400, "Datum fehlt")
             label, action = f"Datum bei {count} Dateien setzen", lambda i: editor.set_date(i, body.taken_at)
+        elif body.action == "location":
+            if "location" not in body.model_fields_set:
+                raise HTTPException(400, "Ort fehlt")
+            loc = body.location
+            label = f"Ort bei {count} Dateien {'setzen' if loc else 'entfernen'}"
+            action = lambda i: editor.set_location(i, loc.lat if loc else None, loc.lon if loc else None)  # noqa: E731
         elif body.action == "rotate":
             if body.degrees is None:
                 raise HTTPException(400, "Drehung fehlt")

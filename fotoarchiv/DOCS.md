@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.02)
+## Funktionen (Version 0.03)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -17,9 +17,10 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum setzen, drehen und löschen für viele Dateien auf einmal.
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
+- **Weltkarte:** Fotos gruppiert nach Aufnahmeort. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
 - **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI und MTS.
 
-Geplant sind: Weltkarte mit Zuordnen des Aufnahmeorts per Drag & Drop und Gesichtserkennung.
+Geplant ist die Gesichtserkennung.
 
 ## Einrichtung
 
@@ -70,6 +71,17 @@ Jede Änderung wird **zuerst mit exiftool in die Datei geschrieben**. Danach lie
 - **Bearbeitbar** sind JPEG, PNG, WebP, TIFF, HEIC/HEIF, AVIF, MP4, MOV, M4V und 3GP. GIF, MKV, WebM, AVI und MTS können keine Metadaten speichern und werden nur angezeigt.
 - **HEIC/AVIF lassen sich nicht drehen.** Die Drehung steckt dort in einem Container-Feld, das exiftool nicht schreiben kann, und die EXIF-Orientierung wird von HEIC-Programmen ignoriert. Handyfotos sind in der Regel schon richtig gedreht.
 - Personen, die ein anderes Programm über **Gesichtsmarkierungen** zugeordnet hat, lassen sich hier nicht entfernen. Das kommt mit der Gesichtserkennung.
+
+## Karte
+
+Über **Karte** oben links wechselst du in die Kartenansicht. Die Suchfilter gelten auch dort, so lassen sich zum Beispiel alle Fotos einer Person auf der Karte anzeigen.
+
+- **Gruppen** zeigen das neueste Foto und die Anzahl. Ein Klick zoomt hinein. Liegen alle Fotos einer Gruppe am selben Punkt, öffnet der Klick sie direkt. Ein Klick auf ein einzelnes Foto öffnet die Einzelansicht mit allen Fotos im sichtbaren Kartenausschnitt.
+- **Ohne Ort** listet alle bearbeitbaren Fotos ohne Aufnahmeort. Antippen wählt Fotos aus. Ziehen legt ein Foto oder die ganze Auswahl an der Stelle ab, an der du loslässt. Mit der Maus beginnt das Ziehen sofort, am Handy nach kurzem langem Drücken. Der Ort wird im Hintergrund in die Dateien geschrieben und lässt sich über „Rückgängig“ wieder entfernen.
+- **Ortssuche** oben links springt zu einer Stadt oder Adresse, damit du Fotos genau ablegen kannst.
+- In der **Einzelansicht** lässt sich der Ort über das Stift-Symbol setzen oder korrigieren: in die Karte tippen oder die Stecknadel verschieben.
+
+Die Kartenkacheln kommen von **OpenStreetMap**, die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
 
 ## Papierkorb
 

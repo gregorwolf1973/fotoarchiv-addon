@@ -23,7 +23,7 @@ const send = (method, body) => ({
 });
 
 /** Filter -> Query-String; Listen werden als wiederholte Parameter übergeben. */
-export function filterQuery({ tags = [], persons = [], start = '', end = '', q = '' } = {}, trash = false) {
+export function filterQuery({ tags = [], persons = [], start = '', end = '', q = '' } = {}, trash = false, extra = {}) {
   const params = new URLSearchParams();
   for (const t of tags) params.append('tag', t.id);
   for (const p of persons) params.append('person', p.id);
@@ -31,12 +31,14 @@ export function filterQuery({ tags = [], persons = [], start = '', end = '', q =
   if (end) params.set('end', end);
   if (q) params.set('q', q);
   if (trash) params.set('trash', 'true');
+  for (const [key, value] of Object.entries(extra)) params.set(key, String(value));
   return params.toString();
 }
 
 export const api = {
   state: () => request('api/state'),
-  index: (filters, trash) => request(`api/assets?${filterQuery(filters, trash)}`),
+  index: (filters, trash, extra) => request(`api/assets?${filterQuery(filters, trash, extra)}`),
+  geo: (filters) => request(`api/geo?${filterQuery(filters)}`),
   labels: () => request('api/labels'),
   asset: (id) => request(`api/assets/${id}`),
   update: (id, changes) => request(`api/assets/${id}`, send('PATCH', changes)),

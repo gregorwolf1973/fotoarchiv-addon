@@ -194,3 +194,20 @@ label.field {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+/* Stecknadel auf Karten (Leaflet-Elemente liegen außerhalb der Komponenten) */
+.map-pin {
+  background: transparent;
+  border: 0;
+}
+
+.map-pin svg {
+  fill: var(--danger);
+  stroke: #fff;
+  stroke-width: 1px;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.4));
+}
+
+.leaflet-container {
+  font: inherit;
+}
