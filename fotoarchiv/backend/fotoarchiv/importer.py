@@ -1,0 +1,303 @@
+"""Import aus dem Samba-Ordner, per Upload oder durch Einlesen der vorhandenen Bibliothek."""
+
+import errno
+import json
+import logging
+import os
+import re
+import shutil
+import threading
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from . import media, metadata
+from .config import Settings
+from .db import Database
+from .exiftool import ExifTool
+
+log = logging.getLogger(__name__)
+
+DUPLICATE_DIR = "_duplikate"
+IGNORED_NAMES = {"@eaDir", "#recycle", "Thumbs.db", "desktop.ini"}
+REPORT_LIMIT = 500  # Einträge pro Liste im Bericht
+
+
+@dataclass
+class Result:
+    status: str                  # imported | duplicate | skipped | error
+    name: str
+    message: str = ""
+    asset_id: int | None = None
+    existing: str | None = None  # Pfad des bereits vorhandenen Bildes bei Duplikaten
+
+
+@dataclass
+class Job:
+    mode: str = ""               # import | library
+    running: bool = False
+    started_at: str | None = None
+    finished_at: str | None = None
+    total: int = 0
+    done: int = 0
+    current: str = ""
+    counts: dict = field(default_factory=lambda: {"imported": 0, "duplicate": 0, "skipped": 0, "error": 0})
+    duplicates: list = field(default_factory=list)
+    errors: list = field(default_factory=list)
+    skipped: list = field(default_factory=list)
+
+
+def safe_name(name: str) -> str:
+    name = Path(name.replace("\\", "/")).name
+    name = re.sub(r'[\x00-\x1f<>:"/\\|?*]', "_", name)
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    stem = stem.strip(" .")[:150] or "bild"
+    return f"{stem}.{ext.lower()}" if ext else stem
+
+
+def unique_path(path: Path) -> Path:
+    candidate, n = path, 1
+    while candidate.exists():
+        candidate = path.with_name(f"{path.stem}_{n}{path.suffix}")
+        n += 1
+    return candidate
+
+
+def move_file(source: Path, target: Path):
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.replace(source, target)
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+        shutil.move(source, target)  # anderes Dateisystem: kopieren und löschen
+
+
+def is_ignored(rel: Path) -> bool:
+    return any(part.startswith(".") or part in IGNORED_NAMES for part in rel.parts)
+
+
+def remove_empty_dirs(root: Path):
+    for directory in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
+        if directory.name == DUPLICATE_DIR:
+            continue
+        try:
+            directory.rmdir()  # klappt nur, wenn leer
+        except OSError:
+            pass
+
+
+class Importer:
+    def __init__(self, settings: Settings, db: Database, exiftool: ExifTool):
+        self.settings = settings
+        self.db = db
+        self.exiftool = exiftool
+        self.job = Job()
+        self._file_lock = threading.Lock()  # immer nur eine Datei gleichzeitig (Duplikatprüfung)
+        self._job_lock = threading.Lock()
+        self._report_path = settings.data / "letzter_import.json"
+        try:
+            self.job = Job(**json.loads(self._report_path.read_text(encoding="utf-8")))
+            self.job.running = False
+        except (FileNotFoundError, json.JSONDecodeError, TypeError):
+            pass
+
+    # ── einzelne Datei ─────────────────────────────────────────────
+    def import_file(self, source: Path, *, name: str | None = None, move: bool = True, mtime: float | None = None) -> Result:
+        """Datei prüfen, einsortieren und eintragen. move=False: Datei liegt schon in der Bibliothek."""
+        name = name or source.name
+        kind = media.kind_of(Path(name))
+        if kind is None:
+            return Result("skipped", name, "Dateityp wird nicht unterstützt")
+
+        with self._file_lock:
+            try:
+                stat = source.stat()
+                checksum = media.md5_file(source)
+            except OSError as exc:
+                return Result("error", name, f"Datei nicht lesbar: {exc}")
+
+            existing = self.db.one(
+                "SELECT id, path, deleted_at FROM assets WHERE md5 = ? OR md5_import = ? LIMIT 1",
+                (checksum, checksum),
+            )
+            if existing:
+                where = "im Papierkorb" if existing["deleted_at"] else "bereits im Archiv"
+                return Result("duplicate", name, where, existing["id"], existing["path"])
+
+            try:
+                raw = self.exiftool.read(source)
+            except Exception as exc:  # Metadaten sind nicht zwingend
+                log.warning("Metadaten von %s nicht lesbar: %s", name, exc)
+                raw = {}
+            meta = metadata.extract(raw, Path(name), self.settings.timezone, mtime or stat.st_mtime)
+
+            if move:
+                folder = self.settings.library / f"{meta.taken:%Y}" / f"{meta.taken:%m}"
+                target = unique_path(folder / safe_name(name))
+                try:
+                    move_file(source, target)
+                    if mtime:
+                        os.utime(target, (mtime, mtime))
+                except OSError as exc:
+                    return Result("error", name, f"Verschieben fehlgeschlagen: {exc}")
+            else:
+                target = source
+
+            rel = target.relative_to(self.settings.library).as_posix()
+            try:
+                asset_id = self._insert(rel, kind, stat.st_size, checksum, meta)
+            except Exception as exc:
+                if move:
+                    move_file(target, source)
+                log.exception("Eintragen von %s fehlgeschlagen", name)
+                return Result("error", name, f"Datenbankfehler: {exc}")
+
+        self.ensure_thumbnail(asset_id)
+        self.db.bump()
+        return Result("imported", name, rel, asset_id)
+
+    def _insert(self, rel: str, kind: str, size: int, checksum: str, meta: metadata.Metadata) -> int:
+        with self.db.transaction() as conn:
+            cur = conn.execute(
+                """INSERT INTO assets (path, kind, mime, size, md5, md5_import, taken_at, taken_ts,
+                       date_source, tz_offset, width, height, duration, lat, lon, camera, imported_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (rel, kind, meta.mime or media.mime_of(Path(rel)), size, checksum, checksum,
+                 meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
+                 meta.width, meta.height, meta.duration, meta.lat, meta.lon, meta.camera,
+                 datetime.now().isoformat(timespec="seconds")),
+            )
+            asset_id = cur.lastrowid
+            for table, link, column, names in (
+                ("tags", "asset_tags", "tag_id", meta.tags),
+                ("persons", "asset_persons", "person_id", meta.persons),
+            ):
+                for label in names:
+                    conn.execute(f"INSERT OR IGNORE INTO {table} (name) VALUES (?)", (label,))
+                    conn.execute(
+                        f"INSERT OR IGNORE INTO {link} (asset_id, {column}) SELECT ?, id FROM {table} WHERE name = ?",
+                        (asset_id, label),
+                    )
+        return asset_id
+
+    # ── Vorschaubilder ─────────────────────────────────────────────
+    def cache_file(self, asset_id: int, variant: str) -> Path:
+        return self.settings.cache / variant / f"{asset_id // 1000:04d}" / f"{asset_id}.webp"
+
+    def ensure_thumbnail(self, asset_id: int) -> Path | None:
+        row = self.db.one("SELECT path, kind, width, height, thumb_ok FROM assets WHERE id = ?", (asset_id,))
+        if row is None:
+            return None
+        target = self.cache_file(asset_id, "thumb")
+        if row["thumb_ok"] and target.exists():
+            return target
+        try:
+            tw, th = media.thumbnail(self.settings.library / row["path"], row["kind"], self.settings.ffmpeg, target)
+        except Exception as exc:
+            log.warning("Vorschaubild für %s fehlgeschlagen: %s", row["path"], exc)
+            return None
+        # Die Ausrichtung des Vorschaubilds ist maßgeblich, auch wenn die Metadaten etwas anderes sagen
+        w, h = row["width"] or tw, row["height"] or th
+        if (w > h) != (tw > th) and w != h and tw != th:
+            w, h = h, w
+        self.db.execute("UPDATE assets SET thumb_ok = 1, width = ?, height = ? WHERE id = ?", (w, h, asset_id))
+        return target
+
+    def ensure_preview(self, asset_id: int) -> Path | None:
+        row = self.db.one("SELECT path, kind FROM assets WHERE id = ?", (asset_id,))
+        if row is None:
+            return None
+        target = self.cache_file(asset_id, "preview")
+        if not target.exists():
+            try:
+                media.preview(self.settings.library / row["path"], row["kind"], self.settings.ffmpeg, target)
+            except Exception as exc:
+                log.warning("Großansicht für %s fehlgeschlagen: %s", row["path"], exc)
+                return None
+        return target
+
+    # ── Upload ─────────────────────────────────────────────────────
+    def import_upload(self, temp: Path, name: str, mtime: float | None) -> Result:
+        try:
+            return self.import_file(temp, name=name, mtime=mtime)
+        finally:
+            temp.unlink(missing_ok=True)  # Duplikate und Fehler nicht liegen lassen
+
+    # ── Hintergrund-Job ────────────────────────────────────────────
+    def start(self, mode: str) -> bool:
+        with self._job_lock:
+            if self.job.running:
+                return False
+            self.job = Job(mode=mode, running=True, started_at=datetime.now().isoformat(timespec="seconds"))
+        threading.Thread(target=self._run, args=(mode,), daemon=True, name=f"import-{mode}").start()
+        return True
+
+    def _scan(self, mode: str) -> list[Path]:
+        root = self.settings.import_dir if mode == "import" else self.settings.library
+        if not root.is_dir():
+            return []
+        known = set()
+        if mode == "library":
+            known = {row["path"] for row in self.db.query("SELECT path FROM assets")}
+        files = []
+        for path in root.rglob("*"):
+            rel = path.relative_to(root)
+            if is_ignored(rel) or (mode == "import" and rel.parts[0] == DUPLICATE_DIR):
+                continue
+            if path.is_file() and rel.as_posix() not in known:
+                files.append(path)
+        files.sort()
+        return files
+
+    def _record(self, result: Result, rel: str):
+        job = self.job
+        job.counts[result.status] += 1
+        bucket = {"duplicate": job.duplicates, "error": job.errors, "skipped": job.skipped}.get(result.status)
+        if bucket is not None and len(bucket) < REPORT_LIMIT:
+            entry = {"name": rel, "message": result.message}
+            if result.existing:
+                entry["existing"] = result.existing
+            bucket.append(entry)
+
+    def _run(self, mode: str):
+        job = self.job
+        try:
+            files = self._scan(mode)
+            sizes = {path: path.stat().st_size for path in files}
+            job.total = len(files)
+            root = self.settings.import_dir if mode == "import" else self.settings.library
+            for path in files:
+                rel = path.relative_to(root).as_posix()
+                job.current = rel
+                try:
+                    if not path.exists():
+                        result = Result("skipped", rel, "Datei ist verschwunden")
+                    elif path.stat().st_size != sizes[path]:
+                        result = Result("skipped", rel, "Datei wird noch kopiert")
+                    else:
+                        result = self.import_file(path, move=(mode == "import"))
+                    if result.status == "duplicate" and mode == "import":
+                        move_file(path, unique_path(root / DUPLICATE_DIR / rel))
+                except Exception as exc:
+                    log.exception("Import von %s fehlgeschlagen", rel)
+                    result = Result("error", rel, str(exc))
+                self._record(result, rel)
+                job.done += 1
+            if mode == "import":
+                remove_empty_dirs(root)
+        except Exception as exc:
+            log.exception("Import abgebrochen")
+            self._record(Result("error", "", f"Import abgebrochen: {exc}"), "")
+        finally:
+            job.current = ""
+            job.running = False
+            job.finished_at = datetime.now().isoformat(timespec="seconds")
+            self.db.bump()
+            try:
+                self._report_path.write_text(json.dumps(asdict(job), ensure_ascii=False), encoding="utf-8")
+            except OSError:
+                pass
+            log.info("Import (%s) fertig: %s", mode, job.counts)

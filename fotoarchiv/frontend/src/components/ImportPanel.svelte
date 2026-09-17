@@ -1,0 +1,267 @@
+<script>
+  import { api } from '../lib/api.js';
+  import { formatNumber } from '../lib/format.js';
+  import Icon from './Icon.svelte';
+
+  let { info, onclose, onchanged } = $props();
+
+  let job = $state(null);
+  let error = $state('');
+
+  const sambaPath = $derived.by(() => {
+    const m = /^\/(share|media)\/(.*)$/.exec(info.import_dir);
+    return m ? `\\\\homeassistant\\${m[1]}\\${m[2].replaceAll('/', '\\')}` : null;
+  });
+  const percent = $derived(job?.total ? Math.round((job.done / job.total) * 100) : 0);
+  const finished = $derived(job?.finished_at ? new Date(job.finished_at).toLocaleString('de-DE') : null);
+
+  async function refresh() {
+    const wasRunning = job?.running;
+    try {
+      job = await api.importStatus();
+      error = '';
+    } catch (e) {
+      error = e.message;
+    }
+    if (wasRunning && !job?.running) onchanged();
+  }
+
+  $effect(() => {
+    refresh();
+    const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  });
+
+  async function start(mode) {
+    try {
+      await api.startImport(mode);
+      await refresh();
+    } catch (e) {
+      error = e.message;
+    }
+  }
+
+  function copySambaPath() {
+    navigator.clipboard?.writeText(sambaPath);
+  }
+</script>
+
+<svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
+
+<div class="backdrop" onclick={(e) => e.target === e.currentTarget && onclose()} role="presentation">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="import-title">
+    <header>
+      <h2 id="import-title">Importieren</h2>
+      <button class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
+    </header>
+
+    <section>
+      <h3>Aus dem Import-Ordner</h3>
+      <p>
+        Fotos und Videos in diesen Ordner legen (Unterordner sind erlaubt) und dann den Import starten. Die Dateien
+        werden nach Aufnahmedatum in die Bibliothek verschoben.
+      </p>
+      <div class="path">
+        <code>{info.import_dir}</code>
+        {#if sambaPath}
+          <span class="muted">Samba:</span>
+          <code>{sambaPath}</code>
+          <button class="icon small" onclick={copySambaPath} title="Samba-Pfad kopieren"><Icon name="copy" size={16} /></button>
+        {/if}
+      </div>
+      <button class="primary" disabled={job?.running} onclick={() => start('import')}>
+        <Icon name="import" size={20} /> Import starten
+      </button>
+    </section>
+
+    <section>
+      <h3>Bibliothek einlesen</h3>
+      <p>
+        Nimmt Dateien auf, die schon in <code>{info.library}</code> liegen, ohne sie zu verschieben. Nützlich für eine
+        bestehende Sammlung.
+      </p>
+      <button disabled={job?.running} onclick={() => start('library')}>Bibliothek einlesen</button>
+    </section>
+
+    {#if error}<p class="error">{error}</p>{/if}
+
+    {#if job?.running}
+      <section class="progress">
+        <div class="bar"><div style:width="{percent}%"></div></div>
+        <div class="line">
+          <span>{formatNumber(job.done)} von {formatNumber(job.total)} Dateien</span>
+          <span>{percent} %</span>
+        </div>
+        {#if job.current}<div class="current muted">{job.current}</div>{/if}
+      </section>
+    {/if}
+
+    {#if job && (job.running || job.finished_at)}
+      <section class="report">
+        <h3>{job.running ? 'Bisher' : `Letzter Lauf · ${finished}`}</h3>
+        <div class="counts">
+          <span class="count ok">{formatNumber(job.counts.imported)} neu</span>
+          <span class="count warn">{formatNumber(job.counts.duplicate)} Duplikate</span>
+          <span class="count">{formatNumber(job.counts.skipped)} übersprungen</span>
+          <span class="count bad">{formatNumber(job.counts.error)} Fehler</span>
+        </div>
+        {#if job.duplicates.length}
+          <details>
+            <summary>Duplikate</summary>
+            {#if job.mode === 'import'}
+              <p class="muted">Verschoben nach <code>_duplikate</code> im Import-Ordner. Dort prüfen und löschen.</p>
+            {/if}
+            <ul>
+              {#each job.duplicates as entry}
+                <li><span>{entry.name}</span> <span class="muted">= {entry.existing} ({entry.message})</span></li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
+        {#if job.errors.length}
+          <details open>
+            <summary>Fehler</summary>
+            <ul>
+              {#each job.errors as entry}<li><span>{entry.name}</span> <span class="error">{entry.message}</span></li>{/each}
+            </ul>
+          </details>
+        {/if}
+        {#if job.skipped.length}
+          <details>
+            <summary>Übersprungen</summary>
+            <ul>
+              {#each job.skipped as entry}<li><span>{entry.name}</span> <span class="muted">{entry.message}</span></li>{/each}
+            </ul>
+          </details>
+        {/if}
+      </section>
+    {/if}
+  </div>
+</div>
+
+<style>
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgb(0 0 0 / 0.5);
+  }
+  .panel {
+    width: min(640px, 100%);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 8px 24px 24px;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  h2 {
+    font-size: 1.3rem;
+    font-weight: 500;
+  }
+  h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+  section {
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+  }
+  p {
+    margin: 0 0 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .path {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin-bottom: 14px;
+  }
+  code {
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--chip);
+    overflow-wrap: anywhere;
+  }
+  .progress .bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--chip);
+    overflow: hidden;
+  }
+  .progress .bar div {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+  .line {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .current {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .count {
+    padding: 4px 12px;
+    border-radius: 14px;
+    background: var(--chip);
+    font-size: 0.9rem;
+  }
+  .count.ok {
+    color: var(--success);
+  }
+  .count.warn {
+    color: var(--warning);
+  }
+  .count.bad {
+    color: var(--danger);
+  }
+  details {
+    margin-top: 10px;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 500;
+  }
+  ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .error {
+    color: var(--danger);
+  }
+</style>

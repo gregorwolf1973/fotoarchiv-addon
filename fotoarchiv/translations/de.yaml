@@ -1,0 +1,11 @@
+configuration:
+  library_folder:
+    name: Bibliothek
+    description: >-
+      Ordner, in dem das Archiv liegt. Neue Dateien werden nach Aufnahmedatum in Unterordner JJJJ/MM einsortiert.
+      Muss unter /media oder /share liegen.
+  import_folder:
+    name: Import-Ordner
+    description: >-
+      Eingangsordner, z. B. per Samba als \\homeassistant\share\fotoarchiv-import erreichbar.
+      Nach dem Import sind die Dateien von hier in die Bibliothek verschoben.

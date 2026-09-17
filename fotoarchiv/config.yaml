@@ -1,0 +1,30 @@
+name: "Fotoarchiv"
+description: "Foto- und Video-Datenbank mit Zeitleiste, Duplikaterkennung und Samba-Import"
+version: "0.01"
+url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
+slug: "fotoarchiv"
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8300
+ingress_stream: true
+panel_icon: "mdi:image-multiple"
+panel_title: "Fotoarchiv"
+map:
+  - type: share
+    read_only: false
+  - type: media
+    read_only: false
+options:
+  library_folder: "/media/fotoarchiv"
+  import_folder: "/share/fotoarchiv-import"
+schema:
+  library_folder: str
+  import_folder: str
+# Vorschaubilder lassen sich jederzeit neu erzeugen und würden Backups aufblähen
+backup_exclude:
+  - "cache"
+  - "cache/*"

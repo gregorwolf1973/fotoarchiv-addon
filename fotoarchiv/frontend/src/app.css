@@ -1,0 +1,109 @@
+:root {
+  color-scheme: light;
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --text: #212121;
+  --text-secondary: #424242;
+  --muted: #727272;
+  --border: #e0e0e0;
+  --chip: #eeeeee;
+  --placeholder: #e8e8e8;
+  --timeline-bg: rgb(250 250 250 / 0.92);
+  --accent: #03a9f4; /* Home-Assistant-Blau */
+  --on-accent: #ffffff;
+  --success: #2e7d32;
+  --warning: #b26a00;
+  --warning-bg: #fff3cd;
+  --danger: #c62828;
+  --danger-bg: #fde0e0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #111111;
+    --surface: #1c1c1c;
+    --text: #e1e1e1;
+    --text-secondary: #c4c4c4;
+    --muted: #9b9b9b;
+    --border: #2f2f2f;
+    --chip: #2c2c2c;
+    --placeholder: #262626;
+    --timeline-bg: rgb(17 17 17 / 0.92);
+    --accent: #29b6f6;
+    --on-accent: #0b1d26;
+    --success: #81c784;
+    --warning: #ffb74d;
+    --warning-bg: #3d2e10;
+    --danger: #ef9a9a;
+    --danger-bg: #3d1a1a;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--chip);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+button.icon {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+button.icon.small {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -1,0 +1,11 @@
+configuration:
+  library_folder:
+    name: Library
+    description: >-
+      Folder holding the archive. New files are sorted into YYYY/MM subfolders by capture date.
+      Must be below /media or /share.
+  import_folder:
+    name: Import folder
+    description: >-
+      Inbox folder, e.g. reachable via Samba as \\homeassistant\share\fotoarchiv-import.
+      Imported files are moved from here into the library.

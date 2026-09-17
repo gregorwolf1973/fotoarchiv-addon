@@ -1,0 +1,28 @@
+<script>
+  // Material Design Icons (Apache 2.0), passend zu Home Assistant
+  const PATHS = {
+    upload: 'M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z',
+    import: 'M20,6H12L10,4H4A2,2 0 0,0 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8A2,2 0 0,0 20,6M11,17V14H7V12H11V9L16,13.5L11,17Z',
+    close: 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
+    left: 'M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z',
+    right: 'M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z',
+    info: 'M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z',
+    download: 'M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z',
+    play: 'M8,5.14V19.14L19,12.14L8,5.14Z',
+    check: 'M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z',
+    copy: 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
+    alert: 'M13,14H11V9H13M13,18H11V16H13M1,21H23L12,2L1,21Z',
+    images: 'M22,16V4A2,2 0 0,0 20,2H8A2,2 0 0,0 6,4V16A2,2 0 0,0 8,18H20A2,2 0 0,0 22,16M11,12L13.03,14.71L16,11L20,16H8M2,6V20A2,2 0 0,0 4,22H18V20H4V6',
+  };
+  let { name, size = 24 } = $props();
+</script>
+
+<svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true"><path d={PATHS[name]} /></svg>
+
+<style>
+  svg {
+    fill: currentColor;
+    flex: none;
+    display: block;
+  }
+</style>
