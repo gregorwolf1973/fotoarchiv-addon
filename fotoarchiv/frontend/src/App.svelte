@@ -12,6 +12,7 @@
   import ImportPanel from './components/ImportPanel.svelte';
   import LabelDialog from './components/LabelDialog.svelte';
   import MapView from './components/MapView.svelte';
+  import PeopleView from './components/PeopleView.svelte';
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
   import Uploader from './components/Uploader.svelte';
@@ -26,7 +27,7 @@
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | map | trash
+  let view = $state('photos'); // photos | map | people | trash
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
@@ -200,6 +201,12 @@
     return viewerItems[i + 1]?.[0] ?? viewerItems[i - 1]?.[0] ?? null;
   };
 
+  function trackTask(task) {
+    pending.set(task.id, {});
+    tasks = [...tasks, task];
+    kick();
+  }
+
   function openViewer(ids, id) {
     viewerIds = ids;
     openId = id;
@@ -278,7 +285,7 @@
   }
 
   function keydown(e) {
-    if (openIndex >= 0 || dialog || showImport || view === 'map' || e.target.closest?.('input, textarea')) return;
+    if (openIndex >= 0 || dialog || showImport || view === 'map' || view === 'people' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     else if (e.key === 'Delete' && selected.size) (trash ? confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
@@ -337,6 +344,7 @@
       <nav class="views">
         <button class:active={view === 'photos'} onclick={() => setView('photos')} title="Fotos"><Icon name="images" size={20} /><span class="label">Fotos</span></button>
         <button class:active={view === 'map'} onclick={() => setView('map')} title="Karte"><Icon name="map" size={20} /><span class="label">Karte</span></button>
+        <button class:active={view === 'people'} onclick={() => setView('people')} title="Personen"><Icon name="person" size={20} /><span class="label">Personen</span></button>
       </nav>
       <div class="search-inline"><SearchBar {labels} {filters} onchange={setFilters} /></div>
       <span class="grow"></span>
@@ -367,14 +375,24 @@
   {#if missingTools.length}
     <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
   {/if}
-  {#if filtered}
+  {#if filtered && view !== 'people'}
     <div class="resultbar">
       <span>{formatNumber(items.length)} Treffer</span>
       <button class="link" onclick={() => setFilters(NO_FILTERS)}>Filter zurücksetzen</button>
     </div>
   {/if}
 
-  {#if view === 'map'}
+  {#if view === 'people'}
+    <PeopleView
+      revision={info?.revision}
+      onchanged={kick}
+      ontask={trackTask}
+      onshowphotos={(person) => {
+        setView('photos');
+        setFilters({ ...NO_FILTERS, persons: [{ id: person.id, name: person.name }] });
+      }}
+    />
+  {:else if view === 'map'}
     <MapView {filters} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
   {:else if items.length}
     {#key listKey}
@@ -428,11 +446,7 @@
     {info}
     onclose={() => (showImport = false)}
     onchanged={kick}
-    ontask={(task) => {
-      pending.set(task.id, {});
-      tasks = [...tasks, task];
-      kick();
-    }}
+    ontask={trackTask}
   />
 {/if}
 

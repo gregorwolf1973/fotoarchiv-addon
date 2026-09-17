@@ -19,10 +19,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import config, labels, media
+from . import config, faces_api, labels, media
 from .db import Database
 from .editor import WRITABLE, EditError, Editor, capabilities
 from .exiftool import ExifTool
+from .faces import FaceService
 from .importer import Importer, safe_name
 from .tasks import TaskRunner
 
@@ -122,6 +123,7 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
     importer = Importer(settings, db, exiftool)
     editor = Editor(settings, db, exiftool, importer)
     tasks = TaskRunner(on_progress=db.bump)
+    faces = FaceService(settings, db, editor, enabled=settings.face_recognition)
     stop = threading.Event()
 
     def purge_loop():
@@ -143,7 +145,9 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
         log.info("Bibliothek: %s | Import: %s | Papierkorb: %d Tage",
                  settings.library, settings.import_dir, settings.trash_days)
         threading.Thread(target=purge_loop, daemon=True, name="purge").start()
+        faces.start()
         yield
+        faces.stop()
         stop.set()
         exiftool.close()
         db.close()
@@ -153,7 +157,7 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
     binary_types = ("image/webp", *media.IMAGE_TYPES.values(), *media.VIDEO_TYPES.values())
     app.add_middleware(GZipMiddleware, minimum_size=1024, exclude_content_types=tuple(set(binary_types)))
     app.state.settings, app.state.db, app.state.importer = settings, db, importer
-    app.state.editor, app.state.tasks = editor, tasks
+    app.state.editor, app.state.tasks, app.state.faces = editor, tasks, faces
 
     @app.middleware("http")
     async def ingress_only(request: Request, call_next):
@@ -194,6 +198,7 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
             "trash_days": settings.trash_days,
             "importing": importer.job.running,
             "tasks_running": any(task.running for task in tasks.list()),
+            "faces": {"enabled": faces.enabled, "status": faces.state["status"]},
             "tools": {
                 "vips": media.pyvips is not None,
                 "exiftool": shutil.which(settings.exiftool) is not None,
@@ -375,7 +380,7 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
 
     @app.post("/api/import")
     def import_start(body: ImportRequest):
-        if not importer.start(body.mode):
+        if not importer.start(body.mode, on_done=faces.wake):
             raise HTTPException(409, "Es läuft bereits ein Import")
         return {"started": True}
 
@@ -396,8 +401,11 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
         # Browser liefern lastModified in Millisekunden
         seconds = mtime / 1000 if mtime and mtime > 1e11 else mtime
         result = await run_in_threadpool(importer.import_upload, temp, name, seconds)
+        faces.wake()
         status = 500 if result.status == "error" else 200
         return JSONResponse(result.__dict__, status_code=status)
+
+    faces_api.register(app, db, faces, tasks)
 
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -9,6 +9,12 @@ configuration:
     description: >-
       Eingangsordner, z. B. per Samba als \\homeassistant\share\fotoarchiv-import erreichbar.
       Nach dem Import sind die Dateien von hier in die Bibliothek verschoben.
+  face_recognition:
+    name: Gesichtserkennung
+    description: >-
+      Fotos im Hintergrund nach Gesichtern durchsuchen und ähnliche Gesichter gruppieren. Lädt beim ersten Start
+      die InsightFace-Modelle (ca. 280 MB, nur nicht-kommerzielle Nutzung) herunter. Auf dem Raspberry Pi 5 etwa
+      1 Sekunde pro Foto.
   trash_days:
     name: Papierkorb (Tage)
     description: Gelöschte Dateien bleiben so viele Tage im Papierkorb und werden danach endgültig vom Datenträger gelöscht.

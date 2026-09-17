@@ -16,6 +16,7 @@ class Settings:
     exiftool: str
     ffmpeg: str
     trash_days: int = 30
+    face_recognition: bool = True
     dev: bool = False  # erlaubt Zugriffe außerhalb von Ingress
 
     @property
@@ -50,5 +51,7 @@ def load() -> Settings:
         exiftool=os.environ.get("FOTOARCHIV_EXIFTOOL") or shutil.which("exiftool") or "exiftool",
         ffmpeg=os.environ.get("FOTOARCHIV_FFMPEG") or shutil.which("ffmpeg") or "ffmpeg",
         trash_days=int(pick("FOTOARCHIV_TRASH_DAYS", "trash_days", "30")),
+        face_recognition=str(os.environ.get("FOTOARCHIV_FACES", options.get("face_recognition", True))).lower()
+        not in ("false", "0", "no"),
         dev=os.environ.get("FOTOARCHIV_DEV") == "1",
     )

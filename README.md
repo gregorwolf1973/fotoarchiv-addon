@@ -18,10 +18,10 @@ Foto- und Video-Datenbank für Home Assistant, gebaut für Zehntausende Bilder a
 - **Bearbeiten direkt in der Datei:** Datum, Personen, Schlagworte, Ort und Drehen, auch für viele Fotos auf einmal.
 - **Papierkorb** mit Wiederherstellen und automatischem Leeren.
 - **Weltkarte** mit gruppierten Fotos. Fotos ohne Ort zieht man einfach auf die Karte.
+- **Gesichtserkennung** lokal auf dem Pi. Gruppen benennen, die Namen landen in den Dateien, neue Fotos werden automatisch erkannt.
 - **Fotos und Videos:** JPEG, HEIC, PNG, WebP, AVIF, MP4, MOV und mehr.
 - **Ohne Sonderformat:** Die Bilder bleiben normale Dateien, die Datenbank ist nur ein Index.
 
-**In Arbeit:** Gesichtserkennung.
 
 ### Installation
 
@@ -35,6 +35,6 @@ Details stehen in der [Dokumentation](fotoarchiv/DOCS.md).
 
 ## 🇬🇧 English
 
-Photo and video library for Home Assistant: Samba inbox import, drag & drop upload, MD5 duplicate detection, date-sorted storage (`YYYY/MM`), justified gallery with a draggable year timeline, search by people/tags/date, editing that writes straight into the files (exiftool), bulk actions, a trash and a world map where photos without location can be dragged onto the map. HEIC and video support. Files stay plain files; the database is only an index.
+Photo and video library for Home Assistant: Samba inbox import, drag & drop upload, MD5 duplicate detection, date-sorted storage (`YYYY/MM`), justified gallery with a draggable year timeline, search by people/tags/date, editing that writes straight into the files (exiftool), bulk actions, a trash, a world map where photos without location can be dragged onto the map, and local face recognition (InsightFace) whose names are written into the files. HEIC and video support. Files stay plain files; the database is only an index.
 
 Install by adding `https://github.com/gregorwolf1973/fotoarchiv-addon` as an add-on repository.

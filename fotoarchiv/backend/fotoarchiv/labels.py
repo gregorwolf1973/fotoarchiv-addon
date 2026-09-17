@@ -43,5 +43,9 @@ def current(conn, asset_id: int, kind: str) -> list[str]:
 
 
 def remove_unused(conn: sqlite3.Connection):
-    for table, link, column in TABLES.values():
-        conn.execute(f"DELETE FROM {table} WHERE id NOT IN (SELECT {column} FROM {link})")
+    conn.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM asset_tags)")
+    # Personen mit Gesichtergruppe bleiben, auch wenn gerade kein Foto ihren Namen trägt
+    conn.execute(
+        """DELETE FROM persons WHERE id NOT IN (SELECT person_id FROM asset_persons)
+           AND id NOT IN (SELECT person_id FROM face_groups WHERE person_id IS NOT NULL)"""
+    )

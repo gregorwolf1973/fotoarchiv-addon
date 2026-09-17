@@ -32,6 +32,7 @@ def settings(tmp_path) -> Settings:
         timezone="Europe/Berlin",
         exiftool=EXIFTOOL,
         ffmpeg=FFMPEG or "ffmpeg",
+        face_recognition=False,  # eigene Tests mit echten Modellen: test_faces.py
         dev=True,
     )
 

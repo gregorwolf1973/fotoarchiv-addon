@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
-description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Suche, Bearbeiten direkt in der Datei, Papierkorb"
-version: "0.06"
+description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Gesichtserkennung, Suche, Bearbeiten direkt in der Datei"
+version: "0.07"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:
@@ -22,11 +22,15 @@ options:
   library_folder: "/media/fotoarchiv"
   import_folder: "/share/fotoarchiv-import"
   trash_days: 30
+  face_recognition: true
 schema:
   library_folder: str
   import_folder: str
   trash_days: int(1,365)
-# Vorschaubilder lassen sich jederzeit neu erzeugen und würden Backups aufblähen
+  face_recognition: bool
+# Vorschaubilder und Erkennungsmodelle lassen sich jederzeit neu erzeugen bzw. laden und würden Backups aufblähen
 backup_exclude:
   - "cache"
   - "cache/*"
+  - "models"
+  - "models/*"

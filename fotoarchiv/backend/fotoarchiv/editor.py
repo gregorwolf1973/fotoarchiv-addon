@@ -73,6 +73,15 @@ class Editor:
         self.exiftool = exiftool
         self.importer = importer
         self._lock = threading.RLock()  # immer nur eine Änderung gleichzeitig
+        # Rückmeldungen an andere Teile (Gesichtserkennung): Ereignis -> Funktionen(asset_id)
+        self.hooks: dict[str, list] = {"purge": [], "rotate": [], "persons": []}
+
+    def _emit(self, event: str, asset_id: int):
+        for hook in self.hooks[event]:
+            try:
+                hook(asset_id)
+            except Exception:
+                log.exception("Rückmeldung %s für %s fehlgeschlagen", event, asset_id)
 
     # ── Hilfen ─────────────────────────────────────────────────────
     def _asset(self, asset_id: int, deleted: bool = False):
@@ -206,6 +215,7 @@ class Editor:
             meta = self._refresh(asset_id)
             self.db.bump()
             if kind == "persons":
+                self._emit("persons", asset_id)
                 # Namen aus Gesichtsmarkierungen anderer Programme lassen sich hier nicht entfernen
                 leftover = {p.casefold() for p in meta.persons} - {n.casefold() for n in names}
                 if leftover:
@@ -236,6 +246,7 @@ class Editor:
             else:
                 self._write(path, f"-Orientation#={rotated_orientation(raw.get('IFD0:Orientation'), degrees)}")
             self._refresh(asset_id, new_thumbnail=True)
+            self._emit("rotate", asset_id)
             self.db.bump()
 
     # ── Papierkorb ─────────────────────────────────────────────────
@@ -276,6 +287,7 @@ class Editor:
             path = self.settings.library / row["path"]
             path.unlink(missing_ok=True)
             _prune_empty_dirs(path.parent, self.settings.library / TRASH_DIR)
+            self._emit("purge", asset_id)
             self.importer.drop_cache(asset_id)
             with self.db.transaction() as conn:
                 conn.execute("DELETE FROM assets WHERE id = ?", (asset_id,))
@@ -290,6 +302,7 @@ class Editor:
                 return
             if (self.settings.library / row["path"]).exists():
                 raise EditError("Die Datei ist wieder vorhanden und bleibt im Archiv")
+            self._emit("purge", asset_id)
             self.importer.drop_cache(asset_id)
             with self.db.transaction() as conn:
                 conn.execute("DELETE FROM assets WHERE id = ?", (asset_id,))

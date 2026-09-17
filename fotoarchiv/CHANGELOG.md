@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.07
+
+- Gesichtserkennung (InsightFace buffalo_l: SCRFD + ArcFace über onnxruntime), läuft im Hintergrund, neueste Fotos zuerst
+- Neue Ansicht „Personen“: bekannte Personen und Gruppen unbekannter Gesichter, Fortschrittsanzeige
+- Gruppe benennen (einzelne falsche Gesichter vorher abwählbar) oder ausblenden; gleicher Name führt zusammen
+- Namen werden als Person in die Fotos geschrieben (XMP PersonInImage), auch automatisch erkannte
+- Neue Fotos derselben Person werden automatisch zugeordnet; nach dem Benennen lernt das System passende Gruppen dazu
+- Person umbenennen (schreibt in alle Fotos), Gesicht lösen („nicht diese Person“, wird nicht wieder vorgeschlagen)
+- Einzelansicht: Gesichtsrahmen (Taste f) mit Benennen direkt am Gesicht
+- Vorhandene Personen aus den Metadaten werden verknüpft, wenn ein Foto genau ein Gesicht und eine Person hat
+- Option `face_recognition` zum Abschalten; Modelle (ca. 280 MB) werden beim ersten Start geladen und per SHA-256 geprüft
+
 ## 0.06
 
 - Galerie zoomen: 5 Stufen (Zeilenhöhe 80–300 px) über Plus/Minus unten links, Strg + Mausrad, Touchpad-Geste oder Zusammenziehen mit zwei Fingern

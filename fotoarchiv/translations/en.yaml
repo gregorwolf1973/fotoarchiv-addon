@@ -9,6 +9,11 @@ configuration:
     description: >-
       Inbox folder, e.g. reachable via Samba as \\homeassistant\share\fotoarchiv-import.
       Imported files are moved from here into the library.
+  face_recognition:
+    name: Face recognition
+    description: >-
+      Scan photos for faces in the background and group similar faces. Downloads the InsightFace models
+      (about 280 MB, non-commercial use only) on first start. About 1 second per photo on a Raspberry Pi 5.
   trash_days:
     name: Trash (days)
     description: Deleted files stay in the trash for this many days before they are permanently removed from disk.

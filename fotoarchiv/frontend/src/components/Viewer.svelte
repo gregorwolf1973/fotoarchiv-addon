@@ -4,6 +4,7 @@
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import ChipInput from './ChipInput.svelte';
   import DateDialog from './DateDialog.svelte';
+  import FaceBoxes from './FaceBoxes.svelte';
   import LocationDialog from './LocationDialog.svelte';
   import Icon from './Icon.svelte';
 
@@ -17,6 +18,19 @@
   let editDate = $state(false);
   let editLocation = $state(false);
   let loadedKey = $state(null); // Großansicht geladen: Platzhalter ausblenden
+  let showFaces = $state(false);
+  let stageWidth = $state(0);
+  let stageHeight = $state(0);
+  let natural = $state({ width: 0, height: 0 });
+
+  // Fläche, die das Bild bei object-fit: contain tatsächlich einnimmt
+  const frame = $derived.by(() => {
+    if (!natural.width || !stageWidth) return null;
+    const scale = Math.min(stageWidth / natural.width, stageHeight / natural.height);
+    const width = natural.width * scale;
+    const height = natural.height * scale;
+    return { left: (stageWidth - width) / 2, top: (stageHeight - height) / 2, width, height };
+  });
 
   const item = $derived(items[index]);
   const itemId = $derived(item?.[0]);
@@ -107,6 +121,7 @@
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'i') toggleInfo();
+    else if (e.key === 'f' && !isVideo && !trash) showFaces = !showFaces;
     else if (e.key === 'Delete' && !trash) ondelete(itemId);
     else return;
     e.preventDefault();
@@ -129,16 +144,36 @@
 <svelte:window onkeydown={keydown} />
 
 <div class="viewer" role="dialog" aria-modal="true" aria-label="Einzelansicht">
-  <div class="stage" onpointerdown={pointerdown} onpointerup={pointerup} role="presentation">
+  <div class="stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight} onpointerdown={pointerdown} onpointerup={pointerup} role="presentation">
     {#key key}
       {#if isVideo}
         <!-- svelte-ignore a11y_media_has_caption -->
         <video src={originalUrl(item)} poster={previewUrl(item)} controls autoplay playsinline></video>
       {:else}
         {#if loadedKey !== key}<img class="placeholder" src={thumbUrl(item)} alt="" />{/if}
-        <img class="photo" src={previewUrl(item)} alt={detail?.name ?? ''} onload={() => (loadedKey = key)} />
+        <img
+          class="photo"
+          src={previewUrl(item)}
+          alt={detail?.name ?? ''}
+          onload={(e) => {
+            loadedKey = key;
+            natural = { width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight };
+          }}
+        />
       {/if}
     {/key}
+    {#if showFaces && !isVideo && frame && loadedKey === key}
+      <FaceBoxes
+        assetId={itemId}
+        revision={item[5]}
+        {frame}
+        persons={labels.persons}
+        onchanged={async () => {
+          detail = await api.asset(itemId).catch(() => detail);
+          onchanged();
+        }}
+      />
+    {/if}
 
     <div class="toolbar">
       <button class="round" onclick={onclose} title="Schließen (Esc)"><Icon name="close" /></button>
@@ -151,6 +186,9 @@
         {#if detail?.rotatable}
           <button class="round" disabled={busy} onclick={() => rotate(270)} title="Nach links drehen"><Icon name="rotate" /></button>
           <button class="round" disabled={busy} onclick={() => rotate(90)} title="Nach rechts drehen"><Icon name="rotate" flip /></button>
+        {/if}
+        {#if !isVideo}
+          <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title="Gesichter zeigen (f)"><Icon name="face" /></button>
         {/if}
         <a class="round" href={originalUrl(item, true)} title="Original herunterladen"><Icon name="download" /></a>
         <button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>

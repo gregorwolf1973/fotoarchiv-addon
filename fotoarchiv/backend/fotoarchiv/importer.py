@@ -282,12 +282,18 @@ class Importer:
             temp.unlink(missing_ok=True)  # Duplikate und Fehler nicht liegen lassen
 
     # ── Hintergrund-Job ────────────────────────────────────────────
-    def start(self, mode: str) -> bool:
+    def start(self, mode: str, on_done=None) -> bool:
         with self._job_lock:
             if self.job.running:
                 return False
             self.job = Job(mode=mode, running=True, started_at=datetime.now().isoformat(timespec="seconds"))
-        threading.Thread(target=self._run, args=(mode,), daemon=True, name=f"import-{mode}").start()
+
+        def run():
+            self._run(mode)
+            if on_done:
+                on_done()
+
+        threading.Thread(target=run, daemon=True, name=f"import-{mode}").start()
         return True
 
     def _scan(self, mode: str) -> list[Path]:

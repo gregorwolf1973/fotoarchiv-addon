@@ -15,7 +15,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # libvips + HEIC-Decoder, exiftool zum Lesen/Schreiben der Metadaten,
-# jpegtran für verlustfreies Drehen, ffmpeg für Video-Vorschaubilder
+# jpegtran für verlustfreies Drehen, ffmpeg für Video-Vorschaubilder, libgomp für onnxruntime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libvips42t64 \
@@ -24,6 +24,7 @@ RUN apt-get update \
         libjpeg-turbo-progs \
         ffmpeg \
         tzdata \
+        libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

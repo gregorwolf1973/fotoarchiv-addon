@@ -63,6 +63,35 @@ MIGRATIONS = [
     ALTER TABLE assets ADD COLUMN orig_path TEXT;  -- Pfad vor dem Verschieben in den Papierkorb
     CREATE INDEX assets_deleted ON assets (deleted_at);
     """,
+    """
+    ALTER TABLE assets ADD COLUMN faces_scanned INTEGER NOT NULL DEFAULT 0;  -- 0 offen, 1 fertig, -1 Fehler
+    ALTER TABLE assets ADD COLUMN persons_dirty INTEGER NOT NULL DEFAULT 0;  -- Namen aus Gesichtern noch in Datei schreiben
+    CREATE INDEX assets_faces_pending ON assets (faces_scanned, deleted_at);
+    CREATE INDEX assets_persons_dirty ON assets (persons_dirty);
+
+    -- Gruppe ähnlicher Gesichter: entweder einer Person zugeordnet oder (noch) unbenannt
+    CREATE TABLE face_groups (
+        id        INTEGER PRIMARY KEY,
+        person_id INTEGER REFERENCES persons (id) ON DELETE SET NULL,
+        vec_sum   BLOB NOT NULL,              -- Summe der Merkmalsvektoren (float32)
+        count     INTEGER NOT NULL DEFAULT 0,
+        hidden    INTEGER NOT NULL DEFAULT 0  -- "unbekannt, nicht mehr zeigen"
+    );
+    CREATE INDEX face_groups_person ON face_groups (person_id);
+
+    CREATE TABLE faces (
+        id             INTEGER PRIMARY KEY,
+        asset_id       INTEGER NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
+        x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL,  -- 0..1, wie angezeigt
+        score          REAL NOT NULL,
+        embedding      BLOB NOT NULL,          -- 512 × float32, Länge 1
+        group_id       INTEGER REFERENCES face_groups (id) ON DELETE SET NULL,
+        confirmed      INTEGER NOT NULL DEFAULT 0,  -- 1 = vom Nutzer bestätigt
+        rejected_group INTEGER                 -- "gehört nicht zu dieser Gruppe"
+    );
+    CREATE INDEX faces_asset ON faces (asset_id);
+    CREATE INDEX faces_group ON faces (group_id);
+    """,
 ]
 
 

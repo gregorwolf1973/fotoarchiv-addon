@@ -49,11 +49,22 @@ export const api = {
   tasks: () => request('api/tasks'),
   emptyTrash: () => request('api/trash/empty', { method: 'POST' }),
   removeMissing: () => request('api/library/remove-missing', { method: 'POST' }),
+  faceStatus: () => request('api/faces/status'),
+  people: () => request('api/people'),
+  groupFaces: (id) => request(`api/groups/${id}/faces`),
+  nameGroup: (id, name) => request(`api/groups/${id}/name`, send('POST', { name })),
+  hideGroup: (id) => request(`api/groups/${id}/hide`, { method: 'POST' }),
+  personFaces: (id) => request(`api/persons/${id}/faces`),
+  renamePerson: (id, name) => request(`api/persons/${id}/rename`, send('POST', { name })),
+  assetFaces: (id) => request(`api/assets/${id}/faces`),
+  assignFace: (id, name) => request(`api/faces/${id}/assign`, send('POST', { name })),
+  removeFace: (id) => request(`api/faces/${id}/remove`, { method: 'POST' }),
   importStatus: () => request('api/import'),
   startImport: (mode) => request('api/import', send('POST', { mode })),
 };
 
 // item = [id, ts, w, h, video, rev]
+export const cropUrl = (faceId) => `api/faces/${faceId}/crop`;
 export const thumbUrl = (item, small = false) => `api/assets/${item[0]}/thumb?r=${item[5]}${small ? '&size=small' : ''}`;
 export const previewUrl = (item) => `api/assets/${item[0]}/preview?r=${item[5]}`;
 export const originalUrl = (item, download = false) =>

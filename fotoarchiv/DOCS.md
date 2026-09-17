@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.06)
+## Funktionen (Version 0.07)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -17,10 +17,11 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum setzen, drehen und löschen für viele Dateien auf einmal.
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
+- **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
 - **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI und MTS.
 
-Geplant ist die Gesichtserkennung.
+Alle ursprünglich geplanten Funktionen sind umgesetzt.
 
 ## Einrichtung
 
@@ -36,6 +37,7 @@ Geplant ist die Gesichtserkennung.
 | `library_folder` | `/media/fotoarchiv` | Bibliothek. Liegt sie unter `/media`, sind die Bilder auch im HA-Medienbrowser sichtbar. |
 | `import_folder` | `/share/fotoarchiv-import` | Eingangsordner für den Samba-Import |
 | `trash_days` | `30` | So viele Tage bleiben gelöschte Dateien im Papierkorb |
+| `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
 
 Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortieren ein reines Umbenennen und geht sofort.
 
@@ -51,6 +53,7 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Löschen | Entf | Papierkorb-Symbol |
 | In der Einzelansicht blättern | ← → | wischen |
 | Infobereich ein/aus | i | ⓘ |
+| Gesichtsrahmen ein/aus | f | Gesichts-Symbol |
 | Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |
 
 ## Bearbeiten
@@ -89,6 +92,32 @@ Legst du eine von Hand gelöschte Datei später wieder in den Import-Ordner oder
 
 **Schutz vor Datenverlust:** Fehlende Einträge werden nie automatisch entfernt. Ist die Bibliothek leer, etwa weil das Laufwerk gerade nicht eingebunden ist, lehnt das Add-on das Entfernen ab.
 
+## Gesichtserkennung
+
+Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zuerst. Der Fortschritt steht oben in der Ansicht **Personen**. Auf einem Raspberry Pi 5 dauert das etwa 1 Sekunde pro Foto, bei 30.000 Fotos also rund 8–9 Stunden. Die Oberfläche bleibt währenddessen bedienbar, die Erkennung nutzt nur zwei Prozessorkerne.
+
+**So gehst du vor:**
+
+1. Unter **Personen → Unbekannte Gesichter** stehen Gruppen ähnlicher Gesichter, die größten zuerst.
+2. Gruppe antippen, falsche Gesichter abwählen, Namen eingeben und speichern. Der Name wird als Person in alle Fotos der Gruppe geschrieben.
+3. Neue Fotos dieser Person werden ab jetzt automatisch zugeordnet und ebenfalls beschriftet (Markierung „auto“). Auch weitere, bereits vorhandene Gruppen, die der Person deutlich ähneln, werden ihr zugeordnet.
+4. Fremde Personen lassen sich mit **Ausblenden** aus den Vorschlägen nehmen.
+
+**Korrigieren:**
+
+- **Person antippen → ✕ an einem Gesicht:** Das Gesicht wird gelöst, der Name wird aus dem Foto entfernt und dort nicht wieder vorgeschlagen.
+- **In der Einzelansicht** blendet das Gesichts-Symbol (Taste **f**) Rahmen um alle Gesichter ein. Ein Rahmen lässt sich direkt benennen oder lösen.
+- **Umbenennen** schreibt den neuen Namen in alle Fotos. Gibst du den Namen einer anderen Person ein, werden beide zusammengeführt.
+- Entfernst du eine Person von Hand aus einem Foto (Personen-Chip), löst sich das zugehörige Gesicht ebenfalls.
+
+**Gut zu wissen:**
+
+- Erkannt werden Gesichter ab etwa 36 Pixeln Größe (bezogen auf 1280 Pixel Bildbreite). Sehr kleine Gesichter auf Gruppenfotos werden übersprungen. Videos werden nicht durchsucht.
+- Personen, die schon in den Metadaten eines Fotos stehen, etwa aus Lightroom oder digiKam, werden automatisch verknüpft, wenn das Foto genau ein Gesicht und genau eine Person hat.
+- Die Modelle **InsightFace buffalo_l** (ca. 280 MB) werden beim ersten Start von GitHub geladen und über SHA-256 geprüft. Sie sind **nur für nicht-kommerzielle Nutzung** freigegeben. Für ein privates Fotoarchiv ist das in Ordnung. Die Modelle sind vom Backup ausgenommen und werden bei Bedarf neu geladen.
+- Die Erkennung läuft komplett lokal, es verlassen keine Fotos oder Gesichtsdaten Home Assistant.
+- Mit `face_recognition: false` wird sie abgeschaltet. Bereits erkannte Personen bleiben in den Dateien.
+
 ## Karte
 
 Über **Karte** oben links wechselst du in die Kartenansicht. Die Suchfilter gelten auch dort, so lassen sich zum Beispiel alle Fotos einer Person auf der Karte anzeigen.
@@ -117,7 +146,7 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 
 ## Speicherplatz und Backups
 
-- Die Datenbank und die Vorschaubilder liegen im Add-on-Datenordner. Pro Bild braucht das etwa 30–40 KB, dazu etwa 6 KB für die kleine Vorschau. Die kleine Vorschau entsteht erst, wenn ein Bild zum ersten Mal in einer kleinen Zoomstufe angezeigt wird.
+- Die Datenbank, die Vorschaubilder und die Gesichtsausschnitte liegen im Add-on-Datenordner. Pro Bild braucht das etwa 30–40 KB, dazu etwa 6 KB für die kleine Vorschau. Die kleine Vorschau entsteht erst, wenn ein Bild zum ersten Mal in einer kleinen Zoomstufe angezeigt wird.
 - **Vorschaubilder sind vom Add-on-Backup ausgenommen.** Sie werden bei Bedarf neu erzeugt.
 - ⚠️ **Eine vollständige Home-Assistant-Sicherung enthält auch den Ordner `/media`, also das ganze Fotoarchiv.** Bei großen Sammlungen solltest du `media` in den Backup-Einstellungen abwählen und die Fotos separat sichern, z. B. auf ein NAS.
 
