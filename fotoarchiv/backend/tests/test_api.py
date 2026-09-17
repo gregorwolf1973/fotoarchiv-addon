@@ -50,6 +50,7 @@ def test_upload_index_detail_and_files(client, settings, make_jpeg, tmp_path):
 
     state = client.get("/api/state").json()
     assert state["counts"]["total"] == 1
+    assert len(state["instance"]) == 8
 
 
 def test_upload_rejects_unsupported_type(client):

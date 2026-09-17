@@ -13,6 +13,7 @@ Foto- und Video-Datenbank für Home Assistant, gebaut für Zehntausende Bilder a
 - **Samba-Import:** Dateien in einen Ordner legen und den Import starten. Das Add-on sortiert sie nach Aufnahmedatum in `JJJJ/MM` ein.
 - **Drag & Drop:** Einzelne Dateien oder ganze Ordner in den Browser ziehen.
 - **Duplikate** werden per MD5-Prüfsumme erkannt und nicht doppelt aufgenommen.
+- **Doppelte und ähnliche Fotos finden:** WhatsApp-Kopien, andere Formate und Serien. Die beste Fassung behalten, Schlagworte, Personen und Ort übernehmen, den Rest in den Papierkorb.
 - **Galerie mit Zeitleiste:** Ein fester Balken mit Jahreszahlen und ein ziehbarer Cursor mit Datumsanzeige.
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext.
 - **Bearbeiten direkt in der Datei:** Datum, Personen, Schlagworte, Ort und Drehen, auch für viele Fotos auf einmal.

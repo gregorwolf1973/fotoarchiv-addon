@@ -10,6 +10,7 @@ from . import config
 from .accesslog import AccessLog
 from .auth import AuthService
 from .db import Database
+from .duplicates import DuplicateService
 from .editor import Editor
 from .exiftool import ExifTool
 from .faces import FaceService
@@ -31,6 +32,7 @@ class Context:
     editor: Editor
     tasks: TaskRunner
     faces: FaceService
+    duplicates: DuplicateService
     limiter: Limiter
     access: AccessLog
     auth: AuthService
@@ -50,9 +52,11 @@ class Context:
         threading.Thread(target=self._maintenance, daemon=True, name="wartung").start()
         self.tasks.start()  # setzt auch Aufgaben fort, die ein Neustart unterbrochen hat
         self.faces.start()
+        self.duplicates.start()
 
     def stop(self):
         self.faces.stop()
+        self.duplicates.stop()
         self._stop.set()
         self.exiftool.close()
         self.db.close()
@@ -67,7 +71,7 @@ class Context:
             self._stop.wait(MAINTENANCE_INTERVAL)
 
 
-def register_task_actions(tasks: TaskRunner, editor: Editor, faces: FaceService):
+def register_task_actions(tasks: TaskRunner, editor: Editor, faces: FaceService, duplicates: DuplicateService):
     """Alle Aktionen, die als Hintergrundaufgabe laufen (und nach einem Neustart weiterlaufen) können."""
     tasks.register("labels", lambda p: lambda i: editor.change_labels(i, p["kind"], p["add"], p["remove"]))
     tasks.register("date", lambda p: lambda i: editor.set_date(i, datetime.fromisoformat(p["taken_at"])))
@@ -79,6 +83,8 @@ def register_task_actions(tasks: TaskRunner, editor: Editor, faces: FaceService)
     tasks.register("purge", lambda p: editor.purge, tolerate_on_resume=True)
     tasks.register("forget", lambda p: editor.forget, tolerate_on_resume=True)
     tasks.register("persons_relabel", lambda p: lambda i: faces.relabel(i, p["add"], p["remove"]))
+    tasks.register("dedupe", lambda p: lambda i: duplicates.resolve_one(i, p["keep_for"][str(i)], p["transfer"]),
+                   tolerate_on_resume=True)
 
 
 def build(settings: config.Settings) -> Context:
@@ -88,10 +94,11 @@ def build(settings: config.Settings) -> Context:
     editor = Editor(settings, db, exiftool, importer)
     tasks = TaskRunner(db, on_progress=db.bump)
     faces = FaceService(settings, db, editor, enabled=settings.face_recognition)
-    register_task_actions(tasks, editor, faces)
+    duplicates = DuplicateService(settings, db, importer, editor, enabled=settings.duplicate_detection)
+    register_task_actions(tasks, editor, faces, duplicates)
     limiter = Limiter()
     access = AccessLog(settings.data / "public_access.log", settings.public_log_max_mb)
     if settings.public_log_export_path:
         access.set_export(settings.public_log_export_path, slot="export")
     auth = AuthService(db, limiter, access, settings.public_session_hours)
-    return Context(settings, db, exiftool, importer, editor, tasks, faces, limiter, access, auth)
+    return Context(settings, db, exiftool, importer, editor, tasks, faces, duplicates, limiter, access, auth)

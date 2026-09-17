@@ -71,6 +71,9 @@ export const api = {
   assetFaces: (id) => request(`api/assets/${id}/faces`),
   assignFace: (id, name) => request(`api/faces/${id}/assign`, send('POST', { name })),
   removeFace: (id) => request(`api/faces/${id}/remove`, { method: 'POST' }),
+  duplicates: () => request('api/duplicates'),
+  resolveDuplicates: (groups, transfer) => request('api/duplicates/resolve', send('POST', { groups, transfer })),
+  ignoreDuplicates: (ids) => request('api/duplicates/ignore', send('POST', { ids })),
   admin: {
     access: () => request('api/admin/access'),
     users: () => request('api/admin/users'),
@@ -90,12 +93,16 @@ export const api = {
   startImport: (mode) => request('api/import', send('POST', { mode })),
 };
 
+// Kennung der Datenbank aus api/state: Bild-URLs werden lange gecacht, nach einem Neuaufbau ändern sie sich
+export const cache = { instance: '' };
+
 // item = [id, ts, w, h, video, rev]
-export const cropUrl = (faceId) => `api/faces/${faceId}/crop`;
-export const thumbUrl = (item, small = false) => `api/assets/${item[0]}/thumb?r=${item[5]}${small ? '&size=small' : ''}`;
-export const previewUrl = (item) => `api/assets/${item[0]}/preview?r=${item[5]}`;
+export const cropUrl = (faceId) => `api/faces/${faceId}/crop?i=${cache.instance}`;
+export const thumbUrl = (item, small = false) =>
+  `api/assets/${item[0]}/thumb?r=${item[5]}&i=${cache.instance}${small ? '&size=small' : ''}`;
+export const previewUrl = (item) => `api/assets/${item[0]}/preview?r=${item[5]}&i=${cache.instance}`;
 export const originalUrl = (item, download = false) =>
-  `api/assets/${item[0]}/original?r=${item[5]}${download ? '&download=true' : ''}`;
+  `api/assets/${item[0]}/original?r=${item[5]}&i=${cache.instance}${download ? '&download=true' : ''}`;
 
 /** Upload mit Fortschritt; löst immer auf, Fehler stehen im Ergebnis. */
 export function upload(file, onprogress) {

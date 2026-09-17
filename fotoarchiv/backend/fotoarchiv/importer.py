@@ -31,6 +31,7 @@ class Result:
     message: str = ""
     asset_id: int | None = None
     existing: str | None = None  # Duplikat: Pfad des vorhandenen Bildes; wieder zugeordnet: bisheriger Pfad
+    similar: str | None = None   # neu importiert, aber sehr ähnlich zu diesem vorhandenen Foto
 
 
 @dataclass
@@ -43,7 +44,8 @@ class Job:
     done: int = 0
     current: str = ""
     counts: dict = field(default_factory=lambda: {
-        "imported": 0, "relinked": 0, "duplicate": 0, "skipped": 0, "error": 0, "missing": 0})
+        "imported": 0, "relinked": 0, "duplicate": 0, "skipped": 0, "error": 0, "missing": 0, "similar": 0})
+    similar: list = field(default_factory=list)   # neu, aber einem vorhandenen Foto sehr ähnlich
     relinked: list = field(default_factory=list)
     missing: list = field(default_factory=list)   # Einträge, deren Datei fehlt (nur beim Abgleich)
     duplicates: list = field(default_factory=list)
@@ -99,6 +101,8 @@ class Importer:
         self.db = db
         self.exiftool = exiftool
         self.job = Job()
+        # Rückmeldungen: "imported" -> Funktion(asset_id), darf den Pfad eines ähnlichen Fotos liefern
+        self.hooks: dict[str, list] = {"imported": []}
         self._file_lock = threading.Lock()  # immer nur eine Datei gleichzeitig (Duplikatprüfung)
         self._job_lock = threading.Lock()
         self._report_path = settings.data / "letzter_import.json"
@@ -175,8 +179,14 @@ class Importer:
             self.db.bump()
             return Result("relinked", name, f"Eintrag wieder zugeordnet (vorher {existing['path']})", asset_id, existing["path"])
         self.ensure_thumbnail(asset_id)
+        similar = None
+        for hook in self.hooks["imported"]:
+            try:
+                similar = hook(asset_id) or similar
+            except Exception:
+                log.exception("Rückmeldung nach Import von %s fehlgeschlagen", name)
         self.db.bump()
-        return Result("imported", name, rel, asset_id)
+        return Result("imported", name, rel, asset_id, similar=similar)
 
     def _relink(self, asset_id: int, rel: str, size: int, checksum: str, meta: metadata.Metadata):
         """Vorhandenen Eintrag auf eine neue Datei zeigen lassen; ID, Import-Prüfsumme und Import-Datum bleiben."""
@@ -184,7 +194,7 @@ class Importer:
             conn.execute(
                 """UPDATE assets SET path = ?, size = ?, md5 = ?, taken_at = ?, taken_ts = ?, date_source = ?,
                        tz_offset = ?, width = ?, height = ?, duration = ?, lat = ?, lon = ?, camera = ?,
-                       rev = rev + 1, thumb_ok = 0
+                       rev = rev + 1, thumb_ok = 0, phash = NULL
                    WHERE id = ?""",
                 (rel, size, checksum, meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
                  meta.width, meta.height, meta.duration, meta.lat, meta.lon, meta.camera, asset_id),
@@ -316,6 +326,10 @@ class Importer:
     def _record(self, result: Result, rel: str):
         job = self.job
         job.counts[result.status] += 1
+        if result.similar:
+            job.counts["similar"] = job.counts.get("similar", 0) + 1
+            if len(job.similar) < REPORT_LIMIT:
+                job.similar.append({"name": rel, "existing": result.similar})
         bucket = {"duplicate": job.duplicates, "error": job.errors, "skipped": job.skipped,
                   "relinked": job.relinked}.get(result.status)
         if bucket is not None and len(bucket) < REPORT_LIMIT:

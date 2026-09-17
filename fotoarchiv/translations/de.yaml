@@ -15,6 +15,12 @@ configuration:
       Fotos im Hintergrund nach Gesichtern durchsuchen und ähnliche Gesichter gruppieren. Lädt beim ersten Start
       die InsightFace-Modelle (ca. 280 MB, nur nicht-kommerzielle Nutzung) herunter. Auf dem Raspberry Pi 5 etwa
       1 Sekunde pro Foto.
+  duplicate_detection:
+    name: Doppelte Fotos erkennen
+    description: >-
+      Fotos im Hintergrund vergleichen und doppelte Fassungen (verkleinert, neu gespeichert, anderes Format) sowie
+      Serien ähnlicher Aufnahmen finden. Beim Import wird auf sehr ähnliche vorhandene Fotos hingewiesen. Sehr schnell,
+      einige Millisekunden pro Foto.
   public_enabled:
     name: Internetzugang
     description: >-

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10
+
+- Doppelte und sehr ähnliche Fotos finden: Wahrnehmungs-Hash im Hintergrund, eigene Ansicht „Doppelte Fotos“ mit den Listen „Doppelt“ (verkleinert, neu gespeichert, anderes Format) und „Serien“ (ähnlich, innerhalb von 30 Sekunden)
+- Beste Fassung wird vorgeschlagen (Auflösung, Datum, Metadaten, Größe), Auswahl je Foto änderbar, Rest in den Papierkorb, einzeln oder alle Vorschläge auf einmal
+- Optional werden Schlagworte, Personen, Ort und ein verlässlicheres Datum vorher aufs behaltene Foto übertragen
+- „Keine Duplikate“ merkt sich Gruppen, die nicht wieder vorgeschlagen werden sollen
+- Import und Upload weisen auf Fotos hin, die einem vorhandenen sehr ähnlich sind
+- Neue Option `duplicate_detection` zum Abschalten
+- Behoben: Nach einem Neuaufbau der Datenbank konnte der Browser alte Vorschaubilder aus dem Cache zeigen
+
 ## 0.09
 
 - Personen zusammenführen: eigener Knopf im Personen-Dialog mit Auswahlliste, Vorschau („3 Fotos von Anna werden zu Anna Müller“) und Bestätigung; Umbenennen auf einen vorhandenen Namen fragt ebenfalls nach

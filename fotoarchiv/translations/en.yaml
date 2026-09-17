@@ -14,6 +14,11 @@ configuration:
     description: >-
       Scan photos for faces in the background and group similar faces. Downloads the InsightFace models
       (about 280 MB, non-commercial use only) on first start. About 1 second per photo on a Raspberry Pi 5.
+  duplicate_detection:
+    name: Detect duplicate photos
+    description: >-
+      Compare photos in the background to find duplicate versions (resized, re-saved, other format) and bursts of
+      similar shots. Imports point out very similar existing photos. Very fast, a few milliseconds per photo.
   public_enabled:
     name: Internet access
     description: >-

@@ -22,7 +22,12 @@
   const done = $derived(queue.filter((e) => !['waiting', 'uploading'].includes(e.status)).length);
   const summary = $derived.by(() => {
     const count = (s) => queue.filter((e) => e.status === s).length;
-    return { imported: count('imported'), duplicate: count('duplicate'), failed: count('error') + count('skipped') };
+    return {
+      imported: count('imported'),
+      similar: queue.filter((e) => e.similar).length,
+      duplicate: count('duplicate'),
+      failed: count('error') + count('skipped'),
+    };
   });
 
   /** Dateien oder (per Drag & Drop) ganze Ordner hinzufügen. */
@@ -48,7 +53,11 @@
       entry.status = 'uploading';
       upload(entry.file, (p) => (entry.progress = p)).then((result) => {
         entry.status = result.status;
-        entry.message = result.status === 'duplicate' ? `schon vorhanden: ${result.existing}` : result.message;
+        entry.similar = Boolean(result.similar);
+        entry.message =
+          result.status === 'duplicate' ? `schon vorhanden: ${result.existing}`
+          : result.similar ? `sehr ähnlich zu: ${result.similar}`
+          : result.message;
         entry.file = null;
         active--;
         pump();
@@ -132,17 +141,17 @@
     </header>
     {#if done === queue.length}
       <p class="summary">
-        {summary.imported} importiert{#if summary.duplicate}, {summary.duplicate} Duplikate{/if}{#if summary.failed}, {summary.failed} nicht importiert{/if}
+        {summary.imported} importiert{#if summary.similar} ({summary.similar} sehr ähnlich zu vorhandenen){/if}{#if summary.duplicate}, {summary.duplicate} Duplikate{/if}{#if summary.failed}, {summary.failed} nicht importiert{/if}
       </p>
     {/if}
     <ul>
       {#each queue as entry}
-        <li class={entry.status}>
+        <li class={entry.status} class:similar={entry.similar}>
           <span class="name" title={entry.name}>{entry.name}</span>
           {#if entry.status === 'uploading'}
             <span class="bar"><span style:width="{Math.round(entry.progress * 100)}%"></span></span>
           {:else}
-            <span class="state" title={entry.message}>{LABELS[entry.status] ?? entry.status}</span>
+            <span class="state" title={entry.message}>{entry.similar ? 'ähnlich' : (LABELS[entry.status] ?? entry.status)}</span>
           {/if}
         </li>
       {/each}
@@ -235,6 +244,7 @@
   .imported .state {
     color: var(--success);
   }
+  .similar .state,
   .duplicate .state {
     color: var(--warning);
   }

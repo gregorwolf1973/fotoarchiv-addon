@@ -1,13 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import { api, auth, filterQuery } from './lib/api.js';
+  import { api, auth, cache, filterQuery } from './lib/api.js';
   import { ZOOM_LEVELS } from './lib/layout.js';
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
   import AccessPanel from './components/AccessPanel.svelte';
   import Confirm from './components/Confirm.svelte';
   import DateDialog from './components/DateDialog.svelte';
+  import DuplicatesView from './components/DuplicatesView.svelte';
   import Gallery from './components/Gallery.svelte';
   import Icon from './components/Icon.svelte';
   import ImportPanel from './components/ImportPanel.svelte';
@@ -29,10 +30,11 @@
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | map | people | trash
+  let view = $state('photos'); // photos | map | people | trash | duplicates
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
+  let viewerList = $state.raw(null); // eigene Einträge, die nicht im Index stehen müssen (Duplikate)
   let showImport = $state(false);
   let searchOpen = $state(false);
   let dialog = $state(null);
@@ -55,7 +57,7 @@
   );
   const indexById = $derived(new Map(items.map((item, i) => [item[0], i])));
   const viewerItems = $derived(
-    viewerIds ? viewerIds.map((id) => items[indexById.get(id)]).filter(Boolean) : items,
+    viewerList ?? (viewerIds ? viewerIds.map((id) => items[indexById.get(id)]).filter(Boolean) : items),
   );
   const openIndex = $derived(openId === null ? -1 : viewerItems.findIndex((item) => item[0] === openId));
   const missingTools = $derived(
@@ -77,6 +79,7 @@
     const seq = ++sequence;
     try {
       const next = await api.state();
+      cache.instance = next.instance;
       const query = filterQuery(filters, trash);
       if (next.revision !== revision || query !== loadedQuery) {
         const index = await api.index(filters, trash);
@@ -198,7 +201,7 @@
   function setView(next) {
     view = next;
     openId = null;
-    viewerIds = null;
+    viewerIds = viewerList = null;
     searchOpen = false;
     selected.clear();
     kick();
@@ -253,9 +256,13 @@
     viewerIds = ids;
     openId = id;
   }
+  function openList(list, id) {
+    viewerList = list;
+    openId = id;
+  }
   function closeViewer() {
     openId = null;
-    viewerIds = null;
+    viewerIds = viewerList = null;
   }
 
   async function deleteOne(id) {
@@ -327,7 +334,7 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || view === 'map' || view === 'people' || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || view === 'map' || view === 'people' || view === 'duplicates' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     else if (e.key === 'Delete' && selected.size) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
@@ -382,6 +389,15 @@
         <button class="danger" onclick={confirmEmptyTrash}><Icon name="deleteForever" size={20} /><span class="label">Papierkorb leeren</span></button>
       {/if}
     </header>
+  {:else if view === 'duplicates'}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">Doppelte Fotos</strong>
+        <span class="sub">Gelöschte Fotos landen im Papierkorb</span>
+      </div>
+      <span class="grow"></span>
+    </header>
   {:else}
     <header class="topbar">
       <div class="brand" title={info ? `${formatNumber(info.counts.images)} Fotos · ${formatNumber(info.counts.videos)} Videos · ${formatBytes(info.counts.bytes)}` : ''}>
@@ -409,6 +425,7 @@
           </button>
         {/if}
         {#if canEdit}
+          <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos"><Icon name="duplicate" /></button>
           <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
             <Icon name="delete" />
             {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
@@ -434,7 +451,7 @@
   {#if missingTools.length}
     <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
   {/if}
-  {#if filtered && view !== 'people'}
+  {#if filtered && view !== 'people' && view !== 'duplicates'}
     <div class="resultbar">
       <span>{formatNumber(items.length)} Treffer</span>
       <button class="link" onclick={() => setFilters(NO_FILTERS)}>Filter zurücksetzen</button>
@@ -452,6 +469,8 @@
         setFilters({ ...NO_FILTERS, persons: [{ id: person.id, name: person.name }] });
       }}
     />
+  {:else if view === 'duplicates'}
+    <DuplicatesView revision={info?.revision} onopen={openList} ontask={trackTask} onchanged={kick} />
   {:else if view === 'map'}
     <MapView {filters} {canEdit} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
   {:else if items.length}

@@ -4,11 +4,12 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.09)
+## Funktionen (Version 0.10)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
 - **Duplikaterkennung per MD5.** Bereits vorhandene Dateien werden nicht noch einmal aufgenommen. Beim Ordner-Import landen sie in `_duplikate` im Import-Ordner. Die Prüfsumme vom Import wird dauerhaft gespeichert, damit ein Bild auch nach späterer Bearbeitung noch als Duplikat erkannt wird.
+- **Doppelte und ähnliche Fotos finden:** verkleinerte Kopien, anders gespeicherte Fassungen und Serien. Die beste Fassung wird vorgeschlagen, der Rest kommt in den Papierkorb. Siehe [Doppelte Fotos](#doppelte-fotos).
 - **Bibliothek abgleichen.** Übernimmt Dateien, die schon in der Bibliothek liegen, ohne sie zu verschieben, und erkennt von Hand verschobene oder gelöschte Dateien. Siehe [Dateien außerhalb des Fotoarchivs ändern](#dateien-außerhalb-des-fotoarchivs-ändern).
 - **Galerie** mit Tagesgruppen, Zeilen im Blocksatz und flüssigem Scrollen auch bei Zehntausenden Bildern. Die Vorschaugröße lässt sich in 5 Stufen zoomen, die kleinsten zwei gruppieren nach Monat.
 - **Zeitleiste rechts.** Ein fester Balken mit Jahreszahlen und einem Cursor zum Ziehen, der Monat und Jahr anzeigt.
@@ -39,6 +40,7 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `import_folder` | `/share/fotoarchiv-import` | Eingangsordner für den Samba-Import |
 | `trash_days` | `30` | So viele Tage bleiben gelöschte Dateien im Papierkorb |
 | `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
+| `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
 | `public_enabled` | `false` | Internetzugang auf Port 8301 starten |
 | `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
 | `public_cookie_secure` | `true` | Sitzungs-Cookie nur über HTTPS (nur zum Testen ausschalten) |
@@ -124,6 +126,29 @@ Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zu
 - Die Modelle **InsightFace buffalo_l** (ca. 280 MB) werden beim ersten Start von GitHub geladen und über SHA-256 geprüft. Sie sind **nur für nicht-kommerzielle Nutzung** freigegeben. Für ein privates Fotoarchiv ist das in Ordnung. Die Modelle sind vom Backup ausgenommen und werden bei Bedarf neu geladen.
 - Die Erkennung läuft komplett lokal, es verlassen keine Fotos oder Gesichtsdaten Home Assistant.
 - Mit `face_recognition: false` wird sie abgeschaltet. Bereits erkannte Personen bleiben in den Dateien.
+
+## Doppelte Fotos
+
+Dateien mit gleicher MD5-Prüfsumme nimmt das Add-on gar nicht erst auf. Dieselbe Aufnahme gibt es aber oft in mehreren Fassungen: als WhatsApp-Kopie, verkleinert, als PNG oder nachbearbeitet. Dafür berechnet das Add-on im Hintergrund für jedes Foto einen **Wahrnehmungs-Hash**. Das ist ein Fingerabdruck der groben Bildstruktur, den Verkleinern, Neukomprimieren oder ein anderes Format kaum verändert. Das geht schnell, auf dem Raspberry Pi 5 dauert es wenige Millisekunden pro Foto.
+
+Über das Symbol **Doppelte Fotos** oben rechts (neben dem Papierkorb) gibt es zwei Listen:
+
+- **Doppelt:** gleiches Motiv, egal wann. Vorgeschlagen wird die Fassung mit der höchsten Auflösung, danach die mit dem verlässlichsten Datum, den meisten Metadaten und der größten Datei.
+- **Serien:** sehr ähnliche Fotos, die innerhalb von 30 Sekunden aufgenommen wurden, etwa mehrere Auslösungen hintereinander. Vorgeschlagen wird die größte Datei, weil sie meist die schärfste ist. Serien bitte immer selbst ansehen.
+
+Bedienung:
+
+- Ein Klick auf ein Vorschaubild öffnet die Einzelansicht mit allen Fotos der Gruppe.
+- Der Schalter unter jedem Foto legt fest, ob es **behalten** oder **gelöscht** wird. Der Stern markiert den Vorschlag. Mehrere Fotos behalten geht auch.
+- **Löschen** legt die nicht behaltenen Fotos einer Gruppe in den Papierkorb. **Alle Vorschläge übernehmen** macht das für alle Gruppen in „Doppelt“ auf einmal, nach einer Rückfrage.
+- Ist **Schlagworte, Personen, Ort und Datum übertragen** angehakt (Standard), bekommt das behaltene Foto vorher die Schlagworte und Personen der gelöschten Fotos. Hat es keinen Ort, übernimmt es den Ort. Stammt sein Datum nur aus dem Dateinamen oder der Dateizeit, übernimmt es ein verlässlicheres Datum. Alles wird in die Datei geschrieben.
+- **Keine Duplikate** merkt sich, dass diese Fotos zusammengehören dürfen. Sie werden nicht wieder vorgeschlagen.
+
+Beim Import und Upload weist das Add-on auf neue Fotos hin, die einem vorhandenen Foto sehr ähnlich sind. Sie werden trotzdem aufgenommen und erscheinen unter **Doppelte Fotos**.
+
+Grenzen: Der Vergleich erkennt dasselbe Bild, nicht dasselbe Motiv aus anderem Blickwinkel. Stark zugeschnittene oder gespiegelte Fassungen werden nicht erkannt. Sehr gleichförmige Bilder, etwa Schnee oder Himmel, können als ähnlich gelten, deshalb wird nie automatisch gelöscht. Videos werden nicht verglichen.
+
+Mit `duplicate_detection: false` wird die Suche abgeschaltet.
 
 ## Karte
 

@@ -119,6 +119,7 @@
           <span class="count ok">{count('imported')} neu</span>
           {#if job.counts.relinked}<span class="count ok">{count('relinked')} wieder zugeordnet</span>{/if}
           <span class="count warn">{count('duplicate')} Duplikate</span>
+          {#if job.counts.similar}<span class="count warn">{count('similar')} sehr ähnlich</span>{/if}
           <span class="count">{count('skipped')} übersprungen</span>
           <span class="count bad">{count('error')} Fehler</span>
           {#if job.mode === 'library' && !job.running}<span class="count" class:bad={job.counts.missing}>{count('missing')} {plural('missing', 'Datei fehlt', 'Dateien fehlen')}</span>{/if}
@@ -160,6 +161,17 @@
             <ul>
               {#each job.duplicates as entry}
                 <li><span>{entry.name}</span> <span class="muted">= {entry.existing} ({entry.message})</span></li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
+        {#if job.similar?.length}
+          <details>
+            <summary>Sehr ähnlich zu vorhandenen Fotos</summary>
+            <p class="muted">Importiert, aber vermutlich schon in anderer Fassung vorhanden. Prüfen unter <strong>Doppelte Fotos</strong>.</p>
+            <ul>
+              {#each job.similar as entry}
+                <li><span>{entry.name}</span> <span class="muted">≈ {entry.existing}</span></li>
               {/each}
             </ul>
           </details>

@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import faces_api, labels, media
+from . import duplicates_api, faces_api, labels, media
 from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
@@ -140,6 +140,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         )
         return {
             "revision": db.revision,
+            "instance": db.instance,
             "counts": dict(counts),
             "library": None if public else str(settings.library),
             "import_dir": None if public else str(settings.import_dir),
@@ -354,7 +355,9 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         seconds = mtime / 1000 if mtime and mtime > 1e11 else mtime
         result = await run_in_threadpool(importer.import_upload, temp, name, seconds)
         faces.wake()
+        ctx.duplicates.wake()
         status = 500 if result.status == "error" else 200
         return JSONResponse(result.__dict__, status_code=status)
 
     faces_api.register(app, db, faces, tasks)
+    duplicates_api.register(app, ctx)

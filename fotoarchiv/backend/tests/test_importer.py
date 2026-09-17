@@ -18,7 +18,7 @@ def test_import_folder_sorts_deduplicates_and_cleans_up(settings, importer, make
     importer._run("import")
     job = importer.job
 
-    assert job.counts == {"imported": 2, "relinked": 0, "duplicate": 1, "skipped": 1, "error": 0, "missing": 0}
+    assert job.counts == {"imported": 2, "relinked": 0, "duplicate": 1, "skipped": 1, "error": 0, "missing": 0, "similar": 0}
     assert (settings.library / "2019" / "05" / "strand.jpg").is_file()
     assert (settings.library / "2020" / "01" / "IMG_20200101_101010.jpg").is_file()
     assert (inbox / DUPLICATE_DIR / "Urlaub" / "strand_kopie.jpg").is_file()

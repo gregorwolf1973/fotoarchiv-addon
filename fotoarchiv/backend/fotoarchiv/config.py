@@ -19,6 +19,7 @@ class Settings:
     ffmpeg: str
     trash_days: int = 30
     face_recognition: bool = True
+    duplicate_detection: bool = True
     # Internetzugang (eigener Port, nur hinter Reverse Proxy mit TLS veröffentlichen)
     public_enabled: bool = False
     public_port: int = 8301
@@ -69,6 +70,7 @@ def load() -> Settings:
         ffmpeg=os.environ.get("FOTOARCHIV_FFMPEG") or shutil.which("ffmpeg") or "ffmpeg",
         trash_days=int(pick("FOTOARCHIV_TRASH_DAYS", "trash_days", 30)),
         face_recognition=_bool(os.environ.get("FOTOARCHIV_FACES", options.get("face_recognition")), True),
+        duplicate_detection=_bool(os.environ.get("FOTOARCHIV_DUPLICATES", options.get("duplicate_detection")), True),
         public_enabled=_bool(os.environ.get("FOTOARCHIV_PUBLIC", options.get("public_enabled")), False),
         public_port=int(pick("FOTOARCHIV_PUBLIC_PORT", "public_port", 8301)),
         public_trusted_proxies=tuple(str(p).strip() for p in proxies if str(p).strip()),

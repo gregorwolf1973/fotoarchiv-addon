@@ -1,5 +1,6 @@
 """SQLite-Zugriff mit einfachen, versionierten Migrationen."""
 
+import secrets
 import sqlite3
 import threading
 import time
@@ -134,6 +135,20 @@ MIGRATIONS = [
     );
     CREATE INDEX tasks_running ON tasks (running, id);
     """,
+    """
+    -- Doppelte/ähnliche Fotos: 64-Bit-Wahrnehmungs-Hash als Hex, NULL = noch nicht berechnet, leer = nicht möglich
+    ALTER TABLE assets ADD COLUMN phash TEXT;
+    CREATE INDEX assets_phash_pending ON assets (phash, kind, deleted_at);
+    CREATE TABLE duplicate_ignores (
+        a INTEGER NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
+        b INTEGER NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
+        PRIMARY KEY (a, b)                         -- a < b: "sind keine Duplikate"
+    );
+    CREATE TABLE meta (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """,
 ]
 
 
@@ -147,6 +162,10 @@ class Database:
         self._conn.execute("PRAGMA synchronous = NORMAL")
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._migrate()
+        # Zufällige Kennung dieser Datenbank: Bild-URLs enthalten sie, damit nach einem Neuaufbau
+        # (gleiche IDs, andere Fotos) keine Vorschaubilder aus dem Browser-Cache auftauchen
+        self._conn.execute("INSERT OR IGNORE INTO meta (key, value) VALUES ('instance', ?)", (secrets.token_hex(4),))
+        self.instance = self._conn.execute("SELECT value FROM meta WHERE key = 'instance'").fetchone()[0]
         # Änderungszähler für die Oberfläche; Startwert Zeit, damit ein Neustart als Änderung gilt
         self.revision = int(time.time() * 1000)
 
