@@ -94,6 +94,7 @@
 {#if person}
   <PersonDialog
     {person}
+    persons={people.persons}
     {canEdit}
     onclose={() => (person = null)}
     onchanged={changed}

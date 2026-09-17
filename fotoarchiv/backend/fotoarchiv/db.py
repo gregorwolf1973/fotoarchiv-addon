@@ -116,6 +116,24 @@ MIGRATIONS = [
     );
     CREATE INDEX sessions_user ON sessions (user_id);
     """,
+    """
+    -- Hintergrundaufgaben, damit sie einen Neustart überstehen
+    CREATE TABLE tasks (
+        id          INTEGER PRIMARY KEY,
+        kind        TEXT NOT NULL,                 -- angemeldete Aktion, z. B. labels, rotate, persons_relabel
+        label       TEXT NOT NULL,
+        params      TEXT NOT NULL,                 -- JSON
+        asset_ids   TEXT NOT NULL,                 -- JSON-Liste, Reihenfolge der Abarbeitung
+        total       INTEGER NOT NULL,
+        done        INTEGER NOT NULL DEFAULT 0,
+        failed      TEXT NOT NULL DEFAULT '[]',
+        current     INTEGER,                       -- Foto in Arbeit
+        running     INTEGER NOT NULL DEFAULT 1,
+        started_at  TEXT NOT NULL,
+        finished_at TEXT
+    );
+    CREATE INDEX tasks_running ON tasks (running, id);
+    """,
 ]
 
 

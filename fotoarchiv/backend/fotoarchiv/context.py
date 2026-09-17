@@ -4,6 +4,7 @@ import logging
 import shutil
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from . import config
 from .accesslog import AccessLog
@@ -47,6 +48,7 @@ class Context:
                  settings.library, settings.import_dir, settings.trash_days,
                  f"Port {settings.public_port}" if settings.public_enabled else "aus")
         threading.Thread(target=self._maintenance, daemon=True, name="wartung").start()
+        self.tasks.start()  # setzt auch Aufgaben fort, die ein Neustart unterbrochen hat
         self.faces.start()
 
     def stop(self):
@@ -65,13 +67,28 @@ class Context:
             self._stop.wait(MAINTENANCE_INTERVAL)
 
 
+def register_task_actions(tasks: TaskRunner, editor: Editor, faces: FaceService):
+    """Alle Aktionen, die als Hintergrundaufgabe laufen (und nach einem Neustart weiterlaufen) können."""
+    tasks.register("labels", lambda p: lambda i: editor.change_labels(i, p["kind"], p["add"], p["remove"]))
+    tasks.register("date", lambda p: lambda i: editor.set_date(i, datetime.fromisoformat(p["taken_at"])))
+    tasks.register("location", lambda p: lambda i: editor.set_location(i, p["lat"], p["lon"]))
+    tasks.register("rotate", lambda p: lambda i: editor.rotate(i, p["degrees"]), repeatable=False)
+    # Beim Wiederholen nach Neustart ist das Foto womöglich schon gelöscht/wiederhergestellt – kein Fehler
+    tasks.register("delete", lambda p: editor.delete, tolerate_on_resume=True)
+    tasks.register("restore", lambda p: editor.restore, tolerate_on_resume=True)
+    tasks.register("purge", lambda p: editor.purge, tolerate_on_resume=True)
+    tasks.register("forget", lambda p: editor.forget, tolerate_on_resume=True)
+    tasks.register("persons_relabel", lambda p: lambda i: faces.relabel(i, p["add"], p["remove"]))
+
+
 def build(settings: config.Settings) -> Context:
     db = Database(settings.db_path)
     exiftool = ExifTool(settings.exiftool)
     importer = Importer(settings, db, exiftool)
     editor = Editor(settings, db, exiftool, importer)
-    tasks = TaskRunner(on_progress=db.bump)
+    tasks = TaskRunner(db, on_progress=db.bump)
     faces = FaceService(settings, db, editor, enabled=settings.face_recognition)
+    register_task_actions(tasks, editor, faces)
     limiter = Limiter()
     access = AccessLog(settings.data / "public_access.log", settings.public_log_max_mb)
     if settings.public_log_export_path:

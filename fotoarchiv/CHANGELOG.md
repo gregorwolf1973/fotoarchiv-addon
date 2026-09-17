@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.09
+
+- Personen zusammenführen: eigener Knopf im Personen-Dialog mit Auswahlliste, Vorschau („3 Fotos von Anna werden zu Anna Müller“) und Bestätigung; Umbenennen auf einen vorhandenen Namen fragt ebenfalls nach
+- Hintergrundaufgaben (Mehrfachaktionen, Umbenennen, Zusammenführen, Papierkorb leeren, fehlende Einträge entfernen) stehen in der Datenbank und laufen nach Neustart oder Update weiter
+- Ein durch Neustart unterbrochenes Foto wird wiederholt – beim Drehen nicht, dann steht es als „bitte prüfen“ im Bericht
+
 ## 0.08
 
 - Internetzugang auf eigenem Port 8301 (Option `public_enabled`), gedacht hinter einem Reverse Proxy mit TLS

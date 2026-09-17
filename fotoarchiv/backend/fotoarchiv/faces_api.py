@@ -1,7 +1,5 @@
 """HTTP-Schnittstelle der Gesichtserkennung: Personen, Gesichtergruppen, einzelne Gesichter."""
 
-from dataclasses import asdict
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -17,6 +15,10 @@ BEST_FACE = "ORDER BY f.confirmed DESC, f.score * f.w * f.h DESC LIMIT 1"
 
 class NameRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+
+
+class MergeRequest(BaseModel):
+    target_id: int
 
 
 def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
@@ -84,15 +86,29 @@ def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
     def person_faces(person_id: int):
         return face_rows("g.person_id = ?", (person_id,))
 
-    @app.post("/api/persons/{person_id}/rename")
-    def person_rename(person_id: int, body: NameRequest):
-        old, new, assets = guard(faces.rename_person, person_id, body.name)
+    def relabel_task(old: str, new: str, assets: list[int], merge: bool) -> dict:
         if not assets:
             db.bump()
             return {"task": None}
-        label = f"Person „{old}“ in „{new}“ umbenennen"
-        task = tasks.submit(label, assets, lambda asset_id: faces.relabel(asset_id, [new], [old]))
-        return {"task": asdict(task)}
+        label = f"„{old}“ mit „{new}“ zusammenführen" if merge else f"Person „{old}“ in „{new}“ umbenennen"
+        return {"task": tasks.submit("persons_relabel", label, assets, {"add": [new], "remove": [old]})}
+
+    @app.post("/api/persons/{person_id}/rename")
+    def person_rename(person_id: int, body: NameRequest):
+        merge = db.one("SELECT 1 FROM persons WHERE name = ? AND id != ?", (body.name.strip(), person_id)) is not None
+        old, new, assets = guard(faces.rename_person, person_id, body.name)
+        return relabel_task(old, new, assets, merge)
+
+    @app.post("/api/persons/{person_id}/merge")
+    def person_merge(person_id: int, body: MergeRequest):
+        """Person in eine andere überführen: Gesichter, Namen in den Dateien, künftige Erkennung."""
+        if person_id == body.target_id:
+            raise HTTPException(400, "Eine Person kann nicht mit sich selbst zusammengeführt werden")
+        target = db.one("SELECT name FROM persons WHERE id = ?", (body.target_id,))
+        if target is None:
+            raise HTTPException(404, "Zielperson nicht gefunden")
+        old, new, assets = guard(faces.rename_person, person_id, target["name"])
+        return relabel_task(old, new, assets, True)
 
     @app.get("/api/assets/{asset_id}/faces")
     def asset_faces(asset_id: int):

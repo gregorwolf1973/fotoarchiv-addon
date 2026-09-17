@@ -191,3 +191,20 @@ def test_remove_missing_entries_with_safety_check(client, settings, make_jpeg, t
     response = client.post("/api/library/remove-missing")
     assert response.status_code == 409 and "Laufwerk" in response.json()["detail"]
     assert client.get(f"/api/assets/{keep}").status_code == 200
+
+
+def test_merge_persons(client, make_jpeg, tmp_path):
+    a = upload(client, make_jpeg, tmp_path, "a.jpg", **{"XMP-iptcExt__PersonInImage": "Anna"})
+    b = upload(client, make_jpeg, tmp_path, "b.jpg", **{"XMP-iptcExt__PersonInImage": "Anna Müller"})
+    c = upload(client, make_jpeg, tmp_path, "c.jpg", **{"XMP-iptcExt__PersonInImage": "Anna"})
+    persons = {p["name"]: p["id"] for p in client.get("/api/labels").json()["persons"]}
+
+    assert client.post(f"/api/persons/{persons['Anna']}/merge", json={"target_id": persons["Anna"]}).status_code == 400
+    assert client.post(f"/api/persons/{persons['Anna']}/merge", json={"target_id": 99999}).status_code == 404
+    task = client.post(f"/api/persons/{persons['Anna']}/merge", json={"target_id": persons["Anna Müller"]}).json()["task"]
+    assert task["label"] == "„Anna“ mit „Anna Müller“ zusammenführen" and task["total"] == 2
+    wait_for_tasks(client)
+
+    for asset_id in (a, b, c):
+        assert client.get(f"/api/assets/{asset_id}").json()["persons"] == ["Anna Müller"]
+    assert [(p["name"], p["count"]) for p in client.get("/api/labels").json()["persons"]] == [("Anna Müller", 3)]

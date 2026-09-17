@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.08)
+## Funktionen (Version 0.09)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -113,7 +113,8 @@ Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zu
 
 - **Person antippen → ✕ an einem Gesicht:** Das Gesicht wird gelöst, der Name wird aus dem Foto entfernt und dort nicht wieder vorgeschlagen.
 - **In der Einzelansicht** blendet das Gesichts-Symbol (Taste **f**) Rahmen um alle Gesichter ein. Ein Rahmen lässt sich direkt benennen oder lösen.
-- **Umbenennen** schreibt den neuen Namen in alle Fotos. Gibst du den Namen einer anderen Person ein, werden beide zusammengeführt.
+- **Umbenennen** schreibt den neuen Namen in alle Fotos.
+- **Zusammenführen:** Person antippen → *Mit anderer Person zusammenführen …* → Zielperson wählen. Die Vorschau zeigt, was passiert. Danach tragen alle Fotos den Namen der Zielperson, und die Gesichter gehören zu ihr. Dasselbe passiert, wenn du beim Umbenennen den Namen einer vorhandenen Person eingibst, dann aber mit Rückfrage.
 - Entfernst du eine Person von Hand aus einem Foto (Personen-Chip), löst sich das zugehörige Gesicht ebenfalls.
 
 **Gut zu wissen:**
@@ -140,6 +141,14 @@ Die Kartenkacheln kommen von **OpenStreetMap**, die Ortssuche nutzt **OpenStreet
 Gelöschte Dateien werden nach `.papierkorb` in der Bibliothek verschoben. Der Ordner beginnt mit einem Punkt und ist deshalb im HA-Medienbrowser nicht sichtbar. Über das Papierkorb-Symbol oben rechts lassen sich Dateien wiederherstellen oder endgültig löschen. Nach `trash_days` Tagen löscht das Add-on sie automatisch.
 
 Eine Datei im Papierkorb gilt beim Import weiterhin als vorhanden. Sie wird also als Duplikat erkannt.
+
+## Hintergrundaufgaben
+
+Mehrfachaktionen, Umbenennen und Zusammenführen von Personen, *Papierkorb leeren* und *Fehlende Einträge entfernen* laufen im Hintergrund, der Fortschritt steht unten. Die Aufgaben stehen in der Datenbank. Wird das Add-on mittendrin neu gestartet oder aktualisiert, laufen sie danach an derselben Stelle weiter.
+
+Das Foto, das beim Neustart gerade in Arbeit war, wird wiederholt. Ausnahme ist das **Drehen**: Ein Foto doppelt zu drehen wäre falsch. Dieses eine Foto erscheint deshalb im Bericht als *„Durch einen Neustart unterbrochen – bitte prüfen“*.
+
+Import und Abgleich sind keine solchen Aufgaben. Sie werden nach einem Neustart einfach erneut gestartet, bereits verarbeitete Dateien überspringen sie.
 
 ## Aufnahmedatum
 

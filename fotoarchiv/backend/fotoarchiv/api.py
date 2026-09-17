@@ -145,7 +145,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             "import_dir": None if public else str(settings.import_dir),
             "trash_days": settings.trash_days,
             "importing": importer.job.running,
-            "tasks_running": any(task.running for task in tasks.list()),
+            "tasks_running": tasks.any_running(),
             "faces": {"enabled": faces.enabled, "status": faces.state["status"]},
             "tools": {
                 "vips": media.pyvips is not None,
@@ -271,37 +271,38 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         if body.action == "purge" and role_of(request) != "admin":
             raise HTTPException(403, "Endgültig löschen ist nur über Home Assistant möglich")
         count = len(set(body.ids))
+        kind, params = body.action, {}
         if body.action in ("tags", "persons"):
             if not body.add and not body.remove:
                 raise HTTPException(400, "Nichts hinzuzufügen oder zu entfernen")
             word = "Schlagworte" if body.action == "tags" else "Personen"
             label = f"{word} bei {count} Dateien ändern"
-            action = lambda i: editor.change_labels(i, body.action, body.add, body.remove)  # noqa: E731
+            kind, params = "labels", {"kind": body.action, "add": body.add, "remove": body.remove}
         elif body.action == "date":
             if body.taken_at is None:
                 raise HTTPException(400, "Datum fehlt")
-            label, action = f"Datum bei {count} Dateien setzen", lambda i: editor.set_date(i, body.taken_at)
+            label, params = f"Datum bei {count} Dateien setzen", {"taken_at": body.taken_at.replace(tzinfo=None).isoformat()}
         elif body.action == "location":
             if "location" not in body.model_fields_set:
                 raise HTTPException(400, "Ort fehlt")
             loc = body.location
             label = f"Ort bei {count} Dateien {'setzen' if loc else 'entfernen'}"
-            action = lambda i: editor.set_location(i, loc.lat if loc else None, loc.lon if loc else None)  # noqa: E731
+            params = {"lat": loc.lat if loc else None, "lon": loc.lon if loc else None}
         elif body.action == "rotate":
             if body.degrees is None:
                 raise HTTPException(400, "Drehung fehlt")
-            label, action = f"{count} Dateien drehen", lambda i: editor.rotate(i, body.degrees)
+            label, params = f"{count} Dateien drehen", {"degrees": body.degrees}
         elif body.action == "delete":
-            label, action = f"{count} Dateien in den Papierkorb", editor.delete
+            label = f"{count} Dateien in den Papierkorb"
         elif body.action == "restore":
-            label, action = f"{count} Dateien wiederherstellen", editor.restore
+            label = f"{count} Dateien wiederherstellen"
         else:
-            label, action = f"{count} Dateien endgültig löschen", editor.purge
-        return asdict(tasks.submit(label, body.ids, action))
+            label = f"{count} Dateien endgültig löschen"
+        return tasks.submit(kind, label, body.ids, params)
 
     @app.get("/api/tasks")
     def task_list():
-        return [asdict(task) for task in tasks.list()]
+        return tasks.list()
 
     if not public:  # Verwaltung: Papierkorb leeren, Abgleich, Import – nur über Home Assistant
         @app.post("/api/trash/empty")
@@ -309,7 +310,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             ids = [r["id"] for r in db.query("SELECT id FROM assets WHERE deleted_at IS NOT NULL")]
             if not ids:
                 raise HTTPException(400, "Der Papierkorb ist leer")
-            return asdict(tasks.submit(f"Papierkorb leeren ({len(ids)} Dateien)", ids, editor.purge))
+            return tasks.submit("purge", f"Papierkorb leeren ({len(ids)} Dateien)", ids)
 
         @app.post("/api/library/remove-missing")
         def remove_missing():
@@ -322,7 +323,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             if not ids:
                 raise HTTPException(400, "Es fehlen keine Dateien")
             label = "1 fehlenden Eintrag entfernen" if len(ids) == 1 else f"{len(ids)} fehlende Einträge entfernen"
-            return asdict(tasks.submit(label, ids, editor.forget))
+            return tasks.submit("forget", label, ids)
 
         # ── Import ─────────────────────────────────────────────────────
         @app.get("/api/import")
