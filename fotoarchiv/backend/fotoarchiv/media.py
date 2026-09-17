@@ -36,6 +36,7 @@ VIDEO_TYPES = {
 THUMB_HEIGHT = 400     # Galerie, reicht für Zeilenhöhe 200 px bei doppelter Pixeldichte
 THUMB_MAX_WIDTH = 1600
 PREVIEW_SIZE = 2048    # Einzelansicht, längste Seite
+SMALL_HEIGHT = 160     # rausgezoomte Galerie; wird aus dem normalen Vorschaubild verkleinert
 
 try:
     import pyvips
@@ -112,6 +113,11 @@ def render(source: Path, kind: str, ffmpeg: str, target: Path, width: int, heigh
 
 def thumbnail(source: Path, kind: str, ffmpeg: str, target: Path) -> tuple[int, int]:
     return render(source, kind, ffmpeg, target, THUMB_MAX_WIDTH, THUMB_HEIGHT, 75)
+
+
+def small(thumb: Path, target: Path) -> tuple[int, int]:
+    """Kleines Vorschaubild aus dem vorhandenen – schnell, auch bei HEIC und Videos."""
+    return _save_webp(_vips_thumbnail(thumb, THUMB_MAX_WIDTH, SMALL_HEIGHT), target, 70)
 
 
 def preview(source: Path, kind: str, ffmpeg: str, target: Path) -> tuple[int, int]:

@@ -11,6 +11,22 @@ const monthFormat = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'num
 export const dayLabel = (ts) => dayFormat.format(ts * 1000);
 export const monthLabel = (ts) => monthFormat.format(ts * 1000);
 const yearOf = (ts) => new Date(ts * 1000).getUTCFullYear();
+const groupKeys = {
+  day: (ts) => Math.floor(ts / DAY),
+  month: (ts) => {
+    const d = new Date(ts * 1000);
+    return d.getUTCFullYear() * 12 + d.getUTCMonth();
+  },
+};
+
+/** Zoomstufen der Galerie: Zeilenhöhe in px; die kleinen Stufen gruppieren nach Monat. */
+export const ZOOM_LEVELS = [
+  { rowHeight: 80, group: 'month' },
+  { rowHeight: 120, group: 'month' },
+  { rowHeight: 170, group: 'day' },
+  { rowHeight: 230, group: 'day' },
+  { rowHeight: 300, group: 'day' },
+];
 
 function ratio(item) {
   const w = item[2];
@@ -35,7 +51,8 @@ function pushRow(rows, items, indices, top, height, width, gap, stretch) {
  * @returns {{rows: object[], height: number, years: {year: number, top: number}[]}}
  *   rows sind nach top sortiert: Tagesüberschriften und Bildzeilen.
  */
-export function buildLayout(items, width, { rowHeight = 200, gap = 4, headerHeight = 48, groupGap = 12 } = {}) {
+export function buildLayout(items, width, { rowHeight = 200, gap = 4, headerHeight = 48, groupGap = 12, group = 'day' } = {}) {
+  const keyOf = groupKeys[group];
   const rows = [];
   const years = [];
   let y = 0;
@@ -43,17 +60,17 @@ export function buildLayout(items, width, { rowHeight = 200, gap = 4, headerHeig
   if (width <= 0) return { rows, height: 0, years };
 
   while (i < items.length) {
-    const day = Math.floor(items[i][1] / DAY);
+    const key = keyOf(items[i][1]);
     const year = yearOf(items[i][1]);
     if (!years.length || years[years.length - 1].year !== year) years.push({ year, top: y });
 
-    const header = { type: 'header', top: y, height: headerHeight, ts: items[i][1], first: i, last: i };
+    const header = { type: 'header', group, top: y, height: headerHeight, ts: items[i][1], first: i, last: i };
     rows.push(header);
     y += headerHeight;
 
     let indices = [];
     let sum = 0;
-    for (; i < items.length && Math.floor(items[i][1] / DAY) === day; i++) {
+    for (; i < items.length && keyOf(items[i][1]) === key; i++) {
       indices.push(i);
       sum += ratio(items[i]);
       if (sum * rowHeight + gap * (indices.length - 1) >= width) {

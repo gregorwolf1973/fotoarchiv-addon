@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.06
+
+- Galerie zoomen: 5 Stufen (Zeilenhöhe 80–300 px) über Plus/Minus unten links, Strg + Mausrad, Touchpad-Geste oder Zusammenziehen mit zwei Fingern
+- Die kleinsten zwei Stufen gruppieren nach Monat statt nach Tag
+- Kleine Vorschaubilder (160 px), sobald sie scharf genug sind; werden beim ersten Anzeigen aus dem normalen Vorschaubild erzeugt
+- Zoomstufe wird pro Gerät gemerkt, das oberste Foto bleibt beim Zoomen stehen
+
 ## 0.05
 
 - „Bibliothek einlesen“ heißt jetzt „Bibliothek abgleichen“ und gleicht das Archiv mit dem Datenträger ab:

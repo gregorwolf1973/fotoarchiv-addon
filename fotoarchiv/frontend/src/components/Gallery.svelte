@@ -1,12 +1,13 @@
 <script>
   import { untrack } from 'svelte';
-  import { buildLayout, dayLabel, rowAt, rowOfItem } from '../lib/layout.js';
+  import { buildLayout, dayLabel, monthLabel, rowAt, rowOfItem, ZOOM_LEVELS } from '../lib/layout.js';
   import { thumbUrl } from '../lib/api.js';
   import Icon from './Icon.svelte';
   import Timeline from './Timeline.svelte';
 
   // selected: SvelteSet mit Bild-IDs. Ist etwas ausgewählt, wählt ein Klick aus statt zu öffnen.
-  let { items, selected, onopen, ontoggle, ontoggleday } = $props();
+  // zoom: Index in ZOOM_LEVELS; onzoom(schritt) ändert ihn (+1 größer, -1 kleiner)
+  let { items, selected, zoom, onopen, ontoggle, ontoggleday, onzoom } = $props();
 
   const LONG_PRESS = 450;
 
@@ -19,11 +20,15 @@
   const compact = $derived(width < 640);
   const pad = $derived(compact ? 4 : 16);
   const timelineWidth = $derived(compact ? 44 : 64);
+  const level = $derived(ZOOM_LEVELS[zoom] ?? ZOOM_LEVELS[2]);
+  // Kleine Vorschaubilder (160 px) nur, wo sie bei dieser Pixeldichte noch scharf sind
+  const small = $derived(level.rowHeight * (globalThis.devicePixelRatio || 1) <= 180);
   const layout = $derived(
     buildLayout(items, Math.max(0, width - pad - timelineWidth), {
-      rowHeight: compact ? 110 : 200,
-      gap: compact ? 2 : 4,
-      headerHeight: compact ? 40 : 52,
+      rowHeight: level.rowHeight,
+      gap: level.rowHeight <= 120 ? 2 : 4,
+      headerHeight: level.group === 'month' ? 44 : compact ? 40 : 52,
+      group: level.group,
     }),
   );
 
@@ -60,7 +65,8 @@
       if (!scroller) return;
       if (rows.length && scroller.scrollTop > 0) {
         const k = rowOfItem(rows, Math.min(anchor, items.length - 1));
-        if (k >= 0) scroller.scrollTop = rows[k].top;
+        // Erste Zeile einer Gruppe: Überschrift mit anzeigen
+        if (k >= 0) scroller.scrollTop = rows[k - 1]?.type === 'header' ? rows[k - 1].top : rows[k].top;
       }
       scrollTop = scroller.scrollTop; // der Browser begrenzt die Position ohne Scroll-Ereignis
     });
@@ -90,6 +96,48 @@
     else onopen(index);
   }
 
+  // Zoomen: Strg + Mausrad (auch Zwei-Finger-Geste am Touchpad) und Zusammenziehen am Touchscreen
+  $effect(() => {
+    if (!scroller) return;
+    let wheel = 0;
+    let pinch = null;
+    const distance = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    function onwheel(e) {
+      if (!e.ctrlKey) return;
+      e.preventDefault(); // sonst zoomt der Browser die ganze Seite
+      wheel += e.deltaY;
+      if (Math.abs(wheel) >= 60) {
+        onzoom(wheel < 0 ? 1 : -1);
+        wheel = 0;
+      }
+    }
+    function ontouchstart(e) {
+      if (e.touches.length === 2) pinch = distance(e.touches);
+    }
+    function ontouchmove(e) {
+      if (e.touches.length !== 2 || pinch === null) return;
+      e.preventDefault();
+      const ratio = distance(e.touches) / pinch;
+      if (ratio > 1.3 || ratio < 0.77) {
+        onzoom(ratio > 1 ? 1 : -1);
+        pinch = distance(e.touches);
+      }
+    }
+    const ontouchend = (e) => e.touches.length < 2 && (pinch = null);
+
+    scroller.addEventListener('wheel', onwheel, { passive: false });
+    scroller.addEventListener('touchstart', ontouchstart, { passive: true });
+    scroller.addEventListener('touchmove', ontouchmove, { passive: false });
+    scroller.addEventListener('touchend', ontouchend);
+    return () => {
+      scroller.removeEventListener('wheel', onwheel);
+      scroller.removeEventListener('touchstart', ontouchstart);
+      scroller.removeEventListener('touchmove', ontouchmove);
+      scroller.removeEventListener('touchend', ontouchend);
+    };
+  });
+
   function broken(event) {
     event.currentTarget.parentElement.classList.add('broken');
   }
@@ -101,10 +149,10 @@
       {#each visible.headers as header (header.top)}
         {@const all = selecting && daySelected(header)}
         <div class="day" style:top="{header.top}px" style:left="{pad}px" style:height="{header.height}px">
-          <button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title="Ganzen Tag auswählen">
+          <button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title={header.group === 'month' ? 'Ganzen Monat auswählen' : 'Ganzen Tag auswählen'}>
             <Icon name="checkCircle" size={20} />
           </button>
-          <h2>{dayLabel(header.ts)}</h2>
+          <h2>{header.group === 'month' ? monthLabel(header.ts) : dayLabel(header.ts)}</h2>
         </div>
       {/each}
       {#each visible.cells as cell (cell.item[0])}
@@ -127,15 +175,23 @@
             oncontextmenu={(e) => e.pointerType !== 'mouse' && e.preventDefault()}
             aria-label={isSelected ? 'Ausgewählt' : 'Öffnen'}
           >
-            <img src={thumbUrl(cell.item)} alt="" loading="lazy" decoding="async" draggable="false" onerror={broken} />
+            <img src={thumbUrl(cell.item, small)} alt="" loading="lazy" decoding="async" draggable="false" onerror={broken} />
           </button>
           {#if cell.item[4]}<span class="badge"><Icon name="play" size={compact ? 14 : 18} /></span>{/if}
           <button class="check" onclick={(e) => ontoggle(cell.index, e)} title="Auswählen" aria-pressed={isSelected}>
-            <Icon name="checkCircle" size={compact ? 20 : 24} />
+            <Icon name="checkCircle" size={level.rowHeight <= 120 ? 18 : 24} />
           </button>
         </div>
       {/each}
     </div>
+  </div>
+  <div class="zoom" role="group" aria-label="Vorschaugröße">
+    <button class="icon small" disabled={zoom <= 0} onclick={() => onzoom(-1)} title="Kleiner – mehr Fotos (Strg + Mausrad)">
+      <Icon name="minus" size={20} />
+    </button>
+    <button class="icon small" disabled={zoom >= ZOOM_LEVELS.length - 1} onclick={() => onzoom(1)} title="Größer – weniger Fotos (Strg + Mausrad)">
+      <Icon name="plus" size={20} />
+    </button>
   </div>
   <Timeline {layout} {scrollTop} {viewport} width={timelineWidth} onscroll={(offset) => (scroller.scrollTop = offset)} />
 </div>
@@ -244,6 +300,22 @@
     border-radius: 50%;
     padding: 3px;
     pointer-events: none;
+  }
+  .zoom {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 5;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 20px;
+    background: var(--surface);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  }
+  .zoom button {
+    width: 36px;
+    height: 36px;
   }
   .check {
     position: absolute;

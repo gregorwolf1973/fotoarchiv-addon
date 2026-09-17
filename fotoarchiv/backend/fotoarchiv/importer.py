@@ -214,7 +214,7 @@ class Importer:
         return self.settings.cache / variant / f"{asset_id // 1000:04d}" / f"{asset_id}.webp"
 
     def drop_cache(self, asset_id: int):
-        for variant in ("thumb", "preview"):
+        for variant in ("thumb", "small", "preview"):
             self.cache_file(asset_id, variant).unlink(missing_ok=True)
 
     def ensure_thumbnail(self, asset_id: int) -> Path | None:
@@ -247,6 +247,20 @@ class Importer:
             except Exception as exc:
                 log.warning("Großansicht für %s fehlgeschlagen: %s", row["path"], exc)
                 return None
+        return target
+
+    def ensure_small(self, asset_id: int) -> Path | None:
+        target = self.cache_file(asset_id, "small")
+        if target.exists():
+            return target
+        thumb = self.ensure_thumbnail(asset_id)
+        if thumb is None:
+            return None
+        try:
+            media.small(thumb, target)
+        except Exception as exc:
+            log.warning("Kleines Vorschaubild für %s fehlgeschlagen: %s", asset_id, exc)
+            return thumb  # lieber groß als gar nichts
         return target
 
     # ── Abgleich mit dem Datenträger ───────────────────────────────

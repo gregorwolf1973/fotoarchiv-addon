@@ -111,6 +111,7 @@ def test_rotate_jpeg_updates_orientation_size_and_thumbnail(settings, importer, 
     before = row(importer, asset_id)
     thumb = importer.cache_file(asset_id, "thumb")
     importer.ensure_preview(asset_id)
+    importer.ensure_small(asset_id)
 
     editor.rotate(asset_id, 90)
     after = row(importer, asset_id)
@@ -118,6 +119,7 @@ def test_rotate_jpeg_updates_orientation_size_and_thumbnail(settings, importer, 
     assert (after["width"], after["height"]) == (240, 320)
     assert pyvips.Image.new_from_file(str(thumb)).height > pyvips.Image.new_from_file(str(thumb)).width
     assert not importer.cache_file(asset_id, "preview").exists()
+    assert not importer.cache_file(asset_id, "small").exists()  # wird gedreht neu erzeugt
     assert after["rev"] > before["rev"]
 
     editor.rotate(asset_id, 270)

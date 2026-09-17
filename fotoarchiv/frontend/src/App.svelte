@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { api, filterQuery } from './lib/api.js';
+  import { ZOOM_LEVELS } from './lib/layout.js';
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
   import Confirm from './components/Confirm.svelte';
@@ -17,6 +18,7 @@
   import Viewer from './components/Viewer.svelte';
 
   const NO_FILTERS = { tags: [], persons: [], start: '', end: '', q: '' };
+  const ZOOM_KEY = 'fotoarchiv.zoom';
 
   let info = $state(null);
   let items = $state.raw([]); // groß und unveränderlich: kein tiefer Proxy
@@ -31,6 +33,7 @@
   let showImport = $state(false);
   let searchOpen = $state(false);
   let dialog = $state(null);
+  let zoom = $state(readZoom());
   let listKey = $state(''); // neue Suche/Ansicht: Galerie neu aufbauen, oben beginnen
   let uploader = $state();
   let fileInput = $state();
@@ -124,6 +127,25 @@
     tick();
     return () => clearTimeout(timer);
   });
+
+  // Zoomstufe pro Gerät merken; Handys starten kleiner
+  function readZoom() {
+    try {
+      const stored = localStorage.getItem(ZOOM_KEY);
+      if (stored !== null && ZOOM_LEVELS[Number(stored)]) return Number(stored);
+    } catch {
+      /* kein Speicher: Standard */
+    }
+    return window.innerWidth < 640 ? 1 : 2;
+  }
+  function changeZoom(step) {
+    zoom = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, zoom + step));
+    try {
+      localStorage.setItem(ZOOM_KEY, String(zoom));
+    } catch {
+      /* ohne Speicher gilt die Stufe nur bis zum Neuladen */
+    }
+  }
 
   function setFilters(next) {
     filters = next;
@@ -359,6 +381,8 @@
       <Gallery
         {items}
         {selected}
+        {zoom}
+        onzoom={changeZoom}
         onopen={(i) => (openId = items[i][0])}
         ontoggle={toggle}
         ontoggleday={toggleDay}

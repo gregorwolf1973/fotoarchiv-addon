@@ -284,9 +284,9 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
         return detail(asset_id)
 
     @app.get("/api/assets/{asset_id}/thumb")
-    def asset_thumb(asset_id: int):
+    def asset_thumb(asset_id: int, size: Literal["normal", "small"] = "normal"):
         asset_row(asset_id)
-        path = importer.ensure_thumbnail(asset_id)
+        path = importer.ensure_small(asset_id) if size == "small" else importer.ensure_thumbnail(asset_id)
         if path is None:
             raise HTTPException(404, "Kein Vorschaubild")
         return FileResponse(path, media_type="image/webp", headers=LONG_CACHE)

@@ -54,7 +54,7 @@ export const api = {
 };
 
 // item = [id, ts, w, h, video, rev]
-export const thumbUrl = (item) => `api/assets/${item[0]}/thumb?r=${item[5]}`;
+export const thumbUrl = (item, small = false) => `api/assets/${item[0]}/thumb?r=${item[5]}${small ? '&size=small' : ''}`;
 export const previewUrl = (item) => `api/assets/${item[0]}/preview?r=${item[5]}`;
 export const originalUrl = (item, download = false) =>
   `api/assets/${item[0]}/original?r=${item[5]}${download ? '&download=true' : ''}`;

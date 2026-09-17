@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
 description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Suche, Bearbeiten direkt in der Datei, Papierkorb"
-version: "0.05"
+version: "0.06"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:

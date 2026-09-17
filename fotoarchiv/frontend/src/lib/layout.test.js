@@ -49,3 +49,10 @@ test('Jahresmarken halten Mindestabstand', () => {
   const layout = { height: 10000, years: [{ year: 2024, top: 0 }, { year: 2023, top: 50 }, { year: 2022, top: 5000 }] };
   assert.deepEqual(yearMarks(layout, 1000, 900).map((m) => m.year), [2024, 2022]);
 });
+
+test('Monatsgruppen fassen alle Tage eines Monats zusammen', () => {
+  const items = [photo(1, '2024-05-30T10:00:00'), photo(2, '2024-05-02T10:00:00'), photo(3, '2024-04-30T10:00:00')];
+  const headers = buildLayout(items, 800, { group: 'month' }).rows.filter((r) => r.type === 'header');
+  assert.deepEqual(headers.map((h) => [h.group, h.first, h.last]), [['month', 0, 1], ['month', 2, 2]]);
+  assert.equal(buildLayout(items, 800).rows.filter((r) => r.type === 'header').length, 3);
+});

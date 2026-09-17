@@ -4,13 +4,13 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.05)
+## Funktionen (Version 0.06)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
 - **Duplikaterkennung per MD5.** Bereits vorhandene Dateien werden nicht noch einmal aufgenommen. Beim Ordner-Import landen sie in `_duplikate` im Import-Ordner. Die Prüfsumme vom Import wird dauerhaft gespeichert, damit ein Bild auch nach späterer Bearbeitung noch als Duplikat erkannt wird.
 - **Bibliothek abgleichen.** Übernimmt Dateien, die schon in der Bibliothek liegen, ohne sie zu verschieben, und erkennt von Hand verschobene oder gelöschte Dateien. Siehe [Dateien außerhalb des Fotoarchivs ändern](#dateien-außerhalb-des-fotoarchivs-ändern).
-- **Galerie** mit Tagesgruppen, Zeilen im Blocksatz und flüssigem Scrollen auch bei Zehntausenden Bildern.
+- **Galerie** mit Tagesgruppen, Zeilen im Blocksatz und flüssigem Scrollen auch bei Zehntausenden Bildern. Die Vorschaugröße lässt sich in 5 Stufen zoomen, die kleinsten zwei gruppieren nach Monat.
 - **Zeitleiste rechts.** Ein fester Balken mit Jahreszahlen und einem Cursor zum Ziehen, der Monat und Jahr anzeigt.
 - **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen.
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext (Dateiname, Kamera, Personen- und Schlagwortnamen). Mehrere Filter gelten gemeinsam.
@@ -51,6 +51,7 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Löschen | Entf | Papierkorb-Symbol |
 | In der Einzelansicht blättern | ← → | wischen |
 | Infobereich ein/aus | i | ⓘ |
+| Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |
 
 ## Bearbeiten
 
@@ -116,7 +117,7 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 
 ## Speicherplatz und Backups
 
-- Die Datenbank und die Vorschaubilder liegen im Add-on-Datenordner. Pro Bild braucht das etwa 30–40 KB.
+- Die Datenbank und die Vorschaubilder liegen im Add-on-Datenordner. Pro Bild braucht das etwa 30–40 KB, dazu etwa 6 KB für die kleine Vorschau. Die kleine Vorschau entsteht erst, wenn ein Bild zum ersten Mal in einer kleinen Zoomstufe angezeigt wird.
 - **Vorschaubilder sind vom Add-on-Backup ausgenommen.** Sie werden bei Bedarf neu erzeugt.
 - ⚠️ **Eine vollständige Home-Assistant-Sicherung enthält auch den Ordner `/media`, also das ganze Fotoarchiv.** Bei großen Sammlungen solltest du `media` in den Backup-Einstellungen abwählen und die Fotos separat sichern, z. B. auf ein NAS.
 

@@ -38,6 +38,10 @@ def test_upload_index_detail_and_files(client, settings, make_jpeg, tmp_path):
 
     thumb = client.get(f"/api/assets/{first['asset_id']}/thumb")
     assert thumb.headers["content-type"] == "image/webp"
+    small = client.get(f"/api/assets/{first['asset_id']}/thumb", params={"size": "small"})
+    import pyvips
+    assert pyvips.Image.new_from_buffer(small.content, "").height == 160
+    assert len(small.content) < len(thumb.content)
     assert "content-encoding" not in thumb.headers
     assert client.get(f"/api/assets/{first['asset_id']}/preview").status_code == 200
 
