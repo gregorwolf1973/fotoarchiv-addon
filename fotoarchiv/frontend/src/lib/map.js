@@ -5,13 +5,16 @@ import 'leaflet/dist/leaflet.css';
 
 const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+// Home Assistant sendet "Referrer-Policy: no-referrer". OpenStreetMap blockiert Anfragen ohne Referer,
+// daher hier ausdrücklich nur den Ursprung (z. B. https://ha.example.org/) mitschicken – nie Pfad oder Ingress-Token.
+const REFERRER_POLICY = 'strict-origin-when-cross-origin';
 const PIN = 'M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5M12,2A7,7 0 0,0 5,9C5,14.25 12,22 12,22C12,22 19,14.25 19,9A7,7 0 0,0 12,2Z';
 
 export { L };
 
 export function createMap(element, options = {}) {
   const map = L.map(element, { worldCopyJump: true, minZoom: 2, zoomControl: true, ...options });
-  L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
+  L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION, referrerPolicy: REFERRER_POLICY }).addTo(map);
   return map;
 }
 
@@ -26,7 +29,7 @@ export const pinIcon = () =>
 /** Ortssuche über OpenStreetMap Nominatim (nur auf ausdrücklichen Wunsch, keine Autovervollständigung). */
 export async function searchPlaces(query) {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '6', 'accept-language': 'de' });
-  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { referrerPolicy: REFERRER_POLICY });
   if (!response.ok) throw new Error('Ortssuche nicht erreichbar');
   const results = await response.json();
   return results.map((r) => ({
