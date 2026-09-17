@@ -47,7 +47,8 @@ export function buildLayout(items, width, { rowHeight = 200, gap = 4, headerHeig
     const year = yearOf(items[i][1]);
     if (!years.length || years[years.length - 1].year !== year) years.push({ year, top: y });
 
-    rows.push({ type: 'header', top: y, height: headerHeight, ts: items[i][1], first: i });
+    const header = { type: 'header', top: y, height: headerHeight, ts: items[i][1], first: i, last: i };
+    rows.push(header);
     y += headerHeight;
 
     let indices = [];
@@ -63,6 +64,7 @@ export function buildLayout(items, width, { rowHeight = 200, gap = 4, headerHeig
         sum = 0;
       }
     }
+    header.last = i - 1;
     if (indices.length) {
       pushRow(rows, items, indices, y, rowHeight, width, gap, false);
       y += rowHeight + gap;

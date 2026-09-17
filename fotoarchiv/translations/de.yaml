@@ -9,3 +9,6 @@ configuration:
     description: >-
       Eingangsordner, z. B. per Samba als \\homeassistant\share\fotoarchiv-import erreichbar.
       Nach dem Import sind die Dateien von hier in die Bibliothek verschoben.
+  trash_days:
+    name: Papierkorb (Tage)
+    description: Gelöschte Dateien bleiben so viele Tage im Papierkorb und werden danach endgültig vom Datenträger gelöscht.

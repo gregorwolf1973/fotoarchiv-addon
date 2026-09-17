@@ -39,6 +39,9 @@ PREVIEW_SIZE = 2048    # Einzelansicht, längste Seite
 
 try:
     import pyvips
+
+    # Der Operations-Cache arbeitet mit Dateinamen – nach Drehen oder Bearbeiten lieferte er veraltete Bilder
+    pyvips.cache_set_max(0)
 except (ImportError, OSError) as exc:  # libvips fehlt
     pyvips = None
     log.error("libvips nicht verfügbar: %s", exc)

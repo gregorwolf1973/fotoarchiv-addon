@@ -3,22 +3,51 @@
 async function request(path, options) {
   const response = await fetch(path, options);
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(body?.detail || response.statusText);
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    if (!response.ok) throw new Error(response.statusText || `Fehler ${response.status}`);
+  }
+  if (!response.ok) {
+    const detail = body?.detail;
+    throw new Error(Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : detail || response.statusText);
+  }
   return body;
+}
+
+const send = (method, body) => ({
+  method,
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+/** Filter -> Query-String; Listen werden als wiederholte Parameter übergeben. */
+export function filterQuery({ tags = [], persons = [], start = '', end = '', q = '' } = {}, trash = false) {
+  const params = new URLSearchParams();
+  for (const t of tags) params.append('tag', t.id);
+  for (const p of persons) params.append('person', p.id);
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  if (q) params.set('q', q);
+  if (trash) params.set('trash', 'true');
+  return params.toString();
 }
 
 export const api = {
   state: () => request('api/state'),
-  index: () => request('api/assets'),
+  index: (filters, trash) => request(`api/assets?${filterQuery(filters, trash)}`),
+  labels: () => request('api/labels'),
   asset: (id) => request(`api/assets/${id}`),
+  update: (id, changes) => request(`api/assets/${id}`, send('PATCH', changes)),
+  rotate: (id, degrees) => request(`api/assets/${id}/rotate`, send('POST', { degrees })),
+  remove: (id) => request(`api/assets/${id}`, { method: 'DELETE' }),
+  restore: (id) => request(`api/assets/${id}/restore`, { method: 'POST' }),
+  batch: (body) => request('api/batch', send('POST', body)),
+  tasks: () => request('api/tasks'),
+  emptyTrash: () => request('api/trash/empty', { method: 'POST' }),
   importStatus: () => request('api/import'),
-  startImport: (mode) =>
-    request('api/import', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mode }),
-    }),
+  startImport: (mode) => request('api/import', send('POST', { mode })),
 };
 
 // item = [id, ts, w, h, video, rev]

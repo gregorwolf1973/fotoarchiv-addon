@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.02
+
+- Suche nach Personen, Schlagworten, Zeitraum und Freitext
+- Bearbeiten direkt in der Datei (exiftool): Datum, Personen, Schlagworte, Ort entfernen
+- Drehen verlustfrei über EXIF-Orientierung bzw. Video-Rotation (nicht bei HEIC/AVIF)
+- Mehrfachauswahl (Häkchen, Shift-Bereich, ganzer Tag, Strg+A, langes Drücken) mit Aktionen im Hintergrund und Fortschritt
+- Papierkorb mit Wiederherstellen, Rückgängig, endgültig löschen und automatischer Bereinigung (Option `trash_days`)
+- Datei wird nach Datumsänderung in den passenden Monatsordner verschoben
+- Fehler behoben: libvips lieferte nach dem Bearbeiten veraltete Vorschaubilder aus seinem Cache
+
 ## 0.01
 
 - Erste Version

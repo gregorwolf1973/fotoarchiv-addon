@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from . import media, metadata
+from . import labels, media, metadata
 from .config import Settings
 from .db import Database
 from .exiftool import ExifTool
@@ -171,21 +171,17 @@ class Importer:
                  datetime.now().isoformat(timespec="seconds")),
             )
             asset_id = cur.lastrowid
-            for table, link, column, names in (
-                ("tags", "asset_tags", "tag_id", meta.tags),
-                ("persons", "asset_persons", "person_id", meta.persons),
-            ):
-                for label in names:
-                    conn.execute(f"INSERT OR IGNORE INTO {table} (name) VALUES (?)", (label,))
-                    conn.execute(
-                        f"INSERT OR IGNORE INTO {link} (asset_id, {column}) SELECT ?, id FROM {table} WHERE name = ?",
-                        (asset_id, label),
-                    )
+            labels.replace(conn, asset_id, "tags", meta.tags)
+            labels.replace(conn, asset_id, "persons", meta.persons)
         return asset_id
 
     # ── Vorschaubilder ─────────────────────────────────────────────
     def cache_file(self, asset_id: int, variant: str) -> Path:
         return self.settings.cache / variant / f"{asset_id // 1000:04d}" / f"{asset_id}.webp"
+
+    def drop_cache(self, asset_id: int):
+        for variant in ("thumb", "preview"):
+            self.cache_file(asset_id, variant).unlink(missing_ok=True)
 
     def ensure_thumbnail(self, asset_id: int) -> Path | None:
         row = self.db.one("SELECT path, kind, width, height, thumb_ok FROM assets WHERE id = ?", (asset_id,))

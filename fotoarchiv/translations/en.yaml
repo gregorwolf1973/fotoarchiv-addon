@@ -9,3 +9,6 @@ configuration:
     description: >-
       Inbox folder, e.g. reachable via Samba as \\homeassistant\share\fotoarchiv-import.
       Imported files are moved from here into the library.
+  trash_days:
+    name: Trash (days)
+    description: Deleted files stay in the trash for this many days before they are permanently removed from disk.

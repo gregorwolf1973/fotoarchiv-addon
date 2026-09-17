@@ -14,10 +14,13 @@ Foto- und Video-Datenbank für Home Assistant, gebaut für Zehntausende Bilder a
 - **Drag & Drop:** Einzelne Dateien oder ganze Ordner in den Browser ziehen.
 - **Duplikate** werden per MD5-Prüfsumme erkannt und nicht doppelt aufgenommen.
 - **Galerie mit Zeitleiste:** Ein fester Balken mit Jahreszahlen und ein ziehbarer Cursor mit Datumsanzeige.
+- **Suche** nach Personen, Schlagworten, Zeitraum und Freitext.
+- **Bearbeiten direkt in der Datei:** Datum, Personen, Schlagworte, Ort und Drehen, auch für viele Fotos auf einmal.
+- **Papierkorb** mit Wiederherstellen und automatischem Leeren.
 - **Fotos und Videos:** JPEG, HEIC, PNG, WebP, AVIF, MP4, MOV und mehr.
 - **Ohne Sonderformat:** Die Bilder bleiben normale Dateien, die Datenbank ist nur ein Index.
 
-**In Arbeit:** Bearbeiten mit Speichern direkt in der Datei (Drehen, Datum, Ort, Tags, Personen), Papierkorb, Suche, Weltkarte mit Zuordnen per Drag & Drop, Gesichtserkennung.
+**In Arbeit:** Weltkarte mit Zuordnen des Aufnahmeorts per Drag & Drop, Gesichtserkennung.
 
 ### Installation
 
@@ -31,6 +34,6 @@ Details stehen in der [Dokumentation](fotoarchiv/DOCS.md).
 
 ## 🇬🇧 English
 
-Photo and video library for Home Assistant: Samba inbox import, drag & drop upload, MD5 duplicate detection, date-sorted storage (`YYYY/MM`), justified gallery with a draggable year timeline, HEIC and video support. Files stay plain files; the database is only an index.
+Photo and video library for Home Assistant: Samba inbox import, drag & drop upload, MD5 duplicate detection, date-sorted storage (`YYYY/MM`), justified gallery with a draggable year timeline, search by people/tags/date, editing that writes straight into the files (exiftool), bulk actions and a trash. HEIC and video support. Files stay plain files; the database is only an index.
 
 Install by adding `https://github.com/gregorwolf1973/fotoarchiv-addon` as an add-on repository.

@@ -23,6 +23,7 @@ test('Neuer Tag beginnt mit Überschrift, Jahre werden gemerkt', () => {
   const layout = buildLayout(items, 800);
   assert.equal(layout.rows.filter((r) => r.type === 'header').length, 3);
   assert.deepEqual(layout.years.map((y) => y.year), [2024, 2023]);
+  assert.deepEqual(layout.rows.filter((r) => r.type === 'header').map((h) => [h.first, h.last]), [[0, 0], [1, 1], [2, 2]]);
   assert.ok(layout.years[1].top > 0);
 });
 

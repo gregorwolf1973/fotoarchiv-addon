@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.01)
+## Funktionen (Version 0.02)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -13,9 +13,13 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Galerie** mit Tagesgruppen, Zeilen im Blocksatz und flüssigem Scrollen auch bei Zehntausenden Bildern.
 - **Zeitleiste rechts.** Ein fester Balken mit Jahreszahlen und einem Cursor zum Ziehen, der Monat und Jahr anzeigt.
 - **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen.
+- **Suche** nach Personen, Schlagworten, Zeitraum und Freitext (Dateiname, Kamera, Personen- und Schlagwortnamen). Mehrere Filter gelten gemeinsam.
+- **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
+- **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum setzen, drehen und löschen für viele Dateien auf einmal.
+- **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
 - **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI und MTS.
 
-Geplant sind: Bearbeiten (Drehen, Datum, Ort, Tags, Personen, jeweils direkt in die Datei geschrieben), Löschen mit Papierkorb, Suche, Weltkarte und Gesichtserkennung.
+Geplant sind: Weltkarte mit Zuordnen des Aufnahmeorts per Drag & Drop und Gesichtserkennung.
 
 ## Einrichtung
 
@@ -30,8 +34,48 @@ Geplant sind: Bearbeiten (Drehen, Datum, Ort, Tags, Personen, jeweils direkt in 
 |---|---|---|
 | `library_folder` | `/media/fotoarchiv` | Bibliothek. Liegt sie unter `/media`, sind die Bilder auch im HA-Medienbrowser sichtbar. |
 | `import_folder` | `/share/fotoarchiv-import` | Eingangsordner für den Samba-Import |
+| `trash_days` | `30` | So viele Tage bleiben gelöschte Dateien im Papierkorb |
 
 Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortieren ein reines Umbenennen und geht sofort.
+
+## Bedienung
+
+| Aktion | Maus / Tastatur | Touch |
+|---|---|---|
+| Foto auswählen | Häkchen oben links auf dem Foto | lange drücken |
+| Bereich auswählen | Shift + Klick | – |
+| Ganzen Tag auswählen | Häkchen neben dem Datum | Häkchen neben dem Datum |
+| Alles auswählen | Strg + A | – |
+| Auswahl aufheben | Esc | ✕ in der Leiste |
+| Löschen | Entf | Papierkorb-Symbol |
+| In der Einzelansicht blättern | ← → | wischen |
+| Infobereich ein/aus | i | ⓘ |
+
+## Bearbeiten
+
+Jede Änderung wird **zuerst mit exiftool in die Datei geschrieben**. Danach liest das Add-on die Datei neu ein und übernimmt den Stand in die Datenbank. So stimmen Datei und Datenbank immer überein, und andere Programme wie digiKam, Lightroom oder die Fotos-App am Handy sehen dieselben Angaben.
+
+| Angabe | Wird geschrieben in |
+|---|---|
+| Aufnahmedatum (Fotos) | EXIF `DateTimeOriginal`, `CreateDate`, `ModifyDate` |
+| Aufnahmedatum (Videos) | QuickTime `CreateDate` (UTC) und `Keys:CreationDate` (Ortszeit mit Zeitzone) |
+| Schlagworte | XMP `dc:Subject`, bei JPEG/TIFF zusätzlich IPTC `Keywords` |
+| Personen | XMP `Iptc4xmpExt:PersonInImage` |
+| Ort | EXIF GPS bzw. bei Videos `Keys:GPSCoordinates` |
+| Drehen (Fotos) | EXIF-Orientierung (verlustfrei, die Bilddaten bleiben unverändert) |
+| Drehen (Videos) | Rotationsmatrix der Videospur (verlustfrei) |
+
+- Nach einer Datumsänderung wird die Datei in den passenden `JJJJ/MM`-Ordner verschoben.
+- Das Dateidatum (Änderungszeit) bleibt beim Schreiben erhalten.
+- **Bearbeitbar** sind JPEG, PNG, WebP, TIFF, HEIC/HEIF, AVIF, MP4, MOV, M4V und 3GP. GIF, MKV, WebM, AVI und MTS können keine Metadaten speichern und werden nur angezeigt.
+- **HEIC/AVIF lassen sich nicht drehen.** Die Drehung steckt dort in einem Container-Feld, das exiftool nicht schreiben kann, und die EXIF-Orientierung wird von HEIC-Programmen ignoriert. Handyfotos sind in der Regel schon richtig gedreht.
+- Personen, die ein anderes Programm über **Gesichtsmarkierungen** zugeordnet hat, lassen sich hier nicht entfernen. Das kommt mit der Gesichtserkennung.
+
+## Papierkorb
+
+Gelöschte Dateien werden nach `.papierkorb` in der Bibliothek verschoben. Der Ordner beginnt mit einem Punkt und ist deshalb im HA-Medienbrowser nicht sichtbar. Über das Papierkorb-Symbol oben rechts lassen sich Dateien wiederherstellen oder endgültig löschen. Nach `trash_days` Tagen löscht das Add-on sie automatisch.
+
+Eine Datei im Papierkorb gilt beim Import weiterhin als vorhanden. Sie wird also als Duplikat erkannt.
 
 ## Aufnahmedatum
 

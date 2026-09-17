@@ -5,13 +5,17 @@
   import Icon from './Icon.svelte';
   import Timeline from './Timeline.svelte';
 
-  let { items, onopen } = $props();
+  // selected: SvelteSet mit Bild-IDs. Ist etwas ausgewählt, wählt ein Klick aus statt zu öffnen.
+  let { items, selected, onopen, ontoggle, ontoggleday } = $props();
+
+  const LONG_PRESS = 450;
 
   let scroller = $state();
   let width = $state(0);
   let viewport = $state(0);
   let scrollTop = $state(0);
 
+  const selecting = $derived(selected.size > 0);
   const compact = $derived(width < 640);
   const pad = $derived(compact ? 4 : 16);
   const timelineWidth = $derived(compact ? 44 : 64);
@@ -38,6 +42,11 @@
     return { headers, cells };
   });
 
+  const daySelected = (header) => {
+    for (let i = header.first; i <= header.last; i++) if (!selected.has(items[i][0])) return false;
+    return true;
+  };
+
   // Beim Ändern der Breite oder neuen Bildern das oberste sichtbare Bild festhalten
   let anchor = 0;
   function onscroll() {
@@ -48,14 +57,37 @@
   $effect(() => {
     const { rows } = layout;
     untrack(() => {
-      if (!scroller || !rows.length || scroller.scrollTop === 0) return;
-      const k = rowOfItem(rows, Math.min(anchor, items.length - 1));
-      if (k >= 0) scroller.scrollTop = rows[k].top;
+      if (!scroller) return;
+      if (rows.length && scroller.scrollTop > 0) {
+        const k = rowOfItem(rows, Math.min(anchor, items.length - 1));
+        if (k >= 0) scroller.scrollTop = rows[k].top;
+      }
+      scrollTop = scroller.scrollTop; // der Browser begrenzt die Position ohne Scroll-Ereignis
     });
   });
 
-  function scrollTo(offset) {
-    scroller.scrollTop = offset;
+  // Langes Drücken auf Touch-Geräten startet die Auswahl
+  let pressTimer;
+  let pressed = false;
+  function pointerdown(e, index) {
+    if (e.pointerType === 'mouse') return;
+    pressed = false;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => {
+      pressed = true;
+      navigator.vibrate?.(20);
+      ontoggle(index, e);
+    }, LONG_PRESS);
+  }
+  const cancelPress = () => clearTimeout(pressTimer);
+
+  function click(e, index) {
+    if (pressed) {
+      pressed = false;
+      return;
+    }
+    if (selecting || e.shiftKey || e.ctrlKey || e.metaKey) ontoggle(index, e);
+    else onopen(index);
   }
 
   function broken(event) {
@@ -63,30 +95,49 @@
   }
 </script>
 
-<div class="gallery">
+<div class="gallery" class:selecting>
   <div class="scroller" id="gallery-scroller" bind:this={scroller} bind:clientWidth={width} bind:clientHeight={viewport} {onscroll}>
     <div class="content" style:height="{layout.height}px">
       {#each visible.headers as header (header.top)}
-        <h2 class="day" style:top="{header.top}px" style:left="{pad}px" style:height="{header.height}px">
-          {dayLabel(header.ts)}
-        </h2>
+        {@const all = selecting && daySelected(header)}
+        <div class="day" style:top="{header.top}px" style:left="{pad}px" style:height="{header.height}px">
+          <button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title="Ganzen Tag auswählen">
+            <Icon name="checkCircle" size={20} />
+          </button>
+          <h2>{dayLabel(header.ts)}</h2>
+        </div>
       {/each}
       {#each visible.cells as cell (cell.item[0])}
-        <button
+        {@const isSelected = selected.has(cell.item[0])}
+        <div
           class="cell"
+          class:selected={isSelected}
           style:top="{cell.top}px"
           style:left="{pad + cell.left}px"
           style:width="{cell.width}px"
           style:height="{cell.height}px"
-          onclick={() => onopen(cell.index)}
         >
-          <img src={thumbUrl(cell.item)} alt="" loading="lazy" decoding="async" draggable="false" onerror={broken} />
+          <button
+            class="open"
+            onclick={(e) => click(e, cell.index)}
+            onpointerdown={(e) => pointerdown(e, cell.index)}
+            onpointerup={cancelPress}
+            onpointermove={cancelPress}
+            onpointercancel={cancelPress}
+            oncontextmenu={(e) => e.pointerType !== 'mouse' && e.preventDefault()}
+            aria-label={isSelected ? 'Ausgewählt' : 'Öffnen'}
+          >
+            <img src={thumbUrl(cell.item)} alt="" loading="lazy" decoding="async" draggable="false" onerror={broken} />
+          </button>
           {#if cell.item[4]}<span class="badge"><Icon name="play" size={compact ? 14 : 18} /></span>{/if}
-        </button>
+          <button class="check" onclick={(e) => ontoggle(cell.index, e)} title="Auswählen" aria-pressed={isSelected}>
+            <Icon name="checkCircle" size={compact ? 20 : 24} />
+          </button>
+        </div>
       {/each}
     </div>
   </div>
-  <Timeline {layout} {scrollTop} {viewport} width={timelineWidth} onscroll={scrollTo} />
+  <Timeline {layout} {scrollTop} {viewport} width={timelineWidth} onscroll={(offset) => (scroller.scrollTop = offset)} />
 </div>
 
 <style>
@@ -111,43 +162,78 @@
   }
   .day {
     position: absolute;
-    margin: 0;
     display: flex;
     align-items: flex-end;
-    padding-bottom: 8px;
+    gap: 6px;
+    padding-bottom: 6px;
     box-sizing: border-box;
+    white-space: nowrap;
+  }
+  .day h2 {
+    margin: 0 0 2px;
     font-size: 0.95rem;
     font-weight: 500;
     color: var(--text);
-    white-space: nowrap;
+  }
+  .daycheck {
+    display: none;
+    min-height: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+  }
+  .daycheck.on {
+    color: var(--accent);
+  }
+  .day:hover .daycheck,
+  .selecting .daycheck {
+    display: inline-flex;
   }
   .cell {
     position: absolute;
+    overflow: hidden;
+    background: var(--placeholder);
+  }
+  .open {
     display: block;
+    width: 100%;
+    height: 100%;
     min-height: 0;
     padding: 0;
     border: 0;
     border-radius: 0;
-    background: var(--placeholder);
-    cursor: pointer;
-    overflow: hidden;
+    background: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
   }
-  .cell img {
+  .open img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 0.15s ease, filter 0.15s ease;
+    transition: transform 0.12s ease, filter 0.15s ease;
   }
-  .cell:hover img {
+  .cell:hover .open img {
     filter: brightness(0.88);
   }
-  .cell:focus-visible {
+  .open:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: -3px;
   }
   .cell:global(.broken) img {
     visibility: hidden;
+  }
+  .selected {
+    background: color-mix(in srgb, var(--accent) 25%, var(--bg));
+  }
+  .selected .open img {
+    transform: scale(0.86);
+    border-radius: 4px;
   }
   .badge {
     position: absolute;
@@ -157,11 +243,47 @@
     background: rgb(0 0 0 / 0.45);
     border-radius: 50%;
     padding: 3px;
+    pointer-events: none;
+  }
+  .check {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    display: none;
+    min-height: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: rgb(255 255 255 / 0.85);
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
+  }
+  .check:hover:not(:disabled) {
+    background: transparent;
+    color: #fff;
+  }
+  .cell:hover .check,
+  .selecting .check {
+    display: inline-flex;
+  }
+  .selected .check {
+    color: var(--accent);
+    filter: none;
+  }
+  @media (hover: none) {
+    .cell:hover .check {
+      display: none;
+    }
+    .selecting .check {
+      display: inline-flex;
+    }
   }
   @media (max-width: 639px) {
-    .day {
+    .day h2 {
       font-size: 0.85rem;
-      padding-bottom: 6px;
     }
   }
 </style>

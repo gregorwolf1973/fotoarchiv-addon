@@ -1,24 +1,30 @@
 """HTTP-API und Auslieferung der Oberfläche."""
 
+import calendar
 import logging
 import os
 import shutil
+import threading
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import config, media
+from . import config, labels, media
 from .db import Database
+from .editor import EditError, Editor, capabilities
 from .exiftool import ExifTool
 from .importer import Importer, safe_name
+from .tasks import TaskRunner
 
 log = logging.getLogger(__name__)
 
@@ -26,10 +32,40 @@ STATIC_DIR = Path(os.environ.get("FOTOARCHIV_STATIC") or Path(__file__).resolve(
 # Home Assistant Ingress kommt immer von dieser Adresse
 INGRESS_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
 LONG_CACHE = {"Cache-Control": "private, max-age=31536000, immutable"}
+PURGE_INTERVAL = 3600
 
 
 class ImportRequest(BaseModel):
-    mode: str = "import"
+    mode: Literal["import", "library"] = "import"
+
+
+class Location(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
+class AssetPatch(BaseModel):
+    taken_at: datetime | None = None
+    location: Location | None = None  # ausdrücklich null = Ort entfernen
+    tags: list[str] | None = None
+    persons: list[str] | None = None
+
+
+class RotateRequest(BaseModel):
+    degrees: Literal[90, 180, 270]
+
+
+class BatchRequest(BaseModel):
+    ids: list[int] = Field(min_length=1)
+    action: Literal["tags", "persons", "date", "rotate", "delete", "restore", "purge"]
+    add: list[str] = []
+    remove: list[str] = []
+    taken_at: datetime | None = None
+    degrees: Literal[90, 180, 270] | None = None
+
+
+def day_start(day: date) -> int:
+    return calendar.timegm(day.timetuple())
 
 
 def create_app(settings: config.Settings | None = None) -> FastAPI:
@@ -37,6 +73,17 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
     db = Database(settings.db_path)
     exiftool = ExifTool(settings.exiftool)
     importer = Importer(settings, db, exiftool)
+    editor = Editor(settings, db, exiftool, importer)
+    tasks = TaskRunner(on_progress=db.bump)
+    stop = threading.Event()
+
+    def purge_loop():
+        while not stop.is_set():
+            try:
+                editor.purge_expired(settings.trash_days)
+            except Exception:
+                log.exception("Papierkorb-Bereinigung fehlgeschlagen")
+            stop.wait(PURGE_INTERVAL)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -46,8 +93,11 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
                 folder.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 log.error("Ordner %s nicht anlegbar: %s", folder, exc)
-        log.info("Bibliothek: %s | Import: %s", settings.library, settings.import_dir)
+        log.info("Bibliothek: %s | Import: %s | Papierkorb: %d Tage",
+                 settings.library, settings.import_dir, settings.trash_days)
+        threading.Thread(target=purge_loop, daemon=True, name="purge").start()
         yield
+        stop.set()
         exiftool.close()
         db.close()
 
@@ -56,6 +106,7 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
     binary_types = ("image/webp", *media.IMAGE_TYPES.values(), *media.VIDEO_TYPES.values())
     app.add_middleware(GZipMiddleware, minimum_size=1024, exclude_content_types=tuple(set(binary_types)))
     app.state.settings, app.state.db, app.state.importer = settings, db, importer
+    app.state.editor, app.state.tasks = editor, tasks
 
     @app.middleware("http")
     async def ingress_only(request: Request, call_next):
@@ -67,8 +118,12 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
             response.headers["Cache-Control"] = "no-cache"  # index.html immer frisch
         return response
 
+    @app.exception_handler(EditError)
+    async def edit_error(_request: Request, exc: EditError):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
     def asset_row(asset_id: int):
-        row = db.one("SELECT * FROM assets WHERE id = ? AND deleted_at IS NULL", (asset_id,))
+        row = db.one("SELECT * FROM assets WHERE id = ?", (asset_id,))
         if row is None:
             raise HTTPException(404, "Bild nicht gefunden")
         return row
@@ -77,16 +132,21 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
     @app.get("/api/state")
     def state():
         counts = db.one(
-            """SELECT COUNT(*) AS total, COALESCE(SUM(kind = 'image'), 0) AS images,
-                      COALESCE(SUM(kind = 'video'), 0) AS videos, COALESCE(SUM(size), 0) AS bytes
-               FROM assets WHERE deleted_at IS NULL"""
+            """SELECT COALESCE(SUM(deleted_at IS NULL), 0) AS total,
+                      COALESCE(SUM(deleted_at IS NULL AND kind = 'image'), 0) AS images,
+                      COALESCE(SUM(deleted_at IS NULL AND kind = 'video'), 0) AS videos,
+                      COALESCE(SUM(CASE WHEN deleted_at IS NULL THEN size END), 0) AS bytes,
+                      COALESCE(SUM(deleted_at IS NOT NULL), 0) AS trash
+               FROM assets"""
         )
         return {
             "revision": db.revision,
             "counts": dict(counts),
             "library": str(settings.library),
             "import_dir": str(settings.import_dir),
+            "trash_days": settings.trash_days,
             "importing": importer.job.running,
+            "tasks_running": any(task.running for task in tasks.list()),
             "tools": {
                 "vips": media.pyvips is not None,
                 "exiftool": shutil.which(settings.exiftool) is not None,
@@ -95,11 +155,42 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
         }
 
     @app.get("/api/assets")
-    def asset_index():
-        """Kompakte Liste aller Bilder für Galerie und Zeitleiste, neueste zuerst."""
+    def asset_index(
+        tag: list[int] = Query([]),
+        person: list[int] = Query([]),
+        start: date | None = None,
+        end: date | None = None,
+        q: str = "",
+        trash: bool = False,
+    ):
+        """Kompakte Liste für Galerie und Zeitleiste, neueste zuerst. Filter werden UND-verknüpft."""
+        where = ["deleted_at IS NOT NULL" if trash else "deleted_at IS NULL"]
+        params: list = []
+        for ids, link, column in ((tag, "asset_tags", "tag_id"), (person, "asset_persons", "person_id")):
+            if ids:
+                marks = ",".join("?" * len(set(ids)))
+                where.append(f"(SELECT COUNT(*) FROM {link} l WHERE l.asset_id = a.id AND l.{column} IN ({marks})) = ?")
+                params += [*set(ids), len(set(ids))]
+        if start:
+            where.append("taken_ts >= ?")
+            params.append(day_start(start))
+        if end:
+            where.append("taken_ts < ?")
+            params.append(day_start(end + timedelta(days=1)))
+        for word in q.split():
+            like = f"%{word}%"
+            where.append(
+                """(path LIKE ? OR camera LIKE ?
+                    OR EXISTS (SELECT 1 FROM asset_tags l JOIN tags t ON t.id = l.tag_id
+                               WHERE l.asset_id = a.id AND t.name LIKE ?)
+                    OR EXISTS (SELECT 1 FROM asset_persons l JOIN persons p ON p.id = l.person_id
+                               WHERE l.asset_id = a.id AND p.name LIKE ?))"""
+            )
+            params += [like] * 4
         rows = db.query(
-            """SELECT id, taken_ts, width, height, kind, rev FROM assets
-               WHERE deleted_at IS NULL ORDER BY taken_ts DESC, id DESC"""
+            f"""SELECT id, taken_ts, width, height, kind, rev FROM assets a
+                WHERE {' AND '.join(where)} ORDER BY taken_ts DESC, id DESC""",
+            params,
         )
         items = [
             [r["id"], r["taken_ts"], r["width"] or 0, r["height"] or 0, 1 if r["kind"] == "video" else 0, r["rev"]]
@@ -107,22 +198,61 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
         ]
         return {"revision": db.revision, "fields": ["id", "ts", "w", "h", "video", "rev"], "items": items}
 
+    @app.get("/api/labels")
+    def label_list():
+        result = {}
+        for kind, (table, link, column) in labels.TABLES.items():
+            rows = db.query(
+                f"""SELECT t.id, t.name, COUNT(*) AS count FROM {table} t
+                    JOIN {link} l ON l.{column} = t.id JOIN assets a ON a.id = l.asset_id AND a.deleted_at IS NULL
+                    GROUP BY t.id ORDER BY t.name COLLATE NOCASE"""
+            )
+            result[kind] = [dict(r) for r in rows]
+        return result
+
+    def detail(asset_id: int) -> dict:
+        row = asset_row(asset_id)
+        with db.transaction() as conn:
+            tags = labels.current(conn, asset_id, "tags")
+            persons = labels.current(conn, asset_id, "persons")
+        result = {key: row[key] for key in row.keys() if key not in ("md5_import", "thumb_ok")}
+        result.update(capabilities(row["path"]), name=Path(row["path"]).name, tags=tags, persons=persons)
+        if row["deleted_at"]:
+            expires = datetime.fromisoformat(row["deleted_at"]) + timedelta(days=settings.trash_days)
+            result["expires_at"] = expires.isoformat(timespec="seconds")
+        return result
+
     @app.get("/api/assets/{asset_id}")
     def asset_detail(asset_id: int):
-        row = asset_row(asset_id)
-        tags = db.query(
-            "SELECT t.name FROM tags t JOIN asset_tags a ON a.tag_id = t.id WHERE a.asset_id = ? ORDER BY t.name",
-            (asset_id,),
-        )
-        persons = db.query(
-            "SELECT p.name FROM persons p JOIN asset_persons a ON a.person_id = p.id WHERE a.asset_id = ? ORDER BY p.name",
-            (asset_id,),
-        )
-        detail = {key: row[key] for key in row.keys() if key not in ("md5_import", "thumb_ok", "deleted_at")}
-        detail["name"] = Path(row["path"]).name
-        detail["tags"] = [t["name"] for t in tags]
-        detail["persons"] = [p["name"] for p in persons]
-        return detail
+        return detail(asset_id)
+
+    @app.patch("/api/assets/{asset_id}")
+    def asset_update(asset_id: int, body: AssetPatch):
+        if body.taken_at is not None:
+            editor.set_date(asset_id, body.taken_at)
+        if "location" in body.model_fields_set:
+            loc = body.location
+            editor.set_location(asset_id, loc.lat if loc else None, loc.lon if loc else None)
+        if body.tags is not None:
+            editor.set_labels(asset_id, "tags", body.tags)
+        if body.persons is not None:
+            editor.set_labels(asset_id, "persons", body.persons)
+        return detail(asset_id)
+
+    @app.post("/api/assets/{asset_id}/rotate")
+    def asset_rotate(asset_id: int, body: RotateRequest):
+        editor.rotate(asset_id, body.degrees)
+        return detail(asset_id)
+
+    @app.delete("/api/assets/{asset_id}")
+    def asset_delete(asset_id: int):
+        editor.delete(asset_id)
+        return {"deleted": True}
+
+    @app.post("/api/assets/{asset_id}/restore")
+    def asset_restore(asset_id: int):
+        editor.restore(asset_id)
+        return detail(asset_id)
 
     @app.get("/api/assets/{asset_id}/thumb")
     def asset_thumb(asset_id: int):
@@ -153,6 +283,43 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
             content_disposition_type="attachment" if download else "inline",
         )
 
+    # ── Mehrfachauswahl ────────────────────────────────────────────
+    @app.post("/api/batch")
+    def batch(body: BatchRequest):
+        count = len(set(body.ids))
+        if body.action in ("tags", "persons"):
+            if not body.add and not body.remove:
+                raise HTTPException(400, "Nichts hinzuzufügen oder zu entfernen")
+            word = "Schlagworte" if body.action == "tags" else "Personen"
+            label = f"{word} bei {count} Dateien ändern"
+            action = lambda i: editor.change_labels(i, body.action, body.add, body.remove)  # noqa: E731
+        elif body.action == "date":
+            if body.taken_at is None:
+                raise HTTPException(400, "Datum fehlt")
+            label, action = f"Datum bei {count} Dateien setzen", lambda i: editor.set_date(i, body.taken_at)
+        elif body.action == "rotate":
+            if body.degrees is None:
+                raise HTTPException(400, "Drehung fehlt")
+            label, action = f"{count} Dateien drehen", lambda i: editor.rotate(i, body.degrees)
+        elif body.action == "delete":
+            label, action = f"{count} Dateien in den Papierkorb", editor.delete
+        elif body.action == "restore":
+            label, action = f"{count} Dateien wiederherstellen", editor.restore
+        else:
+            label, action = f"{count} Dateien endgültig löschen", editor.purge
+        return asdict(tasks.submit(label, body.ids, action))
+
+    @app.get("/api/tasks")
+    def task_list():
+        return [asdict(task) for task in tasks.list()]
+
+    @app.post("/api/trash/empty")
+    def trash_empty():
+        ids = [r["id"] for r in db.query("SELECT id FROM assets WHERE deleted_at IS NOT NULL")]
+        if not ids:
+            raise HTTPException(400, "Der Papierkorb ist leer")
+        return asdict(tasks.submit(f"Papierkorb leeren ({len(ids)} Dateien)", ids, editor.purge))
+
     # ── Import ─────────────────────────────────────────────────────
     @app.get("/api/import")
     def import_status():
@@ -160,8 +327,6 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
 
     @app.post("/api/import")
     def import_start(body: ImportRequest):
-        if body.mode not in ("import", "library"):
-            raise HTTPException(400, "Unbekannter Modus")
         if not importer.start(body.mode):
             raise HTTPException(409, "Es läuft bereits ein Import")
         return {"started": True}

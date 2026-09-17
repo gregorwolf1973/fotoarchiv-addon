@@ -59,6 +59,10 @@ MIGRATIONS = [
     );
     CREATE INDEX asset_persons_person ON asset_persons (person_id);
     """,
+    """
+    ALTER TABLE assets ADD COLUMN orig_path TEXT;  -- Pfad vor dem Verschieben in den Papierkorb
+    CREATE INDEX assets_deleted ON assets (deleted_at);
+    """,
 ]
 
 

@@ -69,7 +69,7 @@
   }
 </script>
 
-{#if layout.rows.length}
+{#if layout.height > viewport}
   <div
     class="timeline"
     class:dragging

@@ -15,6 +15,7 @@ class Settings:
     timezone: str
     exiftool: str
     ffmpeg: str
+    trash_days: int = 30
     dev: bool = False  # erlaubt Zugriffe außerhalb von Ingress
 
     @property
@@ -48,5 +49,6 @@ def load() -> Settings:
         timezone=os.environ.get("TZ") or "Europe/Berlin",
         exiftool=os.environ.get("FOTOARCHIV_EXIFTOOL") or shutil.which("exiftool") or "exiftool",
         ffmpeg=os.environ.get("FOTOARCHIV_FFMPEG") or shutil.which("ffmpeg") or "ffmpeg",
+        trash_days=int(pick("FOTOARCHIV_TRASH_DAYS", "trash_days", "30")),
         dev=os.environ.get("FOTOARCHIV_DEV") == "1",
     )
