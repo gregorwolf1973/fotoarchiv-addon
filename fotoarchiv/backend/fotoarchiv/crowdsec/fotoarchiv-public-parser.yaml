@@ -1,0 +1,20 @@
+# CrowdSec-Parser für das Zugriffsprotokoll des Fotoarchiv-Internetzugangs (ein JSON-Objekt pro Zeile).
+onsuccess: next_stage
+filter: "evt.Line.Labels.type == 'fotoarchiv-public'"
+name: fotoarchiv/public-logs
+description: "Zugriffsprotokoll des Fotoarchiv-Internetzugangs auswerten"
+statics:
+  - meta: log_type
+    value: fotoarchiv_public
+  - meta: service
+    value: fotoarchiv
+  - meta: source_ip
+    expression: JsonExtract(evt.Line.Raw, "ip")
+  - meta: event
+    expression: JsonExtract(evt.Line.Raw, "event")
+  - meta: user
+    expression: JsonExtract(evt.Line.Raw, "user")
+  - meta: detail
+    expression: JsonExtract(evt.Line.Raw, "detail")
+  - target: evt.StrTime
+    expression: JsonExtract(evt.Line.Raw, "time")

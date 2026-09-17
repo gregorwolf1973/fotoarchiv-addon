@@ -15,6 +15,27 @@ configuration:
       Fotos im Hintergrund nach Gesichtern durchsuchen und ähnliche Gesichter gruppieren. Lädt beim ersten Start
       die InsightFace-Modelle (ca. 280 MB, nur nicht-kommerzielle Nutzung) herunter. Auf dem Raspberry Pi 5 etwa
       1 Sekunde pro Foto.
+  public_enabled:
+    name: Internetzugang
+    description: >-
+      Startet den Internetzugang auf Port 8301 mit Anmeldung (Konten unter Fotoarchiv → Schild-Symbol).
+      Nie direkt freigeben, sondern über einen Reverse Proxy mit TLS (Nginx Proxy Manager, Cloudflare Tunnel).
+  public_trusted_proxies:
+    name: Vertrauenswürdige Proxys
+    description: >-
+      Adressen/Netze der Reverse Proxys. Nur deren Angaben zur Besucheradresse (X-Forwarded-For,
+      CF-Connecting-IP) werden geglaubt. 172.30.32.0/23 ist das interne Home-Assistant-Netz.
+  public_cookie_secure:
+    name: Sitzungs-Cookie nur über HTTPS
+    description: Ausschalten nur zum Testen im eigenen Netz ohne TLS.
+  public_session_hours:
+    name: Sitzungsdauer (Stunden)
+    description: Nach dieser Zeit muss man sich neu anmelden.
+  public_log_export_path:
+    name: Zusätzliche Protokolldatei
+    description: >-
+      Optional: Kopie des Zugriffsprotokolls, z. B. für eigene Auswertungen. Für CrowdSec nicht nötig –
+      die Einrichtung über das Schild-Symbol erledigt das.
   trash_days:
     name: Papierkorb (Tage)
     description: Gelöschte Dateien bleiben so viele Tage im Papierkorb und werden danach endgültig vom Datenträger gelöscht.

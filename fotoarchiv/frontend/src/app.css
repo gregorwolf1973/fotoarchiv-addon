@@ -170,6 +170,8 @@ button.danger:hover:not(:disabled) {
 }
 
 input[type='text'],
+input[type='password'],
+input[type='number'],
 input[type='date'],
 input[type='datetime-local'] {
   box-sizing: border-box;

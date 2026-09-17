@@ -1,16 +1,18 @@
 <script>
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import { api, filterQuery } from './lib/api.js';
+  import { api, auth, filterQuery } from './lib/api.js';
   import { ZOOM_LEVELS } from './lib/layout.js';
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
+  import AccessPanel from './components/AccessPanel.svelte';
   import Confirm from './components/Confirm.svelte';
   import DateDialog from './components/DateDialog.svelte';
   import Gallery from './components/Gallery.svelte';
   import Icon from './components/Icon.svelte';
   import ImportPanel from './components/ImportPanel.svelte';
   import LabelDialog from './components/LabelDialog.svelte';
+  import Login from './components/Login.svelte';
   import MapView from './components/MapView.svelte';
   import PeopleView from './components/PeopleView.svelte';
   import Notices from './components/Notices.svelte';
@@ -36,6 +38,8 @@
   let dialog = $state(null);
   let zoom = $state(readZoom());
   let listKey = $state(''); // neue Suche/Ansicht: Galerie neu aufbauen, oben beginnen
+  let session = $state(null); // { authenticated, public, role, user, csrf }
+  let showAccess = $state(false);
   let uploader = $state();
   let fileInput = $state();
 
@@ -43,6 +47,9 @@
   let lastToggled = null;
 
   const trash = $derived(view === 'trash');
+  // Rechte: admin = Home Assistant, editor/viewer = Konten des Internetzugangs
+  const canEdit = $derived(session?.role === 'admin' || session?.role === 'editor');
+  const isAdmin = $derived(session?.role === 'admin');
   const filtered = $derived(
     !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
   );
@@ -116,16 +123,51 @@
   let timer;
   function kick() {
     clearTimeout(timer);
-    tick();
+    if (session?.authenticated) tick();
   }
   async function tick() {
     await refresh();
+    if (!session?.authenticated) return;
     const busy = info?.importing || info?.tasks_running || pending.size;
     clearTimeout(timer);
     timer = setTimeout(tick, busy ? 1000 : 20000);
   }
+
+  function signedIn(next) {
+    session = next;
+    auth.csrf = next.csrf;
+    revision = null; // alles neu laden
+    labelsRevision = null;
+    kick();
+  }
+
+  async function logout() {
+    try {
+      await api.logout();
+    } finally {
+      signedOut();
+    }
+  }
+
+  function signedOut() {
+    clearTimeout(timer);
+    auth.csrf = null;
+    items = [];
+    info = null;
+    openId = null;
+    showImport = showAccess = false;
+    dialog = null;
+    selected.clear();
+    session = { ...(session ?? {}), authenticated: false, public: true, role: null, user: null, csrf: null };
+  }
+
   onMount(() => {
-    tick();
+    // Abgelaufene Sitzung: sofort zur Anmeldung, nicht weiter Anfragen schicken (die zählen sonst als Scan)
+    auth.onUnauthorized = () => session?.public && session.authenticated && signedOut();
+    api.session().then(
+      (next) => (next.authenticated ? signedIn(next) : (session = next)),
+      (e) => ((failure = e.message), (loaded = true), (session = { authenticated: true, public: false, role: 'admin' })),
+    );
     return () => clearTimeout(timer);
   });
 
@@ -285,9 +327,9 @@
   }
 
   function keydown(e) {
-    if (openIndex >= 0 || dialog || showImport || view === 'map' || view === 'people' || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || view === 'map' || view === 'people' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
-    else if (e.key === 'Delete' && selected.size) (trash ? confirmPurge([...selected]) : deleteSelected());
+    else if (e.key === 'Delete' && selected.size) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
     else return;
     e.preventDefault();
@@ -301,6 +343,9 @@
 
 <svelte:window onkeydown={keydown} />
 
+{#if session && !session.authenticated}
+  <Login cookieBlocked={session.cookie_blocked} onlogin={signedIn} />
+{:else if session}
 <div class="app">
   {#if selected.size}
     <header class="topbar selection">
@@ -311,9 +356,11 @@
         <button onclick={() => runBatch({ ids: [...selected], action: 'restore' })} title="Wiederherstellen">
           <Icon name="restore" size={20} /><span class="label">Wiederherstellen</span>
         </button>
-        <button class="danger" onclick={() => confirmPurge([...selected])} title="Endgültig löschen">
-          <Icon name="deleteForever" size={20} /><span class="label">Endgültig löschen</span>
-        </button>
+        {#if isAdmin}
+          <button class="danger" onclick={() => confirmPurge([...selected])} title="Endgültig löschen">
+            <Icon name="deleteForever" size={20} /><span class="label">Endgültig löschen</span>
+          </button>
+        {/if}
       {:else}
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'persons' })} title="Personen ändern"><Icon name="person" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'tags' })} title="Schlagworte ändern"><Icon name="tag" /></button>
@@ -331,7 +378,7 @@
         {#if info}<span class="sub">Dateien werden nach {info.trash_days} Tagen endgültig gelöscht</span>{/if}
       </div>
       <span class="grow"></span>
-      {#if info?.counts.trash}
+      {#if info?.counts.trash && isAdmin}
         <button class="danger" onclick={confirmEmptyTrash}><Icon name="deleteForever" size={20} /><span class="label">Papierkorb leeren</span></button>
       {/if}
     </header>
@@ -351,16 +398,28 @@
       <div class="actions">
         {#if info?.importing}<span class="busy" title="Import läuft"></span>{/if}
         <button class="icon search-toggle" class:on={searchOpen} onclick={() => (searchOpen = !searchOpen)} title="Suchen"><Icon name="search" /></button>
-        <button onclick={() => fileInput.click()} title="Dateien hochladen">
-          <Icon name="upload" size={20} /><span class="label">Hochladen</span>
-        </button>
-        <button onclick={() => (showImport = true)} title="Aus Ordner importieren">
-          <Icon name="import" size={20} /><span class="label">Importieren</span>
-        </button>
-        <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
-          <Icon name="delete" />
-          {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
-        </button>
+        {#if canEdit}
+          <button onclick={() => fileInput.click()} title="Dateien hochladen">
+            <Icon name="upload" size={20} /><span class="label">Hochladen</span>
+          </button>
+        {/if}
+        {#if isAdmin}
+          <button onclick={() => (showImport = true)} title="Aus Ordner importieren">
+            <Icon name="import" size={20} /><span class="label">Importieren</span>
+          </button>
+        {/if}
+        {#if canEdit}
+          <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
+            <Icon name="delete" />
+            {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
+          </button>
+        {/if}
+        {#if isAdmin && !session.public}
+          <button class="icon" onclick={() => (showAccess = true)} title="Zugang übers Internet"><Icon name="shield" /></button>
+        {/if}
+        {#if session.public}
+          <button class="icon" onclick={logout} title="Abmelden ({session.user?.display_name || session.user?.username})"><Icon name="logout" /></button>
+        {/if}
         <input bind:this={fileInput} type="file" multiple accept="image/*,video/*,.heic,.heif" hidden onchange={pickFiles} />
       </div>
     </header>
@@ -384,6 +443,7 @@
 
   {#if view === 'people'}
     <PeopleView
+      {canEdit}
       revision={info?.revision}
       onchanged={kick}
       ontask={trackTask}
@@ -393,12 +453,13 @@
       }}
     />
   {:else if view === 'map'}
-    <MapView {filters} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
+    <MapView {filters} {canEdit} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
   {:else if items.length}
     {#key listKey}
       <Gallery
         {items}
         {selected}
+        selectable={canEdit}
         {zoom}
         onzoom={changeZoom}
         onopen={(i) => (openId = items[i][0])}
@@ -418,9 +479,11 @@
       {:else}
         <Icon name="images" size={64} />
         <h2>Noch keine Fotos</h2>
-        <p>Dateien einfach hierher ziehen, über <strong>Hochladen</strong> auswählen oder in den Import-Ordner legen:</p>
-        <code>{info.import_dir}</code>
-        <button class="primary" onclick={() => (showImport = true)}><Icon name="import" size={20} /> Import öffnen</button>
+        {#if isAdmin}
+          <p>Dateien einfach hierher ziehen, über <strong>Hochladen</strong> auswählen oder in den Import-Ordner legen:</p>
+          <code>{info.import_dir}</code>
+          <button class="primary" onclick={() => (showImport = true)}><Icon name="import" size={20} /> Import öffnen</button>
+        {/if}
       {/if}
     </div>
   {/if}
@@ -430,6 +493,8 @@
   <Viewer
     items={viewerItems}
     index={openIndex}
+    {canEdit}
+    canPurge={isAdmin}
     {trash}
     {labels}
     onclose={closeViewer}
@@ -486,7 +551,12 @@
   />
 {/if}
 
-<Uploader bind:this={uploader} onchanged={kick} />
+{#if showAccess}
+  <AccessPanel onclose={() => (showAccess = false)} />
+{/if}
+
+<Uploader bind:this={uploader} enabled={canEdit} onchanged={kick} />
+{/if}
 <Notices {tasks} />
 
 <style>

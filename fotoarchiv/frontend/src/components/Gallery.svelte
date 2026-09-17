@@ -7,7 +7,7 @@
 
   // selected: SvelteSet mit Bild-IDs. Ist etwas ausgewählt, wählt ein Klick aus statt zu öffnen.
   // zoom: Index in ZOOM_LEVELS; onzoom(schritt) ändert ihn (+1 größer, -1 kleiner)
-  let { items, selected, zoom, onopen, ontoggle, ontoggleday, onzoom } = $props();
+  let { items, selected, selectable = true, zoom, onopen, ontoggle, ontoggleday, onzoom } = $props();
 
   const LONG_PRESS = 450;
 
@@ -76,7 +76,7 @@
   let pressTimer;
   let pressed = false;
   function pointerdown(e, index) {
-    if (e.pointerType === 'mouse') return;
+    if (e.pointerType === 'mouse' || !selectable) return;
     pressed = false;
     clearTimeout(pressTimer);
     pressTimer = setTimeout(() => {
@@ -92,7 +92,7 @@
       pressed = false;
       return;
     }
-    if (selecting || e.shiftKey || e.ctrlKey || e.metaKey) ontoggle(index, e);
+    if (selectable && (selecting || e.shiftKey || e.ctrlKey || e.metaKey)) ontoggle(index, e);
     else onopen(index);
   }
 
@@ -149,9 +149,9 @@
       {#each visible.headers as header (header.top)}
         {@const all = selecting && daySelected(header)}
         <div class="day" style:top="{header.top}px" style:left="{pad}px" style:height="{header.height}px">
-          <button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title={header.group === 'month' ? 'Ganzen Monat auswählen' : 'Ganzen Tag auswählen'}>
+          {#if selectable}<button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title={header.group === 'month' ? 'Ganzen Monat auswählen' : 'Ganzen Tag auswählen'}>
             <Icon name="checkCircle" size={20} />
-          </button>
+          </button>{/if}
           <h2>{header.group === 'month' ? monthLabel(header.ts) : dayLabel(header.ts)}</h2>
         </div>
       {/each}
@@ -178,9 +178,9 @@
             <img src={thumbUrl(cell.item, small)} alt="" loading="lazy" decoding="async" draggable="false" onerror={broken} />
           </button>
           {#if cell.item[4]}<span class="badge"><Icon name="play" size={compact ? 14 : 18} /></span>{/if}
-          <button class="check" onclick={(e) => ontoggle(cell.index, e)} title="Auswählen" aria-pressed={isSelected}>
+          {#if selectable}<button class="check" onclick={(e) => ontoggle(cell.index, e)} title="Auswählen" aria-pressed={isSelected}>
             <Icon name="checkCircle" size={level.rowHeight <= 120 ? 18 : 24} />
-          </button>
+          </button>{/if}
         </div>
       {/each}
     </div>

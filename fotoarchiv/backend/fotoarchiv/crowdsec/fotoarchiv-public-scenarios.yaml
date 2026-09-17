@@ -1,0 +1,41 @@
+# CrowdSec-Szenarien für den Fotoarchiv-Internetzugang.
+#
+# public-bf:     fünf falsche Passwörter in ~50 s von einer Adresse
+# public-scan:   zehn Zugriffe ohne Anmeldung oder auf unbekannte Pfade in ~5 min
+# public-locked: das Add-on hat die Adresse selbst gesperrt – dann auch an der Firewall sperren
+type: leaky
+name: fotoarchiv/public-bf
+description: "Passwort-Raten am Fotoarchiv-Internetzugang"
+filter: "evt.Meta.log_type == 'fotoarchiv_public' && evt.Meta.event == 'auth_fail'"
+groupby: evt.Meta.source_ip
+capacity: 5
+leakspeed: "10s"
+blackhole: 5m
+labels:
+  service: fotoarchiv
+  type: bruteforce
+  remediation: true
+---
+type: leaky
+name: fotoarchiv/public-scan
+description: "Abtasten des Fotoarchiv-Internetzugangs"
+filter: "evt.Meta.log_type == 'fotoarchiv_public' && evt.Meta.event in ['unauthorized', 'not_found']"
+groupby: evt.Meta.source_ip
+capacity: 10
+leakspeed: "30s"
+blackhole: 5m
+labels:
+  service: fotoarchiv
+  type: scan
+  remediation: true
+---
+type: trigger
+name: fotoarchiv/public-locked
+description: "Fotoarchiv hat diese Adresse nach wiederholten Fehlversuchen gesperrt"
+filter: "evt.Meta.log_type == 'fotoarchiv_public' && evt.Meta.event == 'rate_limited' && (evt.Meta.detail startsWith 'lock' || evt.Meta.detail startsWith 'scanner')"
+groupby: evt.Meta.source_ip
+blackhole: 10m
+labels:
+  service: fotoarchiv
+  type: bruteforce
+  remediation: true

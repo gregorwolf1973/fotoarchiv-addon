@@ -13,7 +13,7 @@
   import UnlocatedPanel from './UnlocatedPanel.svelte';
 
   // onopen(ids, id): Einzelansicht mit dieser Liste; onbatch(body, undo): Mehrfachaktion starten
-  let { filters, revision, onopen, onbatch } = $props();
+  let { filters, revision, canEdit = true, onopen, onbatch } = $props();
 
   const MAX_ZOOM = 17;
   const PANEL_KEY = 'fotoarchiv.map.panel';
@@ -195,6 +195,7 @@
     <div class="overlay"><PlaceSearch onselect={goTo} /></div>
     {#if dropActive}<div class="drop-hint">Hier loslassen, um den Ort zu setzen</div>{/if}
   </div>
+  {#if canEdit}
   <UnlocatedPanel
     items={unlocated}
     {collapsed}
@@ -203,6 +204,7 @@
     ondrop={drop}
     {onopen}
   />
+  {/if}
 </div>
 
 <style>

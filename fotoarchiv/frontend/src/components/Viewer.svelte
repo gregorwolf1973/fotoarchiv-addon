@@ -8,7 +8,7 @@
   import LocationDialog from './LocationDialog.svelte';
   import Icon from './Icon.svelte';
 
-  let { items, index, trash = false, labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
+  let { items, index, trash = false, canEdit: allowed = true, canPurge = true, labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
 
   const INFO_KEY = 'fotoarchiv.info';
   let showInfo = $state(readInfoSetting());
@@ -36,7 +36,7 @@
   const itemId = $derived(item?.[0]);
   const key = $derived(`${item[0]}-${item[5]}`); // neue Revision (z. B. gedreht) lädt neu
   const isVideo = $derived(item?.[4] === 1);
-  const canEdit = $derived(!trash && detail?.editable);
+  const canEdit = $derived(allowed && !trash && detail?.editable);
 
   function readInfoSetting() {
     try {
@@ -122,7 +122,7 @@
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'i') toggleInfo();
     else if (e.key === 'f' && !isVideo && !trash) showFaces = !showFaces;
-    else if (e.key === 'Delete' && !trash) ondelete(itemId);
+    else if (e.key === 'Delete' && !trash && allowed) ondelete(itemId);
     else return;
     e.preventDefault();
   }
@@ -168,6 +168,7 @@
         revision={item[5]}
         {frame}
         persons={labels.persons}
+        editable={allowed}
         onchanged={async () => {
           detail = await api.asset(itemId).catch(() => detail);
           onchanged();
@@ -180,10 +181,10 @@
       <span class="spacer"></span>
       {#if busy}<span class="spinner" title="Wird gespeichert"></span>{/if}
       {#if trash}
-        <button class="round" onclick={() => onrestore(itemId)} title="Wiederherstellen"><Icon name="restore" /></button>
-        <button class="round" onclick={() => onpurge(itemId)} title="Endgültig löschen"><Icon name="deleteForever" /></button>
+        {#if allowed}<button class="round" onclick={() => onrestore(itemId)} title="Wiederherstellen"><Icon name="restore" /></button>{/if}
+        {#if canPurge}<button class="round" onclick={() => onpurge(itemId)} title="Endgültig löschen"><Icon name="deleteForever" /></button>{/if}
       {:else}
-        {#if detail?.rotatable}
+        {#if detail?.rotatable && allowed}
           <button class="round" disabled={busy} onclick={() => rotate(270)} title="Nach links drehen"><Icon name="rotate" /></button>
           <button class="round" disabled={busy} onclick={() => rotate(90)} title="Nach rechts drehen"><Icon name="rotate" flip /></button>
         {/if}
@@ -191,7 +192,7 @@
           <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title="Gesichter zeigen (f)"><Icon name="face" /></button>
         {/if}
         <a class="round" href={originalUrl(item, true)} title="Original herunterladen"><Icon name="download" /></a>
-        <button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
+        {#if allowed}<button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>{/if}
       {/if}
       <button class="round" class:on={showInfo} onclick={toggleInfo} title="Informationen (i)"><Icon name="info" /></button>
     </div>
@@ -213,7 +214,7 @@
       {:else}
         {#if trash}
           <p class="notice"><Icon name="delete" size={16} /> Im Papierkorb – wird am {expires(detail)} endgültig gelöscht.</p>
-        {:else if !detail.editable}
+        {:else if !detail.editable && allowed}
           <p class="notice"><Icon name="alert" size={16} /> Dieses Dateiformat kann keine Metadaten speichern und ist daher nicht bearbeitbar.</p>
         {/if}
         <dl>

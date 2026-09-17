@@ -92,6 +92,30 @@ MIGRATIONS = [
     CREATE INDEX faces_asset ON faces (asset_id);
     CREATE INDEX faces_group ON faces (group_id);
     """,
+    """
+    -- Konten für den Internetzugang (der Zugang über Home Assistant braucht keins)
+    CREATE TABLE users (
+        id            INTEGER PRIMARY KEY,
+        username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        display_name  TEXT NOT NULL DEFAULT '',
+        password_hash TEXT NOT NULL,
+        role          TEXT NOT NULL DEFAULT 'viewer',  -- viewer | editor
+        enabled       INTEGER NOT NULL DEFAULT 1,
+        created_at    TEXT NOT NULL,
+        last_login    TEXT
+    );
+    CREATE TABLE sessions (
+        id         TEXT PRIMARY KEY,               -- SHA-256 der Kennung aus dem Cookie, nie die Kennung selbst
+        user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        csrf       TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        expires_at REAL NOT NULL,
+        last_seen  REAL NOT NULL,
+        ip         TEXT,
+        user_agent TEXT
+    );
+    CREATE INDEX sessions_user ON sessions (user_id);
+    """,
 ]
 
 

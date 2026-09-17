@@ -1,0 +1,7 @@
+# CrowdSec-Log-Quelle für das Zugriffsprotokoll des Fotoarchiv-Internetzugangs.
+# Wird über Fotoarchiv -> Zugang -> CrowdSec eingerichtet. Der Pfad muss im CrowdSec-Add-on
+# sichtbar sein: beide Add-ons binden /config ein, /share dagegen nicht.
+filenames:
+  - /config/.fotoarchiv/public_access.log
+labels:
+  type: fotoarchiv-public

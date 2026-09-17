@@ -1,7 +1,15 @@
 // Alle Pfade relativ, damit die Oberfläche hinter dem Ingress-Präfix funktioniert.
 
-async function request(path, options) {
+// Internetzugang: CSRF-Token der Sitzung für alle ändernden Anfragen; 401 meldet die Abmeldung an die App
+export const auth = { csrf: null, onUnauthorized: () => {} };
+
+async function request(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  if (method !== 'GET' && auth.csrf) {
+    options = { ...options, headers: { ...(options.headers || {}), 'X-CSRF-Token': auth.csrf } };
+  }
   const response = await fetch(path, options);
+  if (response.status === 401 && !path.startsWith('api/auth/')) auth.onUnauthorized();
   const text = await response.text();
   let body = null;
   try {
@@ -36,6 +44,9 @@ export function filterQuery({ tags = [], persons = [], start = '', end = '', q =
 }
 
 export const api = {
+  session: () => request('api/auth/session'),
+  login: (username, password) => request('api/auth/login', send('POST', { username, password })),
+  logout: () => request('api/auth/logout', { method: 'POST' }),
   state: () => request('api/state'),
   index: (filters, trash, extra) => request(`api/assets?${filterQuery(filters, trash, extra)}`),
   geo: (filters) => request(`api/geo?${filterQuery(filters)}`),
@@ -59,6 +70,21 @@ export const api = {
   assetFaces: (id) => request(`api/assets/${id}/faces`),
   assignFace: (id, name) => request(`api/faces/${id}/assign`, send('POST', { name })),
   removeFace: (id) => request(`api/faces/${id}/remove`, { method: 'POST' }),
+  admin: {
+    access: () => request('api/admin/access'),
+    users: () => request('api/admin/users'),
+    createUser: (user) => request('api/admin/users', send('POST', user)),
+    updateUser: (id, changes) => request(`api/admin/users/${id}`, send('PATCH', changes)),
+    deleteUser: (id) => request(`api/admin/users/${id}`, { method: 'DELETE' }),
+    sessions: () => request('api/admin/sessions'),
+    revokeSession: (id) => request(`api/admin/sessions/${id}`, { method: 'DELETE' }),
+    locks: () => request('api/admin/locks'),
+    unlock: (key) => request('api/admin/locks/unlock', send('POST', { key })),
+    log: (event) => request(`api/admin/log?limit=300${event ? `&event=${event}` : ''}`),
+    clearLog: () => request('api/admin/log', { method: 'DELETE' }),
+    crowdsec: () => request('api/admin/crowdsec'),
+    installCrowdsec: () => request('api/admin/crowdsec/install', { method: 'POST' }),
+  },
   importStatus: () => request('api/import'),
   startImport: (mode) => request('api/import', send('POST', { mode })),
 };
@@ -76,6 +102,7 @@ export function upload(file, onprogress) {
     const xhr = new XMLHttpRequest();
     const query = new URLSearchParams({ name: file.name, mtime: String(file.lastModified || '') });
     xhr.open('PUT', `api/upload?${query}`);
+    if (auth.csrf) xhr.setRequestHeader('X-CSRF-Token', auth.csrf);
     xhr.upload.onprogress = (e) => e.lengthComputable && onprogress(e.loaded / e.total);
     xhr.onload = () => {
       let body;
@@ -84,6 +111,7 @@ export function upload(file, onprogress) {
       } catch {
         body = { status: 'error', message: xhr.status === 413 ? 'Datei zu groß für den Proxy' : xhr.statusText };
       }
+      if (xhr.status === 401) auth.onUnauthorized();
       if (body.detail) body = { status: 'error', message: body.detail };
       resolve(body);
     };

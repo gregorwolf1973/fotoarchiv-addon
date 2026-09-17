@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.08
+
+- Internetzugang auf eigenem Port 8301 (Option `public_enabled`), gedacht hinter einem Reverse Proxy mit TLS
+- Konten mit Rollen „Ansehen“ und „Bearbeiten“; Verwaltung, Import, Abgleich und endgültiges Löschen bleiben Home Assistant vorbehalten
+- Schutz wie in Simple NAS: 10 Fehlversuche je Adresse oder Konto in 15 Minuten → Sperre 15 min, bei Wiederholung doppelt so lang (max. 24 h); Scanner-Sperre; Begrenzung der Anfragen je Adresse
+- Vertrauenswürdige Proxys (`public_trusted_proxies`): X-Forwarded-For und CF-Connecting-IP werden nur von dort übernommen
+- Sitzungen serverseitig (Kennung nur als Hash gespeichert), HttpOnly/Secure/SameSite-Cookie, CSRF-Schutz, Sicherheits-Header (CSP, HSTS, Frame-Verbot)
+- Passwörter mit scrypt; neues Passwort oder Sperren eines Kontos beendet alle seine Sitzungen
+- Verwaltung (Schild-Symbol): Konten, aktive Sitzungen, Sperren aufheben, Zugriffsprotokoll
+- CrowdSec: Zugriffsprotokoll als JSON, Parser und Szenarien, Einrichtung per Klick
+- Anmeldeseite; die Oberfläche blendet Funktionen ohne Berechtigung aus
+
 ## 0.07
 
 - Gesichtserkennung (InsightFace buffalo_l: SCRFD + ArcFace über onnxruntime), läuft im Hintergrund, neueste Fotos zuerst

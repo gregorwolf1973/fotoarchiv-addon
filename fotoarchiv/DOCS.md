@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.07)
+## Funktionen (Version 0.08)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -17,6 +17,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum setzen, drehen und löschen für viele Dateien auf einmal.
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
+- **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
 - **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI und MTS.
@@ -38,6 +39,11 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `import_folder` | `/share/fotoarchiv-import` | Eingangsordner für den Samba-Import |
 | `trash_days` | `30` | So viele Tage bleiben gelöschte Dateien im Papierkorb |
 | `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
+| `public_enabled` | `false` | Internetzugang auf Port 8301 starten |
+| `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
+| `public_cookie_secure` | `true` | Sitzungs-Cookie nur über HTTPS (nur zum Testen ausschalten) |
+| `public_session_hours` | `12` | Gültigkeit einer Anmeldung |
+| `public_log_export_path` | – | Optionale Kopie des Zugriffsprotokolls |
 
 Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortieren ein reines Umbenennen und geht sofort.
 
@@ -150,9 +156,60 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 - **Vorschaubilder sind vom Add-on-Backup ausgenommen.** Sie werden bei Bedarf neu erzeugt.
 - ⚠️ **Eine vollständige Home-Assistant-Sicherung enthält auch den Ordner `/media`, also das ganze Fotoarchiv.** Bei großen Sammlungen solltest du `media` in den Backup-Einstellungen abwählen und die Fotos separat sichern, z. B. auf ein NAS.
 
+## Zugriff übers Internet
+
+Über Home Assistant (Seitenleiste) hast du immer volle Rechte. Für den Zugriff von unterwegs gibt es einen **eigenen Internetzugang** mit eigenen Konten.
+
+### Einrichten
+
+1. In den Add-on-Einstellungen `public_enabled: true` setzen und das Add-on neu starten.
+2. In der Oberfläche auf das **Schild-Symbol** klicken und Konten anlegen:
+   - **Ansehen:** Fotos, Karte und Personen ansehen und Originale herunterladen.
+   - **Bearbeiten:** zusätzlich hochladen, Datum, Ort, Schlagworte und Personen ändern, drehen, in den Papierkorb legen und Gesichter benennen.
+   - Import, Abgleich, endgültiges Löschen und die Kontenverwaltung gibt es nur über Home Assistant.
+3. Den Internetzugang über deinen Reverse Proxy mit TLS veröffentlichen, siehe unten. **Port 8301 nie direkt im Router freigeben.**
+
+### Nginx Proxy Manager (Add-on)
+
+- **Forward Hostname:** der Hostname des Fotoarchiv-Add-ons, zu finden unter *Einstellungen → Add-ons → Fotoarchiv → Info*. Er sieht etwa so aus: `a1b2c3d4-fotoarchiv`.
+- **Forward Port:** `8301`, Schema `http`
+- **SSL:** Zertifikat anfordern, *Force SSL* und *HSTS* aktivieren
+- **Große Uploads:** Unter *Advanced* `client_max_body_size 0;` eintragen
+
+Das Add-on NPM liegt im internen Home-Assistant-Netz `172.30.32.0/23` und ist damit schon als vertrauenswürdiger Proxy eingetragen.
+
+### Cloudflare Tunnel
+
+Als Dienst `http://a1b2c3d4-fotoarchiv:8301` angeben, mit dem Hostnamen wie oben. Die Besucheradresse übernimmt das Add-on aus `CF-Connecting-IP`. Cloudflare begrenzt Uploads im kostenlosen Tarif auf 100 MB pro Datei.
+
+### Proxy auf einem anderen Gerät
+
+Unter *Einstellungen → Add-ons → Fotoarchiv → Konfiguration → Netzwerk* einen Host-Port für 8301 eintragen. Dann die Adresse des Proxy-Geräts unter `public_trusted_proxies` ergänzen.
+
+### Schutz
+
+- **Fehlversuche:** Nach 10 Fehlversuchen innerhalb von 15 Minuten wird die **Adresse** gesperrt. Unabhängig davon wird auch das **Konto** gesperrt, selbst wenn die Versuche von verschiedenen Adressen kommen. Die erste Sperre dauert 15 Minuten, jede weitere doppelt so lange, höchstens 24 Stunden.
+- **Scanner:** Wer ohne Anmeldung wiederholt die API oder unbekannte Pfade aufruft, wird ebenfalls gesperrt.
+- **Anfragen:** Pro Adresse ist die Zahl der Anfragen pro Minute begrenzt.
+- **Proxy-Angaben:** Die Besucheradresse aus `X-Forwarded-For` bzw. `CF-Connecting-IP` wird **nur** von Adressen aus `public_trusted_proxies` übernommen. Gefälschte Angaben bei direktem Zugriff bleiben wirkungslos.
+- **Sitzungen:** Sie werden auf dem Server geführt. Das Cookie ist `HttpOnly`, `Secure` und `SameSite=Lax`. Ändernde Anfragen brauchen zusätzlich ein CSRF-Token.
+- **Passwörter:** Sie werden mit scrypt gespeichert, mindestens 10 Zeichen. Ein neues Passwort oder das Deaktivieren eines Kontos beendet sofort alle seine Sitzungen.
+- **Sicherheits-Header:** CSP, HSTS über HTTPS, keine Einbettung in fremde Seiten.
+
+Unter **Schild-Symbol → Sitzungen & Sperren** siehst du angemeldete Nutzer und aktive Sperren. Dort lassen sich Sitzungen beenden und Sperren aufheben, etwa wenn du dich beim Testen selbst ausgesperrt hast. Unter **Protokoll** stehen Anmeldungen, Fehlversuche, Sperren und Änderungen.
+
+### CrowdSec
+
+Mit dem CrowdSec-Add-on werden Angreifer zusätzlich an der Firewall bzw. bei Cloudflare gesperrt. Unter **Schild-Symbol → CrowdSec → In CrowdSec einrichten** kopiert das Add-on Parser, Szenarien und die Log-Quelle in die CrowdSec-Konfiguration. Das Zugriffsprotokoll wird dann zusätzlich nach `/config/.fotoarchiv/public_access.log` geschrieben. Danach das CrowdSec-Add-on neu starten.
+
+Szenarien:
+- `fotoarchiv/public-bf`: 5 falsche Passwörter in ~50 s
+- `fotoarchiv/public-scan`: 10 Aufrufe ohne Anmeldung in ~5 min
+- `fotoarchiv/public-locked`: Das Add-on hat die Adresse gesperrt
+
 ## Sicherheit
 
-Die Oberfläche ist nur über Home Assistant (Ingress) erreichbar. Direkte Zugriffe auf den Port werden abgewiesen, die Anmeldung übernimmt Home Assistant.
+Der Hauptport des Add-ons ist nur über Home Assistant (Ingress) erreichbar. Direkte Zugriffe darauf werden abgewiesen, die Anmeldung übernimmt Home Assistant. Der Internetzugang läuft getrennt davon auf Port 8301 mit eigenen Konten, siehe oben.
 
 ## Fehlersuche
 

@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte';
 
   // person: { id, name, count, face_id }; onshowphotos(person); ontask(task) verfolgt das Umbenennen
-  let { person, onclose, onchanged, onshowphotos, ontask } = $props();
+  let { person, canEdit = true, onclose, onchanged, onshowphotos, ontask } = $props();
 
   const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
 
@@ -58,6 +58,7 @@
       <button class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
     </header>
 
+    {#if canEdit}
     <form class="rename" onsubmit={rename}>
       <label class="field">
         Name
@@ -69,17 +70,18 @@
       Der neue Name wird in alle {formatNumber(person.count)} Fotos geschrieben. Heißt schon eine andere Person so, werden
       beide zusammengeführt.
     </p>
+    {/if}
 
     <div class="section">
       <h3>Erkannte Gesichter <span class="muted">{formatNumber(faces.length)}</span></h3>
       {#if faces.length}
-        <p class="hint">Falsch zugeordnet? Mit ✕ lösen – der Name wird aus dem Foto entfernt und dort nicht wieder vorgeschlagen.</p>
+        {#if canEdit}<p class="hint">Falsch zugeordnet? Mit ✕ lösen – der Name wird aus dem Foto entfernt und dort nicht wieder vorgeschlagen.</p>{/if}
         <div class="faces">
           {#each faces as face (face.id)}
             <div class="face" title={dateFormat.format(face.taken_ts * 1000)}>
               <img src={cropUrl(face.id)} alt="" loading="lazy" />
               {#if !face.confirmed}<span class="auto" title="automatisch erkannt">auto</span>{/if}
-              <button class="remove" onclick={() => remove(face)} title="Nicht {person.name}"><Icon name="close" size={16} /></button>
+              {#if canEdit}<button class="remove" onclick={() => remove(face)} title="Nicht {person.name}"><Icon name="close" size={16} /></button>{/if}
             </div>
           {/each}
         </div>

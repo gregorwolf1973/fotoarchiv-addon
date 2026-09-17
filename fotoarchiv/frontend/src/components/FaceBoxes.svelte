@@ -4,7 +4,7 @@
   import Icon from './Icon.svelte';
 
   // Rahmen über dem angezeigten Bild. frame: { left, top, width, height } der Bildfläche in der Bühne
-  let { assetId, revision, frame, persons, onchanged } = $props();
+  let { assetId, revision, frame, persons, editable = true, onchanged } = $props();
 
   const listId = `face-names-${Math.random().toString(36).slice(2)}`;
 
@@ -62,9 +62,9 @@
       style:top="{face.y * 100}%"
       style:width="{face.w * 100}%"
       style:height="{face.h * 100}%"
-      onclick={(e) => (e.stopPropagation(), edit(face))}
+      onclick={(e) => (e.stopPropagation(), editable && edit(face))}
       onpointerdown={(e) => e.stopPropagation()}
-      title={face.name ?? 'Unbekannt – antippen zum Benennen'}
+      title={face.name ?? (editable ? 'Unbekannt – antippen zum Benennen' : 'Unbekannt')}
     >
       <span class="label">{face.name ?? '?'}{#if face.name && !face.confirmed}<small>&nbsp;auto</small>{/if}</span>
     </button>

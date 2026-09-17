@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
 description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Gesichtserkennung, Suche, Bearbeiten direkt in der Datei"
-version: "0.07"
+version: "0.08"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:
@@ -13,21 +13,42 @@ ingress_port: 8300
 ingress_stream: true
 panel_icon: "mdi:image-multiple"
 panel_title: "Fotoarchiv"
+ports:
+  8301/tcp: null
+ports_description:
+  8301/tcp: "Internetzugang (public_enabled) – nicht direkt freigeben, nur über Reverse Proxy mit TLS"
 map:
   - type: share
     read_only: false
   - type: media
     read_only: false
+  # nur für die CrowdSec-Einrichtung: dessen Konfiguration und das exportierte Zugriffsprotokoll liegen dort
+  - type: homeassistant_config
+    read_only: false
+    path: /config
 options:
   library_folder: "/media/fotoarchiv"
   import_folder: "/share/fotoarchiv-import"
   trash_days: 30
   face_recognition: true
+  public_enabled: false
+  public_trusted_proxies:
+    - "127.0.0.1"
+    - "::1"
+    - "172.30.32.0/23"
+  public_cookie_secure: true
+  public_session_hours: 12
 schema:
   library_folder: str
   import_folder: str
   trash_days: int(1,365)
   face_recognition: bool
+  public_enabled: bool
+  public_trusted_proxies:
+    - "str?"
+  public_cookie_secure: bool
+  public_session_hours: int(1,720)
+  public_log_export_path: str?
 # Vorschaubilder und Erkennungsmodelle lassen sich jederzeit neu erzeugen bzw. laden und würden Backups aufblähen
 backup_exclude:
   - "cache"

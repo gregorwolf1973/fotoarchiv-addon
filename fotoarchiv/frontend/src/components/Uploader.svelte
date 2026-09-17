@@ -2,7 +2,7 @@
   import { SUPPORTED, upload } from '../lib/api.js';
   import Icon from './Icon.svelte';
 
-  let { onchanged } = $props();
+  let { enabled = true, onchanged } = $props();
 
   const PARALLEL = 2;
   const LABELS = {
@@ -83,7 +83,7 @@
     return files;
   }
 
-  const hasFiles = (e) => e.dataTransfer?.types?.includes('Files');
+  const hasFiles = (e) => enabled && e.dataTransfer?.types?.includes('Files');
 </script>
 
 <svelte:window

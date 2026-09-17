@@ -7,7 +7,7 @@
   import Icon from './Icon.svelte';
   import PersonDialog from './PersonDialog.svelte';
 
-  let { revision, onshowphotos, ontask, onchanged } = $props();
+  let { revision, canEdit = true, onshowphotos, ontask, onchanged } = $props();
 
   let people = $state({ persons: [], groups: [] });
   let loaded = $state(false);
@@ -44,7 +44,7 @@
 </script>
 
 <div class="people">
-  <FaceStatus {revision} />
+  {#if canEdit}<FaceStatus {revision} />{/if}
 
   <section>
     <h2>Personen <span class="count">{formatNumber(people.persons.length)}</span></h2>
@@ -67,6 +67,7 @@
     {/if}
   </section>
 
+  {#if canEdit}
   <section>
     <h2>Unbekannte Gesichter <span class="count">{formatNumber(people.groups.length)}</span></h2>
     {#if people.groups.length}
@@ -84,6 +85,7 @@
       <p class="empty">Keine unbekannten Gesichtergruppen.</p>
     {/if}
   </section>
+  {/if}
 </div>
 
 {#if group}
@@ -92,6 +94,7 @@
 {#if person}
   <PersonDialog
     {person}
+    {canEdit}
     onclose={() => (person = null)}
     onchanged={changed}
     {ontask}

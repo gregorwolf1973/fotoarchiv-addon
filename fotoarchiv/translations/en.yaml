@@ -14,6 +14,25 @@ configuration:
     description: >-
       Scan photos for faces in the background and group similar faces. Downloads the InsightFace models
       (about 280 MB, non-commercial use only) on first start. About 1 second per photo on a Raspberry Pi 5.
+  public_enabled:
+    name: Internet access
+    description: >-
+      Starts internet access on port 8301 with login (accounts under Fotoarchiv → shield icon).
+      Never expose directly; publish only through a reverse proxy with TLS (Nginx Proxy Manager, Cloudflare Tunnel).
+  public_trusted_proxies:
+    name: Trusted proxies
+    description: >-
+      Addresses/networks of your reverse proxies. Only their client address headers (X-Forwarded-For,
+      CF-Connecting-IP) are trusted. 172.30.32.0/23 is the internal Home Assistant network.
+  public_cookie_secure:
+    name: Session cookie over HTTPS only
+    description: Turn off only for testing on your local network without TLS.
+  public_session_hours:
+    name: Session duration (hours)
+    description: After this time users have to sign in again.
+  public_log_export_path:
+    name: Additional log file
+    description: Optional copy of the access log. Not needed for CrowdSec – the setup button takes care of that.
   trash_days:
     name: Trash (days)
     description: Deleted files stay in the trash for this many days before they are permanently removed from disk.
