@@ -14,6 +14,7 @@
     ['all', 'Alle'],
     ['video', 'Videos'],
     ['image', 'Fotos'],
+    ['damaged', 'Beschädigt'],
   ];
   const SIZES = [0, 10, 50, 100, 500, 1000];
 
@@ -83,6 +84,12 @@
         {/each}
       </select>
     </label>
+    {#if kind === 'damaged'}
+      <p class="hint">
+        Dateien, aus denen sich kein Vorschaubild erzeugen ließ – meist abgebrochen kopiert oder hochgeladen. Gibt es das
+        Original noch, diese Einträge löschen und das Original neu importieren.
+      </p>
+    {/if}
     {#if data}
       <span class="sum">{formatNumber(data.count)} Dateien · zusammen <strong>{formatBytes(data.bytes)}</strong></span>
     {/if}
@@ -167,6 +174,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    color: var(--muted);
+  }
+  .hint {
+    flex-basis: 100%;
+    order: 1;
+    margin: 0;
+    font-size: 0.85rem;
     color: var(--muted);
   }
   .sum {

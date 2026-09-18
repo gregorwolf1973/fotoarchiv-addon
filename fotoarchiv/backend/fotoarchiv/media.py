@@ -1,8 +1,10 @@
 """Dateitypen, Prüfsummen und Vorschaubilder."""
 
 import hashlib
+import json
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -46,6 +48,57 @@ try:
 except (ImportError, OSError) as exc:  # libvips fehlt
     pyvips = None
     log.error("libvips nicht verfügbar: %s", exc)
+
+
+def ffprobe_for(ffmpeg: str) -> str:
+    """ffprobe liegt neben ffmpeg (Debian-Paket ffmpeg)."""
+    found = shutil.which(ffmpeg)
+    if found:
+        sibling = Path(found).with_name("ffprobe" + Path(found).suffix)
+        if sibling.exists():
+            return str(sibling)
+    return shutil.which("ffprobe") or "ffprobe"
+
+
+def probe(ffprobe: str, path: Path) -> dict:
+    """Aufbau einer Videodatei; RuntimeError, wenn ffprobe sie nicht lesen kann."""
+    result = subprocess.run(
+        [ffprobe, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
+        capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip()[-300:] or "unbekannter Fehler")
+    return json.loads(result.stdout or "{}")
+
+
+def damage(path: Path, kind: str, ffprobe: str) -> str | None:
+    """Warum die Datei unbrauchbar ist, oder None. Fehlt ein Werkzeug, gilt sie als in Ordnung –
+    abgelehnt wird nur, was nachweislich kaputt ist (z. B. abgebrochen kopiert oder hochgeladen)."""
+    if kind == "image":
+        if pyvips is None:
+            return None
+        try:
+            image = pyvips.Image.new_from_file(str(path))  # liest den Kopf, erkennt das Format am Inhalt
+        except Exception as exc:
+            return f"Bild nicht lesbar ({_first_line(exc)})"
+        return None if image.width > 0 and image.height > 0 else "Bild hat keine Größe"
+    try:
+        info = probe(ffprobe, path)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None  # ffprobe fehlt oder hängt: nicht als beschädigt werten
+    except RuntimeError as exc:
+        text = str(exc)
+        if "moov atom not found" in text:
+            return "Video unvollständig – die Datei ist abgeschnitten (abgebrochen kopiert oder hochgeladen)"
+        return f"Video nicht lesbar ({_first_line(text)})"
+    if not any(s.get("codec_type") == "video" for s in info.get("streams") or []):
+        return "Video enthält keine Bildspur"
+    return None
+
+
+def _first_line(error) -> str:
+    lines = [line.strip() for line in str(error).splitlines() if line.strip()]
+    return (lines[-1] if lines else "unbekannter Fehler")[:160]
 
 
 def kind_of(path: Path) -> str | None:

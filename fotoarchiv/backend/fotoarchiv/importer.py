@@ -20,6 +20,7 @@ from .exiftool import ExifTool
 log = logging.getLogger(__name__)
 
 DUPLICATE_DIR = "_duplikate"
+DAMAGED_DIR = "_defekt"  # beschädigte Dateien aus dem Import-Ordner
 IGNORED_NAMES = {"@eaDir", "#recycle", "Thumbs.db", "desktop.ini"}
 REPORT_LIMIT = 500  # Einträge pro Liste im Bericht
 DATE_RANK = {"mtime": 0, "filename": 1, "exif": 2}  # wie verlässlich die Datumsquelle ist
@@ -28,7 +29,7 @@ RETRY_FAILED = 3600  # s: gescheiterte Vorschaubilder nicht bei jedem Scrollen n
 
 @dataclass
 class Result:
-    status: str                  # imported | relinked | duplicate | skipped | error
+    status: str                  # imported | relinked | duplicate | damaged | skipped | error
     name: str
     message: str = ""
     asset_id: int | None = None
@@ -46,11 +47,13 @@ class Job:
     done: int = 0
     current: str = ""
     counts: dict = field(default_factory=lambda: {
-        "imported": 0, "relinked": 0, "duplicate": 0, "skipped": 0, "error": 0, "missing": 0, "similar": 0})
+        "imported": 0, "relinked": 0, "duplicate": 0, "damaged": 0, "skipped": 0, "error": 0, "missing": 0,
+        "similar": 0})
     similar: list = field(default_factory=list)   # neu, aber einem vorhandenen Foto sehr ähnlich
     relinked: list = field(default_factory=list)
     missing: list = field(default_factory=list)   # Einträge, deren Datei fehlt (nur beim Abgleich)
     duplicates: list = field(default_factory=list)
+    damaged: list = field(default_factory=list)    # beschädigt, liegen in _defekt
     errors: list = field(default_factory=list)
     skipped: list = field(default_factory=list)
 
@@ -89,7 +92,7 @@ def is_ignored(rel: Path) -> bool:
 
 def remove_empty_dirs(root: Path):
     for directory in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
-        if directory.name == DUPLICATE_DIR:
+        if directory.name in (DUPLICATE_DIR, DAMAGED_DIR):
             continue
         try:
             directory.rmdir()  # klappt nur, wenn leer
@@ -105,6 +108,7 @@ class Importer:
         self.job = Job()
         # Rückmeldungen: "imported" -> Funktion(asset_id), darf den Pfad eines ähnlichen Fotos liefern
         self.hooks: dict[str, list] = {"imported": []}
+        self.ffprobe = media.ffprobe_for(settings.ffmpeg)
         self._file_lock = threading.Lock()  # immer nur eine Datei gleichzeitig (Duplikatprüfung)
         self._job_lock = threading.Lock()
         # (Variante, asset_id) -> (rev, Zeitpunkt): gescheiterte Vorschaubilder. Eine neue Revision
@@ -124,6 +128,12 @@ class Importer:
         kind = media.kind_of(Path(name))
         if kind is None:
             return Result("skipped", name, "Dateityp wird nicht unterstützt")
+        if move:
+            # Halbe Dateien (abgebrochen kopiert oder hochgeladen) gar nicht erst ins Archiv lassen.
+            # Beim Abgleich (move=False) liegen sie schon in der Bibliothek und werden aufgenommen.
+            problem = media.damage(source, kind, self.ffprobe)
+            if problem:
+                return Result("damaged", name, problem)
 
         with self._file_lock:
             try:
@@ -256,6 +266,7 @@ class Importer:
         except Exception as exc:
             log.warning("Vorschaubild für %s fehlgeschlagen: %s", row["path"], exc)
             self._set_failed("thumb", asset_id, row["rev"], True)
+            self.db.execute("UPDATE assets SET thumb_ok = -1 WHERE id = ?", (asset_id,))
             return None
         self._set_failed("thumb", asset_id, row["rev"], False)
         # Die Ausrichtung des Vorschaubilds ist maßgeblich, auch wenn die Metadaten etwas anderes sagen
@@ -339,7 +350,7 @@ class Importer:
         files = []
         for path in root.rglob("*"):
             rel = path.relative_to(root)
-            if is_ignored(rel) or (mode == "import" and rel.parts[0] == DUPLICATE_DIR):
+            if is_ignored(rel) or (mode == "import" and rel.parts[0] in (DUPLICATE_DIR, DAMAGED_DIR)):
                 continue
             if path.is_file() and rel.as_posix() not in known:
                 files.append(path)
@@ -348,12 +359,12 @@ class Importer:
 
     def _record(self, result: Result, rel: str):
         job = self.job
-        job.counts[result.status] += 1
+        job.counts[result.status] = job.counts.get(result.status, 0) + 1
         if result.similar:
             job.counts["similar"] = job.counts.get("similar", 0) + 1
             if len(job.similar) < REPORT_LIMIT:
                 job.similar.append({"name": rel, "existing": result.similar})
-        bucket = {"duplicate": job.duplicates, "error": job.errors, "skipped": job.skipped,
+        bucket = {"duplicate": job.duplicates, "damaged": job.damaged, "error": job.errors, "skipped": job.skipped,
                   "relinked": job.relinked}.get(result.status)
         if bucket is not None and len(bucket) < REPORT_LIMIT:
             entry = {"name": rel, "message": result.message}
@@ -380,6 +391,8 @@ class Importer:
                         result = self.import_file(path, move=(mode == "import"))
                     if result.status == "duplicate" and mode == "import":
                         move_file(path, unique_path(root / DUPLICATE_DIR / rel))
+                    elif result.status == "damaged" and mode == "import":
+                        move_file(path, unique_path(root / DAMAGED_DIR / rel))
                 except Exception as exc:
                     log.exception("Import von %s fehlgeschlagen", rel)
                     result = Result("error", rel, str(exc))

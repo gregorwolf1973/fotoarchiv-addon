@@ -10,6 +10,7 @@
     uploading: 'lädt hoch',
     imported: 'importiert',
     duplicate: 'Duplikat',
+    damaged: 'beschädigt',
     skipped: 'übersprungen',
     error: 'Fehler',
   };
@@ -26,7 +27,7 @@
       imported: count('imported'),
       similar: queue.filter((e) => e.similar).length,
       duplicate: count('duplicate'),
-      failed: count('error') + count('skipped'),
+      failed: count('error') + count('skipped') + count('damaged'),
     };
   });
 

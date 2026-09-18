@@ -18,7 +18,8 @@ def test_import_folder_sorts_deduplicates_and_cleans_up(settings, importer, make
     importer._run("import")
     job = importer.job
 
-    assert job.counts == {"imported": 2, "relinked": 0, "duplicate": 1, "skipped": 1, "error": 0, "missing": 0, "similar": 0}
+    assert job.counts == {"imported": 2, "relinked": 0, "duplicate": 1, "damaged": 0, "skipped": 1, "error": 0,
+                          "missing": 0, "similar": 0}
     assert (settings.library / "2019" / "05" / "strand.jpg").is_file()
     assert (settings.library / "2020" / "01" / "IMG_20200101_101010.jpg").is_file()
     assert (inbox / DUPLICATE_DIR / "Urlaub" / "strand_kopie.jpg").is_file()
@@ -126,3 +127,19 @@ def test_library_sync_relinks_moved_and_reports_missing(settings, importer, make
     moved = importer.db.one("SELECT path FROM assets a JOIN asset_tags l ON l.asset_id = a.id "
                             "JOIN tags t ON t.id = l.tag_id WHERE t.name = 'verschoben.jpg'")
     assert moved["path"] == "Sortiert/neu.jpg"                         # Schlagwort blieb erhalten
+
+
+def test_damaged_files_go_to_defekt_folder(settings, importer, make_jpeg):
+    from fotoarchiv.importer import DAMAGED_DIR
+
+    inbox = settings.import_dir / "urlaub"
+    inbox.mkdir(parents=True)
+    (inbox / "abgebrochen.jpg").write_bytes(b"\x00" * 8192)
+    make_jpeg(inbox / "heil.jpg")
+    importer._run("import")
+    job = importer.job
+    assert job.counts["damaged"] == 1 and job.counts["imported"] == 1
+    assert job.damaged[0]["name"] == "urlaub/abgebrochen.jpg" and "nicht lesbar" in job.damaged[0]["message"]
+    assert (settings.import_dir / DAMAGED_DIR / "urlaub" / "abgebrochen.jpg").is_file()
+    importer._run("import")  # zweiter Lauf fasst _defekt nicht an
+    assert importer.job.total == 0

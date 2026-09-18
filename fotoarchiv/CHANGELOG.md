@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16
+
+- Beschädigte Dateien kommen nicht mehr ins Archiv: Beim Import wird geprüft, ob sich ein Foto öffnen bzw. ein Video lesen lässt. Halbe Dateien (abgebrochen kopiert) landen in `_defekt` im Import-Ordner und stehen im Bericht unter „Beschädigt“
+- Uploads werden auf Vollständigkeit geprüft: Kommen weniger Bytes an als angekündigt, wird die Datei abgelehnt statt halb gespeichert
+- Speicherplatz: neuer Filter „Beschädigt“ zeigt Dateien, aus denen sich kein Vorschaubild erzeugen ließ
+- Ursache war ein Fund im Protokoll: 27 abgeschnittene Videos und Fotos, bei denen ffmpeg „moov atom not found“ meldete
+
 ## 0.15
 
 - Umwandeln: HEIC → JPEG, nicht abspielbare Videos (H.265/HEVC, 10 Bit, alte Formate) → H.264-MP4, MOV mit H.264 wird verlustfrei zu MP4 umgepackt

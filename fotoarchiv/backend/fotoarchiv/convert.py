@@ -9,10 +9,8 @@ Vorgemerkt wird über assets.convert: 0 = nichts zu tun, 1 = vorgemerkt, -1 = fe
 Umwandeln eines Videos auf dem Pi so lange dauert wie das Video selbst.
 """
 
-import json
 import logging
 import os
-import shutil
 import subprocess
 import threading
 from dataclasses import dataclass
@@ -92,26 +90,6 @@ def video_command(ffmpeg: str, source: Path, target: Path, plan: Plan) -> list[s
     return command + [str(target)]
 
 
-def ffprobe_for(ffmpeg: str) -> str:
-    """ffprobe liegt neben ffmpeg (Debian-Paket ffmpeg)."""
-    found = shutil.which(ffmpeg)
-    if found:
-        sibling = Path(found).with_name("ffprobe" + Path(found).suffix)
-        if sibling.exists():
-            return str(sibling)
-    return shutil.which("ffprobe") or "ffprobe"
-
-
-def probe(ffprobe: str, path: Path) -> dict:
-    result = subprocess.run(
-        [ffprobe, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
-        capture_output=True, text=True, timeout=120,
-    )
-    if result.returncode:
-        raise RuntimeError(f"ffprobe: {result.stderr.strip()[-300:]}")
-    return json.loads(result.stdout or "{}")
-
-
 def _lower_priority():
     os.nice(10)  # Home Assistant soll flüssig bleiben, während ein Video umgewandelt wird
 
@@ -123,7 +101,7 @@ class ConvertService:
         self.importer = importer
         self.editor = editor
         self.on_import = on_import
-        self.ffprobe = ffprobe_for(settings.ffmpeg)
+        self.ffprobe = media.ffprobe_for(settings.ffmpeg)
         self.current: str | None = None
         self._wake = threading.Event()
         self._stop = threading.Event()
@@ -209,7 +187,7 @@ class ConvertService:
         source = self.settings.library / row["path"]
         if not source.is_file():
             raise EditError("Datei fehlt auf dem Datenträger")
-        info = probe(self.ffprobe, source) if row["kind"] == "video" else None
+        info = media.probe(self.ffprobe, source) if row["kind"] == "video" else None
         plan = decide(source.suffix, row["kind"], info)
         if plan is None:
             return None
@@ -255,10 +233,10 @@ class ConvertService:
 
     def _check_video(self, source: Path, temp: Path):
         """Neue Datei muss ein Video in voller Länge sein, bevor das Original weicht."""
-        new = probe(self.ffprobe, temp)
+        new = media.probe(self.ffprobe, temp)
         if not any(s.get("codec_type") == "video" for s in new.get("streams") or []):
             raise RuntimeError("Ergebnis enthält kein Video")
-        before = float((probe(self.ffprobe, source).get("format") or {}).get("duration") or 0)
+        before = float((media.probe(self.ffprobe, source).get("format") or {}).get("duration") or 0)
         after = float((new.get("format") or {}).get("duration") or 0)
         if before and abs(before - after) > max(1.0, before * 0.02):
             raise RuntimeError(f"Länge passt nicht ({after:.1f} s statt {before:.1f} s)")

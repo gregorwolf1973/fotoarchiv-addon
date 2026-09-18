@@ -119,6 +119,7 @@
           <span class="count ok">{count('imported')} neu</span>
           {#if job.counts.relinked}<span class="count ok">{count('relinked')} wieder zugeordnet</span>{/if}
           <span class="count warn">{count('duplicate')} Duplikate</span>
+          {#if job.counts.damaged}<span class="count bad">{count('damaged')} beschädigt</span>{/if}
           {#if job.counts.similar}<span class="count warn">{count('similar')} sehr ähnlich</span>{/if}
           <span class="count">{count('skipped')} übersprungen</span>
           <span class="count bad">{count('error')} Fehler</span>
@@ -162,6 +163,18 @@
               {#each job.duplicates as entry}
                 <li><span>{entry.name}</span> <span class="muted">= {entry.existing} ({entry.message})</span></li>
               {/each}
+            </ul>
+          </details>
+        {/if}
+        {#if job.damaged?.length}
+          <details open>
+            <summary>Beschädigt</summary>
+            <p class="muted">
+              Nicht ins Archiv übernommen, meist weil das Kopieren abgebrochen ist. Verschoben nach <code>_defekt</code>
+              im Import-Ordner – die Datei noch einmal vom Original kopieren.
+            </p>
+            <ul>
+              {#each job.damaged as entry}<li><span>{entry.name}</span> <span class="error">{entry.message}</span></li>{/each}
             </ul>
           </details>
         {/if}

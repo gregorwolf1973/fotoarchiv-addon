@@ -194,13 +194,15 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
 
     @app.get("/api/largest")
     def asset_largest(
-        kind: Literal["all", "image", "video"] = "all",
+        kind: Literal["all", "image", "video", "damaged"] = "all",
         min_mb: int = Query(0, ge=0),
         limit: int = Query(300, ge=1, le=2000),
     ):
         """Die größten Dateien zuerst, zum Aufräumen. Einträge wie /api/assets plus Größe, Name und Dauer."""
         where, params = ["deleted_at IS NULL", "size >= ?"], [min_mb * 1024 * 1024]
-        if kind != "all":
+        if kind == "damaged":
+            where.append("thumb_ok != 1")  # Vorschaubild ließ sich nicht erzeugen: Datei meist beschädigt
+        elif kind != "all":
             where.append("kind = ?")
             params.append(kind)
         condition = " AND ".join(where)
@@ -392,19 +394,27 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             raise HTTPException(415, "Dateityp wird nicht unterstützt")
         settings.upload_tmp.mkdir(parents=True, exist_ok=True)
         temp = settings.upload_tmp / f"{uuid.uuid4().hex}{Path(safe_name(name)).suffix}"
+        received = 0
         try:
             with open(temp, "wb") as f:
                 async for chunk in request.stream():
                     f.write(chunk)
+                    received += len(chunk)
         except Exception:
             temp.unlink(missing_ok=True)
             raise
+        # Bricht die Verbindung unterwegs ab (Proxy, Funkloch), endet der Datenstrom womöglich ohne Fehler –
+        # dann käme eine halbe Datei ins Archiv
+        expected = request.headers.get("content-length", "")
+        if expected.isdigit() and received != int(expected):
+            temp.unlink(missing_ok=True)
+            raise HTTPException(400, f"Upload unvollständig ({received} von {expected} Bytes) – bitte erneut hochladen")
         # Browser liefern lastModified in Millisekunden
         seconds = mtime / 1000 if mtime and mtime > 1e11 else mtime
         result = await run_in_threadpool(importer.import_upload, temp, name, seconds)
         faces.wake()
         ctx.duplicates.wake()
-        status = 500 if result.status == "error" else 200
+        status = 500 if result.status == "error" else 422 if result.status == "damaged" else 200
         return JSONResponse(result.__dict__, status_code=status)
 
     faces_api.register(app, db, faces, tasks)

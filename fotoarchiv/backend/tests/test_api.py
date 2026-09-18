@@ -247,3 +247,20 @@ def test_largest_files_first_with_filters(client, make_jpeg, tmp_path):
 
     client.delete(f"/api/assets/{big}")  # Papierkorb zählt nicht mit
     assert [item[0] for item in client.get("/api/largest").json()["items"]] == [small]
+
+
+def test_damaged_upload_is_rejected(client):
+    # Abgebrochen übertragen: Endung .jpg, aber kein lesbares Bild
+    r = client.put("/api/upload", params={"name": "halb.jpg"}, content=b"\x00" * 4096)
+    assert r.status_code == 422 and r.json()["status"] == "damaged"
+    assert client.get("/api/assets").json()["items"] == []
+
+
+def test_damaged_filter_lists_files_without_preview(client, monkeypatch, make_jpeg, tmp_path):
+    from fotoarchiv import media
+
+    good = upload(client, make_jpeg, tmp_path, "gut.jpg")
+    monkeypatch.setattr(media, "thumbnail", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("kaputt")))
+    bad = upload(client, make_jpeg, tmp_path, "kaputt.jpg")
+    ids = [item[0] for item in client.get("/api/largest", params={"kind": "damaged"}).json()["items"]]
+    assert ids == [bad] and good != bad
