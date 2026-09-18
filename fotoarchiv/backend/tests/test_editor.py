@@ -100,10 +100,18 @@ def test_labels_replace_add_remove(settings, importer, editor, exiftool, make_jp
     assert "XMP-dc:Subject" not in exiftool.read(path)
 
 
-def test_person_from_face_region_cannot_be_removed(settings, importer, editor, make_jpeg):
-    asset_id = imported(settings, importer, make_jpeg, **{"XMP-mwg-rs__RegionName": "Oma"})
-    with pytest.raises(EditError, match="Gesichtsmarkierung"):
-        editor.set_labels(asset_id, "persons", [])
+def test_person_from_foreign_face_region_can_be_removed_and_renamed(settings, importer, editor, exiftool, make_jpeg):
+    # Namen aus Gesichtsmarkierungen anderer Programme (hier MWG, z. B. Picasa/Lightroom)
+    asset_id = imported(settings, importer, make_jpeg, **{"XMP-mwg-rs__RegionName": ["Oma", "Kai"]})
+    path = settings.library / row(importer, asset_id)["path"]
+
+    editor.change_labels(asset_id, "persons", add=["Kai Müller"], remove=["Kai"])
+    raw = exiftool.read(path)
+    assert not any(key.startswith("XMP-mwg-rs:") for key in raw)          # fremde Markierungen entfernt
+    assert raw["XMP-iptcExt:PersonInImage"] == ["Oma", "Kai Müller"]     # kein Name verloren
+
+    editor.set_labels(asset_id, "persons", [])
+    assert "XMP-iptcExt:PersonInImage" not in exiftool.read(path)
 
 
 def test_rotate_jpeg_updates_orientation_size_and_thumbnail(settings, importer, editor, exiftool, make_jpeg):

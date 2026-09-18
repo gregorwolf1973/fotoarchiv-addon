@@ -68,6 +68,7 @@ export const api = {
   personFaces: (id) => request(`api/persons/${id}/faces`),
   renamePerson: (id, name) => request(`api/persons/${id}/rename`, send('POST', { name })),
   mergePerson: (id, targetId) => request(`api/persons/${id}/merge`, send('POST', { target_id: targetId })),
+  deletePerson: (id) => request(`api/persons/${id}/delete`, { method: 'POST' }),
   assetFaces: (id) => request(`api/assets/${id}/faces`),
   assignFace: (id, name) => request(`api/faces/${id}/assign`, send('POST', { name })),
   removeFace: (id) => request(`api/faces/${id}/remove`, { method: 'POST' }),

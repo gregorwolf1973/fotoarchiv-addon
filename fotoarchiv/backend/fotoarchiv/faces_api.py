@@ -99,6 +99,15 @@ def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
         old, new, assets = guard(faces.rename_person, person_id, body.name)
         return relabel_task(old, new, assets, merge)
 
+    @app.post("/api/persons/{person_id}/delete")
+    def person_delete(person_id: int):
+        """Person entfernen: Name aus allen Fotos, Gesichter wieder unbekannt. Die Fotos bleiben."""
+        name, assets = guard(faces.delete_person, person_id)
+        if not assets:
+            db.bump()
+            return {"task": None}
+        return {"task": tasks.submit("persons_relabel", f"Person „{name}“ entfernen", assets, {"add": [], "remove": [name]})}
+
     @app.post("/api/persons/{person_id}/merge")
     def person_merge(person_id: int, body: MergeRequest):
         """Person in eine andere überführen: Gesichter, Namen in den Dateien, künftige Erkennung."""

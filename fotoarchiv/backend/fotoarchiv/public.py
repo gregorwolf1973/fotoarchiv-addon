@@ -37,7 +37,7 @@ VIEW = {
 }
 EDIT = {
     "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload",
-    "group_name", "group_hide", "person_rename", "person_merge", "face_assign", "face_remove",
+    "group_name", "group_hide", "person_rename", "person_merge", "person_delete", "face_assign", "face_remove",
     "duplicate_list", "duplicate_resolve", "duplicate_ignore",
 }
 # Bilder zählen nicht als Scan: ein abgelaufenes Cookie lädt sonst dutzende Vorschaubilder und sperrt sich selbst

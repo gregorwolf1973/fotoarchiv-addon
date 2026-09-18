@@ -1,5 +1,5 @@
 <script>
-  import { api, cropUrl } from '../lib/api.js';
+  import { api, cropUrl, thumbUrl } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
@@ -11,10 +11,12 @@
   const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
 
   let faces = $state([]);
+  let samples = $state.raw([]); // Fotos einer Person ohne erkannte Gesichter
   // svelte-ignore state_referenced_locally
   let name = $state(person.name);
   let busy = $state(false);
   let merging = $state(false);
+  let deleting = $state(false);
   let search = $state('');
   let target = $state(null);
 
@@ -59,9 +61,31 @@
   }
 
   function load() {
-    api.personFaces(person.id).then((list) => (faces = list), notifyError);
+    api.personFaces(person.id).then((list) => {
+      faces = list;
+      // Nur aus Metadaten bekannt: ein paar Fotos zeigen, damit man sieht, wer gemeint ist
+      if (!list.length && person.count) {
+        api.index({ persons: [{ id: person.id }] }, false).then((index) => (samples = index.items.slice(0, 12)), notifyError);
+      }
+    }, notifyError);
   }
   $effect(load);
+
+  async function removePerson() {
+    if (busy) return;
+    busy = true;
+    try {
+      const { task } = await api.deletePerson(person.id);
+      if (task) ontask(task);
+      else notify(`„${person.name}“ entfernt`);
+      onchanged();
+      onclose();
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      busy = false;
+    }
+  }
 
   async function rename(e) {
     e.preventDefault();
@@ -171,6 +195,21 @@
       {#if others.length}
         <button class="merge-open" onclick={() => startMerge()}>Mit anderer Person zusammenführen …</button>
       {/if}
+      <div class="remove-person">
+        {#if deleting}
+          <p>
+            Der Name „{person.name}“ wird aus {photos(person.count)} entfernt – direkt in den Dateien. Die Fotos selbst bleiben.
+            {#if faces.length}Die {formatNumber(faces.length)} erkannten Gesichter werden wieder zu unbekannten Gesichtern.{/if}
+            Stammt der Name aus Gesichtsmarkierungen eines anderen Programms, werden diese Markierungen dabei mit entfernt.
+          </p>
+          <div class="row">
+            <button onclick={() => (deleting = false)}>Abbrechen</button>
+            <button class="danger" disabled={busy} onclick={removePerson}>{busy ? 'Wird gestartet …' : 'Person entfernen'}</button>
+          </div>
+        {:else}
+          <button class="remove-open" onclick={() => (deleting = true)}><Icon name="delete" size={18} /> Person entfernen …</button>
+        {/if}
+      </div>
     {/if}
 
     {#if !merging}
@@ -188,7 +227,17 @@
           {/each}
         </div>
       {:else}
-        <p class="muted">Keine Gesichter zugeordnet – die Person stammt nur aus den Metadaten der Fotos.</p>
+        <p class="muted">
+          Keine Gesichter zugeordnet – der Name steht nur in den Metadaten der Fotos, meist aus einem anderen Programm
+          (Picasa, Google Fotos, Lightroom, Windows-Fotogalerie).
+        </p>
+        {#if samples.length}
+          <div class="samples">
+            {#each samples as item (item[0])}
+              <img src={thumbUrl(item, true)} alt="" loading="lazy" />
+            {/each}
+          </div>
+        {/if}
       {/if}
     </div>
 
@@ -209,6 +258,36 @@
   }
   .merge-open {
     margin-top: 12px;
+  }
+  .remove-person {
+    margin-top: 12px;
+  }
+  .remove-person p {
+    margin: 0 0 10px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .remove-person .row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .remove-open {
+    color: var(--danger);
+  }
+  .samples {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .samples img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 6px;
+    background: var(--placeholder);
+    display: block;
   }
   .merge h3 {
     margin-bottom: 10px;

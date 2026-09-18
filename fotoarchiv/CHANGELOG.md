@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12
+
+- Personen entfernen: neuer Knopf im Personen-Dialog. Der Name wird aus allen Fotos genommen, erkannte Gesichter werden wieder unbekannt
+- Behoben: Personen aus Gesichtsmarkierungen anderer Programme (Picasa, Google Fotos, Lightroom, Windows-Fotogalerie) ließen sich weder umbenennen noch entfernen. Beim Umbenennen standen danach sogar beide Namen im Foto. Jetzt werden die fremden Markierungen der betroffenen Datei entfernt, alle übrigen Namen bleiben erhalten
+- Personen ohne erkannte Gesichter zeigen im Dialog einige ihrer Fotos
+
 ## 0.11
 
 - Ort für viele Fotos auf einmal setzen: neuer Knopf in der Auswahlleiste, neben dem Datum

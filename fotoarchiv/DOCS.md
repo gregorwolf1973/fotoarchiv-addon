@@ -83,7 +83,7 @@ Jede Änderung wird **zuerst mit exiftool in die Datei geschrieben**. Danach lie
 - Das Dateidatum (Änderungszeit) bleibt beim Schreiben erhalten.
 - **Bearbeitbar** sind JPEG, PNG, WebP, TIFF, HEIC/HEIF, AVIF, MP4, MOV, M4V und 3GP. GIF, MKV, WebM, AVI und MTS können keine Metadaten speichern und werden nur angezeigt.
 - **HEIC/AVIF lassen sich nicht drehen.** Die Drehung steckt dort in einem Container-Feld, das exiftool nicht schreiben kann, und die EXIF-Orientierung wird von HEIC-Programmen ignoriert. Handyfotos sind in der Regel schon richtig gedreht.
-- Personen, die ein anderes Programm über **Gesichtsmarkierungen** zugeordnet hat, lassen sich hier nicht entfernen. Das kommt mit der Gesichtserkennung.
+- Personen, die ein anderes Programm über **Gesichtsmarkierungen** zugeordnet hat (Picasa, Google Fotos, Lightroom, Windows-Fotogalerie), lassen sich umbenennen und entfernen. Dabei werden die fremden Markierungen dieser Datei entfernt. Alle übrigen Namen bleiben erhalten und stehen danach in `PersonInImage`, nur die Gesichtsrahmen des anderen Programms gehen verloren.
 
 ## Dateien außerhalb des Fotoarchivs ändern
 
@@ -117,6 +117,7 @@ Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zu
 - **Person antippen → ✕ an einem Gesicht:** Das Gesicht wird gelöst, der Name wird aus dem Foto entfernt und dort nicht wieder vorgeschlagen.
 - **In der Einzelansicht** blendet das Gesichts-Symbol (Taste **f**) Rahmen um alle Gesichter ein. Ein Rahmen lässt sich direkt benennen oder lösen.
 - **Umbenennen** schreibt den neuen Namen in alle Fotos.
+- **Person entfernen:** Person antippen → *Person entfernen …*. Der Name verschwindet aus allen Fotos, die Fotos selbst bleiben. Erkannte Gesichter werden wieder zu unbekannten Gesichtern. So wirst du auch Namen los, die ein anderes Programm früher in die Dateien geschrieben hat – solche Personen haben keine erkannten Gesichter, der Dialog zeigt dann stattdessen einige ihrer Fotos.
 - **Zusammenführen:** Person antippen → *Mit anderer Person zusammenführen …* → Zielperson wählen. Die Vorschau zeigt, was passiert. Danach tragen alle Fotos den Namen der Zielperson, und die Gesichter gehören zu ihr. Dasselbe passiert, wenn du beim Umbenennen den Namen einer vorhandenen Person eingibst, dann aber mit Rückfrage.
 - Entfernst du eine Person von Hand aus einem Foto (Personen-Chip), löst sich das zugehörige Gesicht ebenfalls.
 

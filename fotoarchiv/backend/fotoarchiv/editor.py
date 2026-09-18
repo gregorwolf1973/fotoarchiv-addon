@@ -213,13 +213,21 @@ class Editor:
                 assignments = ["-XMP-iptcExt:PersonInImage="] + [f"-XMP-iptcExt:PersonInImage={n}" for n in names]
             self._write(path, *assignments)
             meta = self._refresh(asset_id)
+            if kind == "persons" and self._leftover(meta, names):
+                # Der Name steckt in Gesichtsmarkierungen eines anderen Programms (Picasa, Google Fotos,
+                # Lightroom, Windows-Fotogalerie …). Alle gewünschten Namen stehen jetzt in PersonInImage,
+                # also gehen beim Entfernen der fremden Markierungen keine Namen verloren – nur deren Rahmen.
+                self._write(path, "-XMP-mwg-rs:all=", "-XMP-MP:all=")
+                meta = self._refresh(asset_id)
             self.db.bump()
             if kind == "persons":
                 self._emit("persons", asset_id)
-                # Namen aus Gesichtsmarkierungen anderer Programme lassen sich hier nicht entfernen
-                leftover = {p.casefold() for p in meta.persons} - {n.casefold() for n in names}
-                if leftover:
+                if self._leftover(meta, names):
                     raise EditError("Person ist über eine Gesichtsmarkierung zugeordnet und bleibt erhalten")
+
+    @staticmethod
+    def _leftover(meta, names: list[str]) -> bool:
+        return bool({p.casefold() for p in meta.persons} - {n.casefold() for n in names})
 
     def change_labels(self, asset_id: int, kind: str, add: list[str], remove: list[str]):
         with self._lock:

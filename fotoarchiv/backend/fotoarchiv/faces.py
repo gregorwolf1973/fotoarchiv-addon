@@ -539,6 +539,24 @@ class FaceService:
                    WHERE l.person_id = ? AND a.deleted_at IS NULL""", (person_id,))]
         return old["name"], clean[0], assets
 
+    def delete_person(self, person_id: int) -> tuple[str, list[int]]:
+        """Person auflösen: ihre Gesichter werden wieder unbekannt, den Namen nimmt danach
+        eine Hintergrundaufgabe aus den Dateien. Gibt (Name, betroffene Fotos) zurück."""
+        with self._lock, self.db.transaction() as conn:
+            row = conn.execute("SELECT name FROM persons WHERE id = ?", (person_id,)).fetchone()
+            if row is None:
+                raise NotFound("Person nicht gefunden")
+            conn.execute("UPDATE face_groups SET person_id = NULL WHERE person_id = ?", (person_id,))
+            for group in self._groups.values():
+                if group["person_id"] == person_id:
+                    group["person_id"] = None
+            assets = [r["asset_id"] for r in conn.execute(
+                """SELECT l.asset_id FROM asset_persons l JOIN assets a ON a.id = l.asset_id
+                   WHERE l.person_id = ? AND a.deleted_at IS NULL""", (person_id,))]
+            if not assets:
+                labels.remove_unused(conn)
+        return row["name"], assets
+
     # ── Rückmeldungen vom Editor ───────────────────────────────────
     def _before_purge(self, asset_id: int):
         with self._lock, self.db.transaction() as conn:
