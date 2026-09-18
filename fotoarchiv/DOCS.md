@@ -18,7 +18,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum und Ort setzen, drehen und löschen für viele Dateien auf einmal.
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
-- **Speicherplatz:** Die größten Dateien zuerst, gefiltert nach Videos oder Fotos und Mindestgröße, zum Ansehen und Aussortieren. Siehe [Speicherplatz und Backups](#speicherplatz-und-backups).
+- **Speicherplatz:** Nach Größe sortiert – größte oder kleinste zuerst –, gefiltert nach Videos oder Fotos und Mindestgröße, zum Ansehen und Aussortieren. Siehe [Speicherplatz und Backups](#speicherplatz-und-backups).
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
@@ -218,7 +218,9 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 
 ## Speicherplatz und Backups
 
-**Große Dateien finden:** Das Datenbank-Symbol oben rechts öffnet die Ansicht **Speicherplatz**. Sie listet die größten Dateien zuerst, mit Größe, Datum, Dauer und Auflösung. Oben wählst du *Alle*, *Videos* oder *Fotos* und eine Mindestgröße; daneben steht, wie viel Platz diese Auswahl zusammen belegt. Antippen öffnet die Datei, der Kreis links wählt sie aus (Shift + Klick wählt einen Bereich). **In den Papierkorb** verschiebt die Auswahl, der Platz wird erst frei, wenn der Papierkorb geleert wird oder die Frist abläuft.
+**Große Dateien finden:** Das Datenbank-Symbol oben rechts öffnet die Ansicht **Speicherplatz**. Sie listet die Dateien nach Größe, mit Größe, Datum, Dauer und Auflösung. Oben wählst du *Alle*, *Videos* oder *Fotos*, eine Mindestgröße und unter *Reihenfolge*, ob die **größten** oder die **kleinsten** Dateien zuerst kommen; daneben steht, wie viel Platz diese Auswahl zusammen belegt. Antippen öffnet die Datei, der Kreis links wählt sie aus (Shift + Klick wählt einen Bereich). **In den Papierkorb** verschiebt die Auswahl, der Platz wird erst frei, wenn der Papierkorb geleert wird oder die Frist abläuft.
+
+**Kleine Dateien finden:** *Reihenfolge → Kleinste zuerst* dreht die Liste um. Das zeigt, was sich beim Aufräumen sonst nicht zeigt: versehentlich importierte Vorschaubilder und Symbole, WhatsApp-Kopien statt der Originale und Videoschnipsel von wenigen Sekunden. Die Mindestgröße bleibt dabei wirksam – für die kleinsten Dateien überhaupt also auf *alle* stellen.
 
 - Die Datenbank, die Vorschaubilder und die Gesichtsausschnitte liegen im Add-on-Datenordner. Pro Bild braucht das etwa 30–40 KB, dazu etwa 6 KB für die kleine Vorschau. Die kleine Vorschau entsteht erst, wenn ein Bild zum ersten Mal in einer kleinen Zoomstufe angezeigt wird.
 - **Vorschaubilder sind vom Add-on-Backup ausgenommen.** Sie werden bei Bedarf neu erzeugt.

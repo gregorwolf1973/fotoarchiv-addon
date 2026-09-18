@@ -457,7 +457,7 @@
         {/if}
         {#if canEdit}
           <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos"><Icon name="duplicate" /></button>
-          <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – die größten Dateien"><Icon name="storage" /></button>
+          <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – Dateien nach Größe"><Icon name="storage" /></button>
           <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
             <Icon name="delete" />
             {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}

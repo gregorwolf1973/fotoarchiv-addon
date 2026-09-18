@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20
+
+- Speicherplatz: neue Auswahl **Reihenfolge** – neben den größten Dateien lassen sich jetzt auch die kleinsten zuerst anzeigen
+- Nützlich, um versehentlich importierte Vorschaubilder, Symbole und Videoschnipsel zu finden; die Mindestgröße wirkt dabei weiter, für die kleinsten Dateien also auf „alle“ stellen
+
 ## 0.19
 
 - Große Importe schneller: Die Prüfung auf beschädigte Dateien läuft erst nach der Duplikatprüfung, Duplikate kosten also keinen ffprobe-Lauf mehr

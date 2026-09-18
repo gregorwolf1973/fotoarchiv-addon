@@ -198,8 +198,11 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         kind: Literal["all", "image", "video", "damaged"] = "all",
         min_mb: int = Query(0, ge=0),
         limit: int = Query(300, ge=1, le=2000),
+        order: Literal["desc", "asc"] = "desc",
     ):
-        """Die größten Dateien zuerst, zum Aufräumen. Einträge wie /api/assets plus Größe, Name und Dauer."""
+        """Nach Größe sortiert, zum Aufräumen: desc = größte zuerst, asc = kleinste zuerst.
+
+        Einträge wie /api/assets plus Größe, Name und Dauer."""
         where, params = ["deleted_at IS NULL", "size >= ?"], [min_mb * 1024 * 1024]
         if kind == "damaged":
             # Befund der gründlichen Prüfung oder kein Vorschaubild erzeugbar: Datei meist beschädigt
@@ -208,9 +211,10 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             where.append("kind = ?")
             params.append(kind)
         condition = " AND ".join(where)
+        direction = "ASC" if order == "asc" else "DESC"
         rows = db.query(
             f"""SELECT id, taken_ts, width, height, kind, rev, size, path, duration, damaged FROM assets
-                WHERE {condition} ORDER BY size DESC, id DESC LIMIT ?""",
+                WHERE {condition} ORDER BY size {direction}, id DESC LIMIT ?""",
             (*params, limit),
         )
         total = db.one(f"SELECT COUNT(*) AS count, COALESCE(SUM(size), 0) AS bytes FROM assets WHERE {condition}", params)

@@ -5,7 +5,7 @@
   import { notifyError } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
 
-  // Die größten Dateien zuerst, zum Aufräumen des Speicherplatzes.
+  // Nach Größe sortiert, zum Aufräumen des Speicherplatzes – größte oder kleinste zuerst.
   // onopen(list, id): Einzelansicht mit dieser Liste; onbatch(body, undo): Mehrfachaktion im Hintergrund
   // onconvert(ids, danach): Umwandeln mit Rückfrage; null = nicht erlaubt
   let { revision, canEdit = true, onopen, onbatch, onconvert = null } = $props();
@@ -17,21 +17,26 @@
     ['damaged', 'Beschädigt'],
   ];
   const SIZES = [0, 10, 50, 100, 500, 1000];
+  const ORDERS = [
+    ['desc', 'Größte zuerst'],
+    ['asc', 'Kleinste zuerst'],
+  ];
 
   let kind = $state('all');
   let minMb = $state(0);
+  let order = $state('desc');
   let data = $state.raw(null);
   const selected = new SvelteSet();
   let lastIndex = null;
 
   // Eintrag: [id, ts, w, h, video, rev, size, name, duration, damaged]; die ersten sechs wie in der Galerie
   const items = $derived(data?.items ?? []);
-  const largest = $derived(items[0]?.[6] || 1);
+  const largest = $derived(items.reduce((max, item) => Math.max(max, item[6]), 0) || 1);
   const selectedBytes = $derived(items.reduce((sum, item) => sum + (selected.has(item[0]) ? item[6] : 0), 0));
 
   $effect(() => {
     revision; // nach dem Löschen neu laden
-    const request = api.largest(kind, minMb);
+    const request = api.largest(kind, minMb, order);
     let cancelled = false;
     request.then((next) => {
       if (cancelled) return;
@@ -81,6 +86,14 @@
       <select bind:value={minMb} onchange={() => (lastIndex = null)}>
         {#each SIZES as size (size)}
           <option value={size}>{size ? `ab ${size >= 1000 ? `${size / 1000} GB` : `${size} MB`}` : 'alle'}</option>
+        {/each}
+      </select>
+    </label>
+    <label>
+      Reihenfolge
+      <select bind:value={order} onchange={() => (lastIndex = null)}>
+        {#each ORDERS as [value, label] (value)}
+          <option {value}>{label}</option>
         {/each}
       </select>
     </label>
@@ -136,7 +149,10 @@
     {/each}
   </ul>
   {#if data && data.count > items.length}
-    <p class="more">Gezeigt werden die {formatNumber(items.length)} größten von {formatNumber(data.count)} Dateien.</p>
+    <p class="more">
+      Gezeigt werden die {formatNumber(items.length)}
+      {order === 'asc' ? 'kleinsten' : 'größten'} von {formatNumber(data.count)} Dateien.
+    </p>
   {/if}
 </div>
 

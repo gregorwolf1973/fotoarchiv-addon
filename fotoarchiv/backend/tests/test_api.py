@@ -249,6 +249,23 @@ def test_largest_files_first_with_filters(client, make_jpeg, tmp_path):
     assert [item[0] for item in client.get("/api/largest").json()["items"]] == [small]
 
 
+def test_smallest_files_first(client, make_jpeg, tmp_path):
+    small = upload(client, make_jpeg, tmp_path, "klein.jpg", width=200, height=150)
+    big = upload(client, make_jpeg, tmp_path, "gross.jpg", width=1600, height=1200)
+
+    data = client.get("/api/largest", params={"order": "asc"}).json()
+    assert [item[0] for item in data["items"]] == [small, big]
+    assert data["items"][0][6] < data["items"][1][6]
+    # Summe und Anzahl hängen nur an den Filtern, nicht an der Reihenfolge
+    assert (data["count"], data["bytes"]) == tuple(
+        client.get("/api/largest").json()[key] for key in ("count", "bytes")
+    )
+
+    # Filter greifen in beide Richtungen gleich
+    assert client.get("/api/largest", params={"order": "asc", "kind": "video"}).json()["items"] == []
+    assert client.get("/api/largest", params={"order": "asc", "min_mb": 1000}).json()["count"] == 0
+
+
 def test_damaged_upload_is_rejected(client):
     # Abgebrochen übertragen: Endung .jpg, aber kein lesbares Bild
     r = client.put("/api/upload", params={"name": "halb.jpg"}, content=b"\x00" * 4096)
