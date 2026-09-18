@@ -15,6 +15,12 @@ configuration:
       Fotos im Hintergrund nach Gesichtern durchsuchen und ähnliche Gesichter gruppieren. Lädt beim ersten Start
       die InsightFace-Modelle (ca. 280 MB, nur nicht-kommerzielle Nutzung) herunter. Auf dem Raspberry Pi 5 etwa
       1 Sekunde pro Foto.
+  face_threads:
+    name: Kerne für die Gesichtserkennung
+    description: >-
+      Wie viele Prozessorkerne die Gesichtserkennung nutzen darf. Mehr Kerne gehen schneller durch die Fotos,
+      lasten den Pi aber stärker aus. Beim Raspberry Pi 5 (4 Kerne) sind 3 ein guter Wert, wenn Home Assistant
+      flüssig bleiben soll. Die Änderung wirkt nach einem Neustart des Add-ons.
   duplicate_detection:
     name: Doppelte Fotos erkennen
     description: >-

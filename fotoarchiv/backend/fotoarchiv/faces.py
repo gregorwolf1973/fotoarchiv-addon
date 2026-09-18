@@ -130,7 +130,7 @@ class FaceService:
             self.state.update(status="downloading", message="Modelle werden heruntergeladen (ca. 280 MB)")
             ensure_models(self.models, lambda done, total: self.state.update(download_done=done, download_total=total))
         self.state.update(status="loading", message="Modelle werden geladen")
-        self.engine = FaceEngine(self.models)
+        self.engine = FaceEngine(self.models, self.settings.face_threads)
         self.rebuild_groups()
         self.state.update(status="idle", message="")
 

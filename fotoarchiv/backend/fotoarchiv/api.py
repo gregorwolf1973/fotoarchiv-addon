@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -21,6 +21,23 @@ from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
 
 LONG_CACHE = {"Cache-Control": "private, max-age=31536000, immutable"}
+
+# Ersatz für ein Vorschaubild, das sich nicht erzeugen lässt. Bewusst mit 200 statt 404: Die Galerie
+# lädt Dutzende Vorschaubilder auf einmal, und eine Serie von 404 auf verschiedene Pfade werten
+# CrowdSec und ähnliche Wächter als Abtasten (Szenario http-probing) und sperren die Adresse.
+PLACEHOLDER_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90">'
+    '<rect width="120" height="90" fill="#9a9a9a" fill-opacity=".35"/>'
+    '<g fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">'
+    '<rect x="42" y="30" width="36" height="30" rx="3"/><path d="M45 56l10-11 8 8 5-5 7 8"/><path d="M36 67l48-44"/>'
+    "</g></svg>"
+)
+# Kurz cachen: Klappt es später (neue Revision oder neuer Versuch nach einer Stunde), soll das echte Bild kommen
+PLACEHOLDER_HEADERS = {"Cache-Control": "private, max-age=900", "X-Fotoarchiv-Placeholder": "1"}
+
+
+def placeholder() -> Response:
+    return Response(PLACEHOLDER_SVG, media_type="image/svg+xml", headers=PLACEHOLDER_HEADERS)
 
 
 def role_of(request: Request) -> str:
@@ -242,7 +259,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         asset_row(asset_id)
         path = importer.ensure_small(asset_id) if size == "small" else importer.ensure_thumbnail(asset_id)
         if path is None:
-            raise HTTPException(404, "Kein Vorschaubild")
+            return placeholder()
         return FileResponse(path, media_type="image/webp", headers=LONG_CACHE)
 
     @app.get("/api/assets/{asset_id}/preview")
@@ -250,7 +267,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         asset_row(asset_id)
         path = importer.ensure_preview(asset_id)
         if path is None:
-            raise HTTPException(404, "Keine Großansicht")
+            return placeholder()
         return FileResponse(path, media_type="image/webp", headers=LONG_CACHE)
 
     @app.get("/api/assets/{asset_id}/original")

@@ -14,6 +14,12 @@ configuration:
     description: >-
       Scan photos for faces in the background and group similar faces. Downloads the InsightFace models
       (about 280 MB, non-commercial use only) on first start. About 1 second per photo on a Raspberry Pi 5.
+  face_threads:
+    name: Cores for face recognition
+    description: >-
+      How many processor cores face recognition may use. More cores get through the photos faster but put a
+      heavier load on the Pi. On a Raspberry Pi 5 (4 cores), 3 is a good value if Home Assistant should stay
+      responsive. Takes effect after restarting the add-on.
   duplicate_detection:
     name: Detect duplicate photos
     description: >-

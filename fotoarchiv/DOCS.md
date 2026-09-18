@@ -16,7 +16,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen.
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext (Dateiname, Kamera, Personen- und Schlagwortnamen). Mehrere Filter gelten gemeinsam.
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
-- **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum setzen, drehen und löschen für viele Dateien auf einmal.
+- **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum und Ort setzen, drehen und löschen für viele Dateien auf einmal.
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
@@ -40,6 +40,7 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `import_folder` | `/share/fotoarchiv-import` | Eingangsordner für den Samba-Import |
 | `trash_days` | `30` | So viele Tage bleiben gelöschte Dateien im Papierkorb |
 | `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
+| `face_threads` | `2` | Prozessorkerne für die Gesichtserkennung (1–8). Auf dem Pi 5 sind 3 ein guter Wert, wenn Home Assistant flüssig bleiben soll. Wirkt nach einem Neustart des Add-ons. |
 | `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
 | `public_enabled` | `false` | Internetzugang auf Port 8301 starten |
 | `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
@@ -102,12 +103,12 @@ Legst du eine von Hand gelöschte Datei später wieder in den Import-Ordner oder
 
 ## Gesichtserkennung
 
-Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zuerst. Der Fortschritt steht oben in der Ansicht **Personen**. Auf einem Raspberry Pi 5 dauert das etwa 1 Sekunde pro Foto, bei 30.000 Fotos also rund 8–9 Stunden. Die Oberfläche bleibt währenddessen bedienbar, die Erkennung nutzt nur zwei Prozessorkerne.
+Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zuerst. Der Fortschritt steht oben in der Ansicht **Personen**. Auf einem Raspberry Pi 5 dauert das etwa 1 Sekunde pro Foto, bei 30.000 Fotos also rund 8–9 Stunden. Die Oberfläche bleibt währenddessen bedienbar, die Erkennung nutzt standardmäßig zwei Prozessorkerne. Mit der Option `face_threads` gibst du ihr mehr Kerne und kommst schneller durch.
 
 **So gehst du vor:**
 
 1. Unter **Personen → Unbekannte Gesichter** stehen Gruppen ähnlicher Gesichter, die größten zuerst.
-2. Gruppe antippen, falsche Gesichter abwählen, Namen eingeben und speichern. Der Name wird als Person in alle Fotos der Gruppe geschrieben.
+2. Gruppe antippen, falsche Gesichter abwählen, Namen eingeben und speichern. Der Name wird als Person in alle Fotos der Gruppe geschrieben. Erkennst du jemanden am Gesicht allein nicht, zeigt das Bilder-Symbol oben im Fenster die **ganzen Fotos** – mit Aufnahmedatum und dem gemeinten Gesicht klein in der Ecke. Die Einstellung wird gemerkt.
 3. Neue Fotos dieser Person werden ab jetzt automatisch zugeordnet und ebenfalls beschriftet (Markierung „auto“). Auch weitere, bereits vorhandene Gruppen, die der Person deutlich ähneln, werden ihr zugeordnet.
 4. Fremde Personen lassen sich mit **Ausblenden** aus den Vorschlägen nehmen.
 
@@ -248,5 +249,6 @@ Der Hauptport des Add-ons ist nur über Home Assistant (Ingress) erreichbar. Dir
 ## Fehlersuche
 
 - **„Fehlende Programme im Add-on“:** Das Image wurde unvollständig gebaut. Deinstallieren und neu installieren.
-- **Ein Bild zeigt nur eine graue Fläche:** Das Vorschaubild konnte nicht erzeugt werden. Genaueres steht im Protokoll des Add-ons.
+- **Ein Bild zeigt nur ein durchgestrichenes Bildsymbol:** Das Vorschaubild konnte nicht erzeugt werden. Genaueres steht im Protokoll des Add-ons („Vorschaubild für … fehlgeschlagen“). Neu versucht wird nach einer Stunde oder sobald die Datei bearbeitet wird.
+- **Ein Video lässt sich nicht abspielen, obwohl es ein MP4 ist:** Die Endung verrät nur den Container, nicht den Codec darin. Neuere Handys nehmen oft in H.265/HEVC auf, das die meisten Browser nicht abspielen können. Das Vorschaubild erscheint trotzdem, weil ffmpeg den Codec lesen kann. Die Einzelansicht zeigt dann einen Hinweis; das Original lässt sich herunterladen und lokal abspielen.
 - **Dateien bleiben im Import-Ordner liegen:** Den Bericht im Import-Fenster unter „Fehler“ und „Übersprungen“ prüfen. Dateien, die beim Start noch kopiert wurden, werden übersprungen und beim nächsten Import übernommen.

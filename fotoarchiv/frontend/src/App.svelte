@@ -13,6 +13,7 @@
   import Icon from './components/Icon.svelte';
   import ImportPanel from './components/ImportPanel.svelte';
   import LabelDialog from './components/LabelDialog.svelte';
+  import LocationDialog from './components/LocationDialog.svelte';
   import Login from './components/Login.svelte';
   import MapView from './components/MapView.svelte';
   import PeopleView from './components/PeopleView.svelte';
@@ -372,6 +373,7 @@
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'persons' })} title="Personen ändern"><Icon name="person" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'tags' })} title="Schlagworte ändern"><Icon name="tag" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'date' })} title="Datum setzen"><Icon name="calendar" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'location' })} title="Aufnahmeort setzen"><Icon name="marker" /></button>
         <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 270 })} title="Nach links drehen"><Icon name="rotate" /></button>
         <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 90 })} title="Nach rechts drehen"><Icon name="rotate" flip /></button>
         <button class="icon" onclick={deleteSelected} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
@@ -552,6 +554,17 @@
     oncancel={() => (dialog = null)}
     onsave={(value) => {
       runBatch({ ids: [...selected], action: 'date', taken_at: value });
+      dialog = null;
+    }}
+  />
+{:else if dialog?.type === 'location'}
+  <LocationDialog
+    count={selected.size}
+    oncancel={() => (dialog = null)}
+    onsave={(location) => {
+      // Kein Rückgängig: Die Auswahl kann vorher verschiedene Orte gehabt haben,
+      // ein pauschales Zurücksetzen auf "kein Ort" würde die alten Angaben verlieren.
+      runBatch({ ids: [...selected], action: 'location', location });
       dialog = null;
     }}
   />

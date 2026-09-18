@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11
+
+- Ort für viele Fotos auf einmal setzen: neuer Knopf in der Auswahlleiste, neben dem Datum
+- Unbekannte Gesichter: Das Bilder-Symbol im Fenster „Wer ist das?“ zeigt die ganzen Fotos statt nur der Gesichtsausschnitte, mit Datum und dem gemeinten Gesicht in der Ecke. Die Ansicht wird gemerkt
+- Videos, die der Browser nicht abspielen kann (meist H.265/HEVC), zeigen jetzt einen Hinweis mit Download-Knopf statt eines stummen Standbilds
+- Videos starten nicht mehr von selbst: Der Autostart wurde von Browsern mit Ton ohnehin blockiert
+- Neue Option `face_threads`: Prozessorkerne für die Gesichtserkennung (bisher fest 2)
+- Behoben: Fotos, deren Vorschaubild sich nicht erzeugen lässt, konnten eine Sperre durch CrowdSec auslösen. Beim Scrollen kam für jedes eine 404-Antwort, und eine solche Serie sieht wie ein Scanner aus (Szenario `http-probing`). Jetzt kommt ein Ersatzbild, und ein gescheitertes Vorschaubild wird erst nach einer Stunde oder nach einer Änderung an der Datei neu versucht
+
 ## 0.10
 
 - Doppelte und sehr ähnliche Fotos finden: Wahrnehmungs-Hash im Hintergrund, eigene Ansicht „Doppelte Fotos“ mit den Listen „Doppelt“ (verkleinert, neu gespeichert, anderes Format) und „Serien“ (ähnlich, innerhalb von 30 Sekunden)

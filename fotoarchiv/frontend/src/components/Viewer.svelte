@@ -22,6 +22,19 @@
   let stageWidth = $state(0);
   let stageHeight = $state(0);
   let natural = $state({ width: 0, height: 0 });
+  let videoError = $state('');
+
+  // Ein .mp4 sagt nichts über den Codec darin. Kann der Browser ihn nicht dekodieren,
+  // bleibt sonst nur das Vorschaubild stehen, ohne jeden Hinweis.
+  const VIDEO_ERRORS = {
+    1: 'Die Wiedergabe wurde abgebrochen.',
+    2: 'Das Video konnte nicht vollständig geladen werden (Netzwerkfehler).',
+    3: 'Der Browser kann dieses Video nicht dekodieren. Meist steckt H.265/HEVC darin, das nur wenige Browser abspielen.',
+    4: 'Dieses Videoformat unterstützt der Browser nicht. Die Datei selbst ist in Ordnung – nur der Codec darin passt nicht.',
+  };
+  function videoFailed(e) {
+    videoError = VIDEO_ERRORS[e.currentTarget.error?.code] ?? 'Das Video lässt sich nicht abspielen.';
+  }
 
   // Fläche, die das Bild bei object-fit: contain tatsächlich einnimmt
   const frame = $derived.by(() => {
@@ -58,6 +71,7 @@
     const id = itemId;
     detail = null;
     error = '';
+    videoError = '';
     if (id === undefined) return;
     let cancelled = false;
     api.asset(id).then(
@@ -147,8 +161,17 @@
   <div class="stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight} onpointerdown={pointerdown} onpointerup={pointerup} role="presentation">
     {#key key}
       {#if isVideo}
+        <!-- Kein autoplay: Browser blocken Autostart mit Ton ohnehin, und bei Familienvideos
+             will man den Ton hören statt stumm zu starten. -->
         <!-- svelte-ignore a11y_media_has_caption -->
-        <video src={originalUrl(item)} poster={previewUrl(item)} controls autoplay playsinline></video>
+        <video
+          src={originalUrl(item)}
+          poster={previewUrl(item)}
+          controls
+          playsinline
+          preload="metadata"
+          onerror={videoFailed}
+        ></video>
       {:else}
         {#if loadedKey !== key}<img class="placeholder" src={thumbUrl(item)} alt="" />{/if}
         <img
@@ -174,6 +197,14 @@
           onchanged();
         }}
       />
+    {/if}
+
+    {#if videoError}
+      <div class="video-error">
+        <Icon name="alert" size={22} />
+        <p>{videoError}</p>
+        <a class="download" href={originalUrl(item, true)}><Icon name="download" size={18} /> Original herunterladen</a>
+      </div>
     {/if}
 
     <div class="toolbar">
@@ -339,6 +370,34 @@
   }
   .placeholder {
     filter: blur(8px);
+  }
+  .video-error {
+    position: absolute;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    width: min(420px, calc(100% - 32px));
+    padding: 16px;
+    border-radius: 10px;
+    background: rgb(0 0 0 / 0.82);
+    color: #fff;
+    text-align: center;
+    z-index: 2;
+  }
+  .video-error p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .video-error .download {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #fff;
+    font-size: 0.9rem;
   }
   .toolbar {
     position: absolute;

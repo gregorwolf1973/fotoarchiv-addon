@@ -32,7 +32,7 @@ def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
 
     def face_rows(where: str, params) -> list[dict]:
         rows = db.query(
-            f"""SELECT f.id, f.asset_id, f.confirmed, a.taken_ts FROM faces f
+            f"""SELECT f.id, f.asset_id, f.confirmed, a.taken_ts, a.rev FROM faces f
                 JOIN assets a ON a.id = f.asset_id AND a.deleted_at IS NULL
                 LEFT JOIN face_groups g ON g.id = f.group_id
                 WHERE {where} ORDER BY a.taken_ts DESC LIMIT 2000""",

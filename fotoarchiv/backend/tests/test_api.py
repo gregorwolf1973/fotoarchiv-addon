@@ -209,3 +209,25 @@ def test_merge_persons(client, make_jpeg, tmp_path):
     for asset_id in (a, b, c):
         assert client.get(f"/api/assets/{asset_id}").json()["persons"] == ["Anna Müller"]
     assert [(p["name"], p["count"]) for p in client.get("/api/labels").json()["persons"]] == [("Anna Müller", 3)]
+
+
+def test_broken_thumbnail_gives_placeholder_and_is_not_retried(client, monkeypatch, make_jpeg, tmp_path):
+    # Eine Serie von 404 beim Scrollen sieht für CrowdSec wie ein Scanner aus (http-probing)
+    from fotoarchiv import media
+
+    calls = []
+
+    def broken(*args, **kwargs):
+        calls.append(1)
+        raise RuntimeError("kaputt")
+
+    monkeypatch.setattr(media, "thumbnail", broken)
+    photo = make_jpeg(tmp_path / "kaputt.jpg")
+    asset_id = client.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes()).json()["asset_id"]
+
+    for size in ("normal", "small", "normal"):
+        thumb = client.get(f"/api/assets/{asset_id}/thumb", params={"size": size})
+        assert thumb.status_code == 200
+        assert thumb.headers["content-type"].startswith("image/svg+xml")
+        assert "immutable" not in thumb.headers["cache-control"]
+    assert len(calls) == 1  # einmal beim Import versucht, danach gemerkt

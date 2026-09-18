@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
 description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Gesichtserkennung, Suche, Bearbeiten direkt in der Datei"
-version: "0.10"
+version: "0.11"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:
@@ -31,6 +31,7 @@ options:
   import_folder: "/share/fotoarchiv-import"
   trash_days: 30
   face_recognition: true
+  face_threads: 2
   duplicate_detection: true
   public_enabled: false
   public_trusted_proxies:
@@ -44,6 +45,7 @@ schema:
   import_folder: str
   trash_days: int(1,365)
   face_recognition: bool
+  face_threads: int(1,8)
   duplicate_detection: bool
   public_enabled: bool
   public_trusted_proxies:

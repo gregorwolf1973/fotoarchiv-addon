@@ -5,7 +5,8 @@
   import PlaceSearch from './PlaceSearch.svelte';
 
   // lat/lon: bisheriger Ort oder null. onsave({ lat, lon })
-  let { lat = null, lon = null, onsave, oncancel } = $props();
+  // count > 1: der Ort gilt für eine Mehrfachauswahl
+  let { lat = null, lon = null, count = 1, onsave, oncancel } = $props();
 
   let container = $state();
   // svelte-ignore state_referenced_locally
@@ -47,7 +48,11 @@
       <h2 id="location-title">Aufnahmeort</h2>
       <button class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
     </header>
-    <p>In die Karte tippen oder die Stecknadel verschieben. Mit der Suche springst du schnell zu einem Ort.</p>
+    {#if count > 1}
+      <p>Alle <strong>{count}</strong> ausgewählten Dateien bekommen genau diesen Ort. In die Karte tippen oder die Stecknadel verschieben.</p>
+    {:else}
+      <p>In die Karte tippen oder die Stecknadel verschieben. Mit der Suche springst du schnell zu einem Ort.</p>
+    {/if}
     <div class="map-box">
       <div class="map" bind:this={container}></div>
       <div class="search"><PlaceSearch onselect={goTo} /></div>

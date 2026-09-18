@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,7 @@ DUPLICATE_DIR = "_duplikate"
 IGNORED_NAMES = {"@eaDir", "#recycle", "Thumbs.db", "desktop.ini"}
 REPORT_LIMIT = 500  # Einträge pro Liste im Bericht
 DATE_RANK = {"mtime": 0, "filename": 1, "exif": 2}  # wie verlässlich die Datumsquelle ist
+RETRY_FAILED = 3600  # s: gescheiterte Vorschaubilder nicht bei jedem Scrollen neu berechnen
 
 
 @dataclass
@@ -105,6 +107,9 @@ class Importer:
         self.hooks: dict[str, list] = {"imported": []}
         self._file_lock = threading.Lock()  # immer nur eine Datei gleichzeitig (Duplikatprüfung)
         self._job_lock = threading.Lock()
+        # (Variante, asset_id) -> (rev, Zeitpunkt): gescheiterte Vorschaubilder. Eine neue Revision
+        # (Datei bearbeitet oder ersetzt) oder eine Stunde Abstand erlaubt einen neuen Versuch.
+        self._failed: dict[tuple[str, int], tuple[int, float]] = {}
         self._report_path = settings.data / "letzter_import.json"
         try:
             self.job = Job(**json.loads(self._report_path.read_text(encoding="utf-8")))
@@ -227,18 +232,32 @@ class Importer:
         for variant in ("thumb", "small", "preview"):
             self.cache_file(asset_id, variant).unlink(missing_ok=True)
 
+    def _recently_failed(self, variant: str, asset_id: int, rev: int) -> bool:
+        entry = self._failed.get((variant, asset_id))
+        return entry is not None and entry[0] == rev and time.monotonic() - entry[1] < RETRY_FAILED
+
+    def _set_failed(self, variant: str, asset_id: int, rev: int, failed: bool):
+        if failed:
+            self._failed[(variant, asset_id)] = (rev, time.monotonic())
+        else:
+            self._failed.pop((variant, asset_id), None)
+
     def ensure_thumbnail(self, asset_id: int) -> Path | None:
-        row = self.db.one("SELECT path, kind, width, height, thumb_ok FROM assets WHERE id = ?", (asset_id,))
+        row = self.db.one("SELECT path, kind, width, height, thumb_ok, rev FROM assets WHERE id = ?", (asset_id,))
         if row is None:
             return None
         target = self.cache_file(asset_id, "thumb")
         if row["thumb_ok"] and target.exists():
             return target
+        if self._recently_failed("thumb", asset_id, row["rev"]):
+            return None
         try:
             tw, th = media.thumbnail(self.settings.library / row["path"], row["kind"], self.settings.ffmpeg, target)
         except Exception as exc:
             log.warning("Vorschaubild für %s fehlgeschlagen: %s", row["path"], exc)
+            self._set_failed("thumb", asset_id, row["rev"], True)
             return None
+        self._set_failed("thumb", asset_id, row["rev"], False)
         # Die Ausrichtung des Vorschaubilds ist maßgeblich, auch wenn die Metadaten etwas anderes sagen
         w, h = row["width"] or tw, row["height"] or th
         if (w > h) != (tw > th) and w != h and tw != th:
@@ -247,16 +266,20 @@ class Importer:
         return target
 
     def ensure_preview(self, asset_id: int) -> Path | None:
-        row = self.db.one("SELECT path, kind FROM assets WHERE id = ?", (asset_id,))
+        row = self.db.one("SELECT path, kind, rev FROM assets WHERE id = ?", (asset_id,))
         if row is None:
             return None
         target = self.cache_file(asset_id, "preview")
         if not target.exists():
+            if self._recently_failed("preview", asset_id, row["rev"]):
+                return None
             try:
                 media.preview(self.settings.library / row["path"], row["kind"], self.settings.ffmpeg, target)
             except Exception as exc:
                 log.warning("Großansicht für %s fehlgeschlagen: %s", row["path"], exc)
+                self._set_failed("preview", asset_id, row["rev"], True)
                 return None
+            self._set_failed("preview", asset_id, row["rev"], False)
         return target
 
     def ensure_small(self, asset_id: int) -> Path | None:
