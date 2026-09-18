@@ -81,7 +81,7 @@
     <form onsubmit={save}>
       <header>
         <h2 id="group-title">Wer ist das?</h2>
-        <button type="button" class="icon" class:on={showPhotos} onclick={togglePhotos}
+        <button type="button" class="icon view-toggle" class:on={showPhotos} onclick={togglePhotos}
           title={showPhotos ? 'Nur die Gesichter zeigen' : 'Ganze Fotos zeigen'}>
           <Icon name={showPhotos ? 'face' : 'images'} />
         </button>
@@ -197,6 +197,9 @@
   }
   .on {
     color: var(--accent);
+  }
+  .view-toggle {
+    margin-left: auto; /* neben dem Schließen-Knopf statt in der Mitte der Kopfzeile */
   }
   .mark {
     position: absolute;

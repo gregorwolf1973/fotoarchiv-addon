@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.13)
+## Funktionen (Version 0.14)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -13,7 +13,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Bibliothek abgleichen.** Übernimmt Dateien, die schon in der Bibliothek liegen, ohne sie zu verschieben, und erkennt von Hand verschobene oder gelöschte Dateien. Siehe [Dateien außerhalb des Fotoarchivs ändern](#dateien-außerhalb-des-fotoarchivs-ändern).
 - **Galerie** mit Tagesgruppen, Zeilen im Blocksatz und flüssigem Scrollen auch bei Zehntausenden Bildern. Die Vorschaugröße lässt sich in 5 Stufen zoomen, die kleinsten zwei gruppieren nach Monat.
 - **Zeitleiste rechts.** Ein fester Balken mit Jahreszahlen und einem Cursor zum Ziehen, der Monat und Jahr anzeigt.
-- **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen.
+- **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen. Zoomen bis 8-fach mit Mausrad, Doppelklick oder zwei Fingern; beim Hineinzoomen wird das Original in voller Auflösung nachgeladen (JPEG, PNG, WebP, GIF, AVIF bis 60 MB – HEIC und TIFF kann der Browser nicht anzeigen, dort bleibt es bei der Großansicht).
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext (Dateiname, Kamera, Personen- und Schlagwortnamen). Mehrere Filter gelten gemeinsam.
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum und Ort setzen, drehen und löschen für viele Dateien auf einmal.
@@ -62,6 +62,8 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Auswahl aufheben | Esc | ✕ in der Leiste |
 | Löschen | Entf | Papierkorb-Symbol |
 | In der Einzelansicht blättern | ← → | wischen |
+| Foto vergrößern | Mausrad, Doppelklick, + / − (0 = zurück) | zwei Finger auseinanderziehen, doppelt tippen |
+| Vergrößertes Foto verschieben | ziehen | mit einem Finger ziehen |
 | Infobereich ein/aus | i | ⓘ |
 | Gesichtsrahmen ein/aus | f | Gesichts-Symbol |
 | Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |

@@ -2,6 +2,7 @@
   import { api, originalUrl, previewUrl, thumbUrl } from '../lib/api.js';
   import { DATE_SOURCES, formatBytes, formatDuration, formatTaken } from '../lib/format.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
+  import { clampView, RESET, zoomAt } from '../lib/zoom.js';
   import ChipInput from './ChipInput.svelte';
   import DateDialog from './DateDialog.svelte';
   import FaceBoxes from './FaceBoxes.svelte';
@@ -23,6 +24,10 @@
   let stageHeight = $state(0);
   let natural = $state({ width: 0, height: 0 });
   let videoError = $state('');
+  let stage = $state();
+  let view = $state(RESET); // Zoom: { scale, x, y }
+  let hiresFor = $state(null); // Original nachladen, sobald gezoomt wird (einmal je Bild)
+  let hiresReady = $state(null);
 
   // Ein .mp4 sagt nichts über den Codec darin. Kann der Browser ihn nicht dekodieren,
   // bleibt sonst nur das Vorschaubild stehen, ohne jeden Hinweis.
@@ -50,6 +55,48 @@
   const key = $derived(`${item[0]}-${item[5]}`); // neue Revision (z. B. gedreht) lädt neu
   const isVideo = $derived(item?.[4] === 1);
   const canEdit = $derived(allowed && !trash && detail?.editable);
+
+  // ── Zoom ───────────────────────────────────────────────────────
+  // Browser zeigen HEIC/TIFF nicht an; sehr große Originale lohnen das Nachladen nicht
+  const HIRES_TYPES = /^image\/(jpeg|png|webp|gif|avif)$/;
+  const HIRES_MAX = 60 * 1024 * 1024;
+  const zoomed = $derived(view.scale > 1.01);
+  const canZoom = $derived(!isVideo && frame !== null && loadedKey === key);
+  const stageSize = $derived({ width: stageWidth, height: stageHeight });
+  const transform = $derived(zoomed ? `translate(${view.x}px, ${view.y}px) scale(${view.scale})` : null);
+  const hiresAllowed = $derived(!isVideo && HIRES_TYPES.test(detail?.mime ?? '') && (detail?.size ?? Infinity) <= HIRES_MAX);
+
+  $effect(() => {
+    key; // anderes Bild oder neue Revision: ungezoomt beginnen
+    view = RESET;
+  });
+  $effect(() => {
+    if (zoomed && hiresAllowed) hiresFor = key;
+  });
+
+  function zoomTo(scale, x, y) {
+    if (canZoom) view = zoomAt(view, scale, x, y, frame, stageSize);
+  }
+  const toggleZoom = (x, y) => (zoomed ? (view = RESET) : zoomTo(2.5, x, y));
+
+  function local(e) {
+    const rect = stage.getBoundingClientRect();
+    return [e.clientX - rect.left, e.clientY - rect.top];
+  }
+
+  // Mausrad und Touchpad-Geste; muss preventDefault können, darum nicht passiv
+  $effect(() => {
+    if (!stage) return;
+    function onwheel(e) {
+      if (!canZoom || e.target.closest('.toolbar, .nav')) return;
+      e.preventDefault();
+      const delta = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY; // Firefox liefert Zeilen
+      const [x, y] = local(e);
+      zoomTo(view.scale * Math.exp(-delta * 0.002), x, y);
+    }
+    stage.addEventListener('wheel', onwheel, { passive: false });
+    return () => stage.removeEventListener('wheel', onwheel);
+  });
 
   function readInfoSetting() {
     try {
@@ -137,18 +184,91 @@
     else if (e.key === 'i') toggleInfo();
     else if (e.key === 'f' && !isVideo && !trash) showFaces = !showFaces;
     else if (e.key === 'Delete' && !trash && allowed) ondelete(itemId);
+    else if ((e.key === '+' || e.key === '=') && canZoom) zoomTo(view.scale * 1.5, stageWidth / 2, stageHeight / 2);
+    else if (e.key === '-' && canZoom) zoomTo(view.scale / 1.5, stageWidth / 2, stageHeight / 2);
+    else if (e.key === '0' && zoomed) view = RESET;
     else return;
     e.preventDefault();
   }
 
-  // Wischen auf Touch-Geräten
-  let startX = null;
-  const pointerdown = (e) => e.pointerType !== 'mouse' && (startX = e.clientX);
+  // Gesten: Wischen blättert (ungezoomt), zwei Finger zoomen, ein Finger bzw. die Maus verschiebt
+  // das gezoomte Bild, Doppeltippen zoomt hinein und wieder heraus
+  const pointers = new Map(); // pointerId -> [x, y]
+  let gesture = null; // { type: swipe | pan | pinch | click, sx, sy, … }
+  let lastTap = null;
+  const spread = () => {
+    const [a, b] = [...pointers.values()];
+    return [Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  };
+
+  function pointerdown(e) {
+    if (e.target.closest('button, a, input, textarea, form')) return;
+    const [x, y] = local(e);
+    pointers.set(e.pointerId, [x, y]);
+    if (pointers.size === 2 && canZoom) {
+      gesture = { type: 'pinch', dist: spread()[0], scale: view.scale };
+    } else if (pointers.size === 1) {
+      const type = zoomed ? 'pan' : e.pointerType === 'mouse' ? 'click' : 'swipe';
+      gesture = { type, sx: x, sy: y, x, y, touch: e.pointerType !== 'mouse' };
+      if (type === 'pan') {
+        try {
+          stage.setPointerCapture(e.pointerId); // Verschieben auch, wenn der Zeiger die Bühne verlässt
+        } catch {
+          /* Zeiger schon wieder weg */
+        }
+      }
+    }
+  }
+
+  function pointermove(e) {
+    if (!pointers.has(e.pointerId)) return;
+    const [x, y] = local(e);
+    pointers.set(e.pointerId, [x, y]);
+    if (gesture?.type === 'pinch' && pointers.size === 2) {
+      const [dist, cx, cy] = spread();
+      zoomTo((gesture.scale * dist) / gesture.dist, cx, cy);
+    } else if (gesture?.type === 'pan') {
+      view = clampView({ scale: view.scale, x: view.x + x - gesture.x, y: view.y + y - gesture.y }, frame, stageSize);
+      gesture.x = x;
+      gesture.y = y;
+    }
+  }
+
   function pointerup(e) {
-    if (startX === null) return;
-    const dx = e.clientX - startX;
-    startX = null;
-    if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+    if (!pointers.has(e.pointerId)) return;
+    const [x, y] = local(e);
+    pointers.delete(e.pointerId);
+    const done = gesture;
+    if (pointers.size) {
+      // Nach dem Zusammenziehen bleibt oft ein Finger liegen: mit ihm weiter verschieben
+      const [rest] = pointers.values();
+      gesture = zoomed ? { type: 'pan', sx: rest[0], sy: rest[1], x: rest[0], y: rest[1], touch: true, moved: true } : null;
+      return;
+    }
+    gesture = null;
+    if (!done || done.type === 'pinch' || e.type === 'pointercancel') return;
+    const dx = x - done.sx;
+    const dy = y - done.sy;
+    if (done.type === 'swipe' && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+      go(dx < 0 ? 1 : -1);
+      return;
+    }
+    // Doppeltippen am Touchscreen; mit der Maus übernimmt das dblclick
+    if (done.touch && !done.moved && Math.hypot(dx, dy) < 10) {
+      const now = performance.now();
+      if (lastTap && now - lastTap.time < 300 && Math.hypot(x - lastTap.x, y - lastTap.y) < 30) {
+        toggleZoom(x, y);
+        lastTap = null;
+      } else {
+        lastTap = { time: now, x, y };
+      }
+    }
+  }
+
+  function dblclick(e) {
+    if (!canZoom || e.target.closest('button, a, input, form')) return;
+    const [x, y] = local(e);
+    toggleZoom(x, y);
   }
 
   const mapLink = (d) => `https://www.openstreetmap.org/?mlat=${d.lat}&mlon=${d.lon}#map=15/${d.lat}/${d.lon}`;
@@ -158,7 +278,20 @@
 <svelte:window onkeydown={keydown} />
 
 <div class="viewer" role="dialog" aria-modal="true" aria-label="Einzelansicht">
-  <div class="stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight} onpointerdown={pointerdown} onpointerup={pointerup} role="presentation">
+  <div
+    class="stage"
+    class:zoomable={!isVideo}
+    class:zoomed
+    bind:this={stage}
+    bind:clientWidth={stageWidth}
+    bind:clientHeight={stageHeight}
+    onpointerdown={pointerdown}
+    onpointermove={pointermove}
+    onpointerup={pointerup}
+    onpointercancel={pointerup}
+    ondblclick={dblclick}
+    role="presentation"
+  >
     {#key key}
       {#if isVideo}
         <!-- Kein autoplay: Browser blocken Autostart mit Ton ohnehin, und bei Familienvideos
@@ -178,14 +311,21 @@
           class="photo"
           src={previewUrl(item)}
           alt={detail?.name ?? ''}
+          style:transform
+          draggable="false"
           onload={(e) => {
             loadedKey = key;
             natural = { width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight };
           }}
         />
+        {#if hiresFor === key}
+          <!-- Beim Hineinzoomen das Original darüberlegen, sobald es geladen ist -->
+          <img class="photo hires" class:ready={hiresReady === key} src={originalUrl(item)} alt="" style:transform
+            draggable="false" onload={() => (hiresReady = key)} />
+        {/if}
       {/if}
     {/key}
-    {#if showFaces && !isVideo && frame && loadedKey === key}
+    {#if showFaces && !isVideo && !zoomed && frame && loadedKey === key}
       <FaceBoxes
         assetId={itemId}
         revision={item[5]}
@@ -359,6 +499,28 @@
     align-items: center;
     justify-content: center;
     touch-action: pan-y;
+    overflow: hidden;
+  }
+  /* Bei Fotos übernimmt die Seite alle Gesten selbst (Zoom, Verschieben, Wischen) */
+  .stage.zoomable {
+    touch-action: none;
+  }
+  .stage.zoomed {
+    cursor: grab;
+  }
+  .stage.zoomed:active {
+    cursor: grabbing;
+  }
+  .photo {
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+  .hires {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .hires.ready {
+    opacity: 1;
   }
   .stage img,
   .stage video {

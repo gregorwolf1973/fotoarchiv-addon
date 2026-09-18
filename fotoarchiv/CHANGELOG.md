@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14
+
+- Einzelansicht zoomen: Mausrad, Doppelklick, Tasten + / − / 0, am Touchscreen zwei Finger und Doppeltippen, bis 8-fach. Vergrößert lässt sich das Foto verschieben, ungezoomt blättert Wischen wie bisher
+- Beim Hineinzoomen wird das Original in voller Auflösung nachgeladen (nicht bei HEIC/TIFF, die der Browser nicht anzeigen kann)
+- Fenster „Wer ist das?“: Der Umschalter für ganze Fotos sitzt jetzt neben dem Schließen-Knopf
+- Speicherplatz: Abstände in der Detailzeile korrigiert
+
 ## 0.13
 
 - Neue Ansicht „Speicherplatz“ (Datenbank-Symbol oben rechts): die größten Dateien zuerst, Filter nach Videos/Fotos und Mindestgröße, Summe der Auswahl, Mehrfachauswahl mit Shift-Bereich und Löschen in den Papierkorb

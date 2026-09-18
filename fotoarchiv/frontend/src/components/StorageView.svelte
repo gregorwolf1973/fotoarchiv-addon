@@ -61,6 +61,10 @@
   }
 
   const date = (ts) => new Date(ts * 1000).toLocaleDateString('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
+  const details = (item) =>
+    [date(item[1]), item[4] && item[8] ? formatDuration(item[8]) : '', item[2] && item[3] ? `${item[2]} × ${item[3]}` : '']
+      .filter(Boolean)
+      .join(' · ');
 </script>
 
 <div class="storage">
@@ -107,9 +111,7 @@
         </button>
         <div class="meta">
           <span class="name" title={item[7]}>{item[7]}</span>
-          <small>
-            {date(item[1])}{#if item[4] && item[8]} · {formatDuration(item[8])}{/if}{#if item[2] && item[3]} · {item[2]} × {item[3]}{/if}
-          </small>
+          <small>{details(item)}</small>
           <span class="bar"><span style:width="{Math.max(1, (item[6] / largest) * 100)}%"></span></span>
         </div>
         <strong class="size">{formatBytes(item[6])}</strong>
