@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19
+
+- Große Importe schneller: Die Prüfung auf beschädigte Dateien läuft erst nach der Duplikatprüfung, Duplikate kosten also keinen ffprobe-Lauf mehr
+- Die Dateisuche betritt `_duplikate`, `_defekt` und versteckte Ordner nicht mehr und liest den Dateityp aus dem Verzeichnis statt jede Datei einzeln abzufragen – bei Hunderttausenden Dateien spürbar schneller
+- Während der Suche zeigt das Import-Fenster, wie viele Dateien schon gefunden sind, statt minutenlang „0 von 0“
+
 ## 0.18
 
 - Bibliothek abgleichen mit **gründlicher Prüfung** (Häkchen im Import-Fenster): jede Datei wird vollständig gelesen – Fotos ganz dekodiert, Videos mit ffprobe – und mit der gespeicherten Prüfsumme verglichen

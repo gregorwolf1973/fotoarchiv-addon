@@ -99,10 +99,6 @@ def move_file(source: Path, target: Path):
         source.unlink()
 
 
-def is_ignored(rel: Path) -> bool:
-    return any(part.startswith(".") or part in IGNORED_NAMES for part in rel.parts)
-
-
 def remove_empty_dirs(root: Path):
     for directory in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
         if directory.name in (DUPLICATE_DIR, DAMAGED_DIR):
@@ -142,12 +138,6 @@ class Importer:
         kind = media.kind_of(Path(name))
         if kind is None:
             return Result("skipped", name, "Dateityp wird nicht unterstützt")
-        if move:
-            # Halbe Dateien (abgebrochen kopiert oder hochgeladen) gar nicht erst ins Archiv lassen.
-            # Beim Abgleich (move=False) liegen sie schon in der Bibliothek und werden aufgenommen.
-            problem = media.damage(source, kind, self.ffprobe)
-            if problem:
-                return Result("damaged", name, problem)
 
         with self._file_lock:
             try:
@@ -164,6 +154,14 @@ class Importer:
             if existing and (existing["deleted_at"] or (self.settings.library / existing["path"]).is_file()):
                 where = "im Papierkorb" if existing["deleted_at"] else "bereits im Archiv"
                 return Result("duplicate", name, where, existing["id"], existing["path"])
+
+            if move:
+                # Halbe Dateien (abgebrochen kopiert oder hochgeladen) gar nicht erst ins Archiv lassen.
+                # Erst nach der Duplikatprüfung: bei großen Importen mit vielen Duplikaten spart das
+                # je Video einen ffprobe-Lauf. Beim Abgleich (move=False) werden sie aufgenommen.
+                problem = media.damage(source, kind, self.ffprobe)
+                if problem:
+                    return Result("damaged", name, problem)
 
             try:
                 raw = self.exiftool.read(source)
@@ -363,13 +361,32 @@ class Importer:
         known = set()
         if mode == "library":
             known = {row["path"] for row in self.db.query("SELECT path FROM assets")}
-        files = []
-        for path in root.rglob("*"):
-            rel = path.relative_to(root)
-            if is_ignored(rel) or (mode == "import" and rel.parts[0] in (DUPLICATE_DIR, DAMAGED_DIR)):
+        # Ausgeschlossene Ordner gar nicht erst betreten: _duplikate wächst bei großen Importen
+        # auf Hunderttausende Dateien, und jeder weitere Import müsste sie sonst erneut durchlaufen
+        skip_top = {DUPLICATE_DIR, DAMAGED_DIR} if mode == "import" else set()
+        files: list[Path] = []
+        stack = [root]
+        reported = 0
+        while stack:
+            folder = stack.pop()
+            try:
+                entries = list(os.scandir(folder))
+            except OSError as exc:
+                log.warning("Ordner %s nicht lesbar: %s", folder, exc)
                 continue
-            if path.is_file() and rel.as_posix() not in known:
-                files.append(path)
+            for entry in entries:
+                if entry.name.startswith(".") or entry.name in IGNORED_NAMES:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    if not (folder == root and entry.name in skip_top):
+                        stack.append(Path(entry.path))
+                elif entry.is_file():  # nutzt den Dateityp aus dem Verzeichnis, kein eigener stat
+                    path = Path(entry.path)
+                    if path.relative_to(root).as_posix() not in known:
+                        files.append(path)
+            if len(files) - reported >= 1000:
+                reported = len(files)
+                self.job.current = f"Dateien suchen … {reported:,} gefunden".replace(",", ".")
         files.sort()
         return files
 
