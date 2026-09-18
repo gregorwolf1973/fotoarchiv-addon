@@ -34,8 +34,8 @@
   const VIDEO_ERRORS = {
     1: 'Die Wiedergabe wurde abgebrochen.',
     2: 'Das Video konnte nicht vollständig geladen werden (Netzwerkfehler).',
-    3: 'Der Browser kann dieses Video nicht dekodieren. Meist steckt H.265/HEVC darin, das nur wenige Browser abspielen.',
-    4: 'Dieses Videoformat unterstützt der Browser nicht. Die Datei selbst ist in Ordnung – nur der Codec darin passt nicht.',
+    3: 'Der Browser kann dieses Video nicht dekodieren. Meist steckt H.265/HEVC darin, das nur wenige Browser abspielen. Abhilfe: in der Galerie auswählen und „Umwandeln“.',
+    4: 'Dieses Videoformat unterstützt der Browser nicht. Die Datei selbst ist in Ordnung – nur der Codec darin passt nicht. Abhilfe: in der Galerie auswählen und „Umwandeln“.',
   };
   function videoFailed(e) {
     videoError = VIDEO_ERRORS[e.currentTarget.error?.code] ?? 'Das Video lässt sich nicht abspielen.';

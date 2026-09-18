@@ -135,7 +135,7 @@
     if (!session?.authenticated) return;
     const busy = info?.importing || info?.tasks_running || pending.size;
     clearTimeout(timer);
-    timer = setTimeout(tick, busy ? 1000 : 20000);
+    timer = setTimeout(tick, busy ? 1000 : info?.converting?.pending ? 5000 : 20000);
   }
 
   function signedIn(next) {
@@ -325,6 +325,22 @@
     };
   }
 
+  function confirmConvert(ids, after = () => {}) {
+    dialog = {
+      type: 'confirm',
+      title: 'Umwandeln?',
+      text:
+        `HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann, zu MP4 (H.264). ` +
+        `Andere Dateien bleiben, wie sie sind. Die neue Datei ersetzt das Original; das Original kommt für ` +
+        `${info?.trash_days ?? 30} Tage in den Papierkorb. Ein Video braucht auf dem Pi etwa so lange, wie es dauert.`,
+      confirmLabel: `${ids.length === 1 ? '1 Datei' : `${formatNumber(ids.length)} Dateien`} umwandeln`,
+      onconfirm: () => {
+        runBatch({ ids, action: 'convert' });
+        after();
+      },
+    };
+  }
+
   function deleteSelected() {
     const ids = [...selected];
     runBatch({ ids, action: 'delete' }, () => runBatch({ ids, action: 'restore' }));
@@ -377,6 +393,9 @@
         <button class="icon" onclick={() => (dialog = { type: 'location' })} title="Aufnahmeort setzen"><Icon name="marker" /></button>
         <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 270 })} title="Nach links drehen"><Icon name="rotate" /></button>
         <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 90 })} title="Nach rechts drehen"><Icon name="rotate" flip /></button>
+        {#if isAdmin}
+          <button class="icon" onclick={() => confirmConvert([...selected])} title="Umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4"><Icon name="convert" /></button>
+        {/if}
         <button class="icon" onclick={deleteSelected} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
       {/if}
     </header>
@@ -461,6 +480,11 @@
   {#if failure}
     <div class="banner error"><Icon name="alert" size={18} /> Server nicht erreichbar: {failure}</div>
   {/if}
+  {#if info?.converting?.pending}
+    <div class="banner"><span class="busy"></span> {`Umwandeln läuft: noch ${formatNumber(info.converting.pending)}${info.converting.current ? ` · gerade ${info.converting.current}` : ''}`}</div>
+  {:else if info?.converting?.failed && isAdmin}
+    <div class="banner error"><Icon name="alert" size={18} /> {formatNumber(info.converting.failed)} {info.converting.failed === 1 ? 'Datei ließ' : 'Dateien ließen'} sich nicht umwandeln – den Grund zeigt das Protokoll des Add-ons. Die Originale sind unverändert.</div>
+  {/if}
   {#if missingTools.length}
     <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
   {/if}
@@ -485,7 +509,7 @@
   {:else if view === 'duplicates'}
     <DuplicatesView revision={info?.revision} onopen={openList} ontask={trackTask} onchanged={kick} />
   {:else if view === 'storage'}
-    <StorageView revision={info?.revision} {canEdit} onopen={openList} onbatch={runBatch} />
+    <StorageView revision={info?.revision} {canEdit} onopen={openList} onbatch={runBatch} onconvert={isAdmin ? confirmConvert : null} />
   {:else if view === 'map'}
     <MapView {filters} {canEdit} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
   {:else if items.length}

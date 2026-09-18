@@ -67,7 +67,7 @@ class RotateRequest(BaseModel):
 
 class BatchRequest(BaseModel):
     ids: list[int] = Field(min_length=1)
-    action: Literal["tags", "persons", "date", "location", "rotate", "delete", "restore", "purge"]
+    action: Literal["tags", "persons", "date", "location", "rotate", "delete", "restore", "purge", "convert"]
     add: list[str] = []
     remove: list[str] = []
     taken_at: datetime | None = None
@@ -165,6 +165,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             "importing": importer.job.running,
             "tasks_running": tasks.any_running(),
             "faces": {"enabled": faces.enabled, "status": faces.state["status"]},
+            "converting": ctx.converter.status(),
             "tools": {
                 "vips": media.pyvips is not None,
                 "exiftool": shutil.which(settings.exiftool) is not None,
@@ -314,6 +315,8 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
     def batch(body: BatchRequest, request: Request):
         if body.action == "purge" and role_of(request) != "admin":
             raise HTTPException(403, "Endgültig löschen ist nur über Home Assistant möglich")
+        if body.action == "convert" and role_of(request) != "admin":
+            raise HTTPException(403, "Umwandeln ist nur über Home Assistant möglich")
         count = len(set(body.ids))
         kind, params = body.action, {}
         if body.action in ("tags", "persons"):
@@ -340,6 +343,8 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             label = f"{count} Dateien in den Papierkorb"
         elif body.action == "restore":
             label = f"{count} Dateien wiederherstellen"
+        elif body.action == "convert":
+            label = f"{count} Dateien zum Umwandeln vormerken"
         else:
             label = f"{count} Dateien endgültig löschen"
         return tasks.submit(kind, label, body.ids, params)

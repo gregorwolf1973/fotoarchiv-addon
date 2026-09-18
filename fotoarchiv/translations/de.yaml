@@ -27,6 +27,12 @@ configuration:
       Fotos im Hintergrund vergleichen und doppelte Fassungen (verkleinert, neu gespeichert, anderes Format) sowie
       Serien ähnlicher Aufnahmen finden. Beim Import wird auf sehr ähnliche vorhandene Fotos hingewiesen. Sehr schnell,
       einige Millisekunden pro Foto.
+  convert_on_import:
+    name: Beim Import umwandeln
+    description: >-
+      HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann (z. B. H.265/HEVC), zu MP4 mit H.264.
+      MOV mit H.264 wird nur verlustfrei umgepackt. Das Original kommt in den Papierkorb. Videos brauchen auf dem
+      Raspberry Pi etwa so lange, wie sie dauern. Vorhandene Dateien wandelst du über die Auswahl um.
   public_enabled:
     name: Internetzugang
     description: >-

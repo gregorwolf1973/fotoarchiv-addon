@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.14)
+## Funktionen (Version 0.15)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -43,6 +43,7 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
 | `face_threads` | `2` | Prozessorkerne für die Gesichtserkennung (1–8). Auf dem Pi 5 sind 3 ein guter Wert, wenn Home Assistant flüssig bleiben soll. Wirkt nach einem Neustart des Add-ons. |
 | `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
+| `convert_on_import` | `false` | HEIC und nicht abspielbare Videos beim Import umwandeln, siehe [Umwandeln](#umwandeln) |
 | `public_enabled` | `false` | Internetzugang auf Port 8301 starten |
 | `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
 | `public_cookie_secure` | `true` | Sitzungs-Cookie nur über HTTPS (nur zum Testen ausschalten) |
@@ -165,6 +166,26 @@ Mit `duplicate_detection: false` wird die Suche abgeschaltet.
 - In der **Einzelansicht** lässt sich der Ort über das Stift-Symbol setzen oder korrigieren: in die Karte tippen oder die Stecknadel verschieben.
 
 Die Kartenkacheln kommen von **OpenStreetMap**, die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
+
+## Umwandeln
+
+Manche Dateien kann der Browser nicht anzeigen oder abspielen: **HEIC**-Fotos vom iPhone und Videos in **H.265/HEVC**, 10 Bit oder alten Formaten (AVI, MTS …). Das Fotoarchiv wandelt sie um:
+
+| Datei | wird zu | Dauer auf dem Pi 5 |
+|---|---|---|
+| HEIC/HEIF | JPEG (Qualität 92, sRGB) | etwa eine Sekunde |
+| MOV, AVI … mit H.264 | MP4, **verlustfrei umgepackt** | Sekunden |
+| H.265/HEVC, 10 Bit, andere Codecs | MP4 mit H.264 | etwa so lange, wie das Video dauert |
+
+MP4 und WebM, die der Browser abspielen kann, bleiben unangetastet.
+
+- **Vorhandene Dateien:** in der Galerie oder unter *Speicherplatz* auswählen und **Umwandeln** (Pfeile-Symbol) wählen. Nur über Home Assistant, nicht über den Internetzugang.
+- **Neue Dateien:** mit `convert_on_import: true` werden sie gleich nach dem Import vorgemerkt.
+- Umgewandelt wird nacheinander im Hintergrund mit niedriger Priorität; oben steht, wie viele noch warten.
+- **Das Original kommt in den Papierkorb** und lässt sich bis zum Ablauf der Frist wiederherstellen. Der Eintrag behält Personen, Schlagworte, Ort, Datum und erkannte Gesichter; die Metadaten werden in die neue Datei übernommen.
+- Wird eine Datei während des Umwandelns bearbeitet, wird sie danach erneut umgewandelt, damit nichts verloren geht.
+- Schlägt etwas fehl, bleibt das Original unverändert; der Grund steht im Protokoll des Add-ons.
+- **Einschränkung:** HDR-Videos (iPhone „HDR-Video") verlieren beim Umwandeln ihr HDR und können etwas blasser wirken.
 
 ## Papierkorb
 

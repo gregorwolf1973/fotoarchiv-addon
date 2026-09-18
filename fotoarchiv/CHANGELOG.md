@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15
+
+- Umwandeln: HEIC → JPEG, nicht abspielbare Videos (H.265/HEVC, 10 Bit, alte Formate) → H.264-MP4, MOV mit H.264 wird verlustfrei zu MP4 umgepackt
+- Knopf „Umwandeln“ in der Auswahlleiste und in der Ansicht „Speicherplatz“ (nur über Home Assistant), mit Rückfrage
+- Neue Option `convert_on_import` (Standard aus): neue Dateien gleich beim Import umwandeln
+- Das Original kommt in den Papierkorb, der Eintrag behält Personen, Schlagworte, Ort und Gesichter; umgewandelt wird im Hintergrund mit niedriger Priorität, der Fortschritt steht oben
+- Hinweis bei nicht abspielbaren Videos verweist auf „Umwandeln“
+
 ## 0.14
 
 - Einzelansicht zoomen: Mausrad, Doppelklick, Tasten + / − / 0, am Touchscreen zwei Finger und Doppeltippen, bis 8-fach. Vergrößert lässt sich das Foto verschieben, ungezoomt blättert Wischen wie bisher

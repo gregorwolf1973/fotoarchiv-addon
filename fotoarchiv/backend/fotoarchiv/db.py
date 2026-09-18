@@ -149,6 +149,12 @@ MIGRATIONS = [
         value TEXT NOT NULL
     );
     """,
+    """
+    -- Umwandeln (HEIC → JPEG, Videos → H.264-MP4): 0 = nichts zu tun, 1 = vorgemerkt, -1 = fehlgeschlagen
+    ALTER TABLE assets ADD COLUMN convert INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE assets ADD COLUMN convert_error TEXT;
+    CREATE INDEX assets_convert ON assets (convert, deleted_at);
+    """,
 ]
 
 

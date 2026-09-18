@@ -7,7 +7,8 @@
 
   // Die größten Dateien zuerst, zum Aufräumen des Speicherplatzes.
   // onopen(list, id): Einzelansicht mit dieser Liste; onbatch(body, undo): Mehrfachaktion im Hintergrund
-  let { revision, canEdit = true, onopen, onbatch } = $props();
+  // onconvert(ids, danach): Umwandeln mit Rückfrage; null = nicht erlaubt
+  let { revision, canEdit = true, onopen, onbatch, onconvert = null } = $props();
 
   const KINDS = [
     ['all', 'Alle'],
@@ -92,6 +93,10 @@
       <strong>{formatNumber(selected.size)} ausgewählt · {formatBytes(selectedBytes)}</strong>
       <span class="grow"></span>
       <button onclick={() => (selected.clear(), (lastIndex = null))}>Aufheben</button>
+      {#if onconvert}
+        <button onclick={() => onconvert([...selected], () => (selected.clear(), (lastIndex = null)))}
+          title="HEIC → JPEG, nicht abspielbare Videos → MP4"><Icon name="convert" size={18} /> Umwandeln</button>
+      {/if}
       <button class="danger" onclick={trash}><Icon name="delete" size={18} /> In den Papierkorb</button>
     </div>
   {/if}

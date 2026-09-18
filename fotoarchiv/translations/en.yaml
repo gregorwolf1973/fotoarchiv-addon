@@ -25,6 +25,12 @@ configuration:
     description: >-
       Compare photos in the background to find duplicate versions (resized, re-saved, other format) and bursts of
       similar shots. Imports point out very similar existing photos. Very fast, a few milliseconds per photo.
+  convert_on_import:
+    name: Convert on import
+    description: >-
+      HEIC photos become JPEG, videos the browser cannot play (e.g. H.265/HEVC) become H.264 MP4. H.264 MOV files
+      are only repackaged losslessly. The original goes to the trash. Videos take about as long as their running
+      time on a Raspberry Pi. Convert existing files via the selection.
   public_enabled:
     name: Internet access
     description: >-
