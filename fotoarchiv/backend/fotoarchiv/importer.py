@@ -83,7 +83,17 @@ def move_file(source: Path, target: Path):
     except OSError as exc:
         if exc.errno != errno.EXDEV:
             raise
-        shutil.move(source, target)  # anderes Dateisystem: kopieren und löschen
+        # Anderes Dateisystem (in Home Assistant schon /share → /media): kopieren und löschen.
+        # Schreibt noch jemand an der Quelle (Samba-Kopie läuft), wäre die Kopie nur ein halber Stand –
+        # und das Löschen danach nähme das Original mit. Darum vorher vergleichen.
+        before = source.stat()
+        shutil.copy2(source, target)
+        after = source.stat()
+        changed = (after.st_size, after.st_mtime_ns) != (before.st_size, before.st_mtime_ns)
+        if changed or target.stat().st_size != after.st_size:
+            target.unlink(missing_ok=True)
+            raise OSError(errno.EBUSY, "Datei hat sich während des Kopierens geändert – wird wohl noch geschrieben")
+        source.unlink()
 
 
 def is_ignored(rel: Path) -> bool:
@@ -357,6 +367,10 @@ class Importer:
         files.sort()
         return files
 
+    def _recently_written(self, path: Path) -> bool:
+        """Beim Kopieren per Samba ändert sich die Datei laufend; Windows setzt das alte Datum erst am Ende."""
+        return time.time() - path.stat().st_mtime < self.settings.import_quiet_seconds
+
     def _record(self, result: Result, rel: str):
         job = self.job
         job.counts[result.status] = job.counts.get(result.status, 0) + 1
@@ -385,8 +399,8 @@ class Importer:
                 try:
                     if not path.exists():
                         result = Result("skipped", rel, "Datei ist verschwunden")
-                    elif path.stat().st_size != sizes[path]:
-                        result = Result("skipped", rel, "Datei wird noch kopiert")
+                    elif path.stat().st_size != sizes[path] or self._recently_written(path):
+                        result = Result("skipped", rel, "Datei wird noch kopiert – beim nächsten Import dabei")
                     else:
                         result = self.import_file(path, move=(mode == "import"))
                     if result.status == "duplicate" and mode == "import":

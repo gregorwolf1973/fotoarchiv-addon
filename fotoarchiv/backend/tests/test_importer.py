@@ -143,3 +143,54 @@ def test_damaged_files_go_to_defekt_folder(settings, importer, make_jpeg):
     assert (settings.import_dir / DAMAGED_DIR / "urlaub" / "abgebrochen.jpg").is_file()
     importer._run("import")  # zweiter Lauf fasst _defekt nicht an
     assert importer.job.total == 0
+
+
+def test_files_still_being_copied_wait_for_next_import(settings, importer, make_jpeg):
+    import dataclasses
+    import os
+
+    from fotoarchiv.importer import Importer
+
+    patient = Importer(dataclasses.replace(settings, import_quiet_seconds=60), importer.db, importer.exiftool)
+    photo = make_jpeg(settings.import_dir / "frisch.jpg")
+    patient._run("import")
+    assert patient.job.counts["skipped"] == 1 and "noch kopiert" in patient.job.skipped[0]["message"]
+    assert photo.is_file()
+
+    old = photo.stat().st_mtime - 3600  # Windows setzt am Ende des Kopierens das alte Datum
+    os.utime(photo, (old, old))
+    patient._run("import")
+    assert patient.job.counts["imported"] == 1 and not photo.exists()
+
+
+def test_move_across_filesystems_keeps_source_if_it_changes(tmp_path, monkeypatch):
+    import errno
+    import os
+    import shutil
+
+    import pytest
+    from fotoarchiv import importer as module
+
+    def cross_device(*args):
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr(os, "replace", cross_device)
+    source, target = tmp_path / "share" / "clip.mp4", tmp_path / "media" / "clip.mp4"
+    source.parent.mkdir()
+    source.write_bytes(b"a" * 1000)
+
+    real_copy = shutil.copy2
+
+    def copy_while_samba_writes(src, dst):
+        real_copy(src, dst)
+        with open(src, "ab") as f:  # Samba schreibt weiter
+            f.write(b"b" * 1000)
+
+    monkeypatch.setattr(module.shutil, "copy2", copy_while_samba_writes)
+    with pytest.raises(OSError, match="während des Kopierens"):
+        module.move_file(source, target)
+    assert source.stat().st_size == 2000 and not target.exists()  # nichts verloren, nichts halb
+
+    monkeypatch.setattr(module.shutil, "copy2", real_copy)
+    module.move_file(source, target)  # fertig geschrieben: klappt
+    assert target.stat().st_size == 2000 and not source.exists()

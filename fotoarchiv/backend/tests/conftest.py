@@ -33,6 +33,7 @@ def settings(tmp_path) -> Settings:
         exiftool=EXIFTOOL,
         ffmpeg=FFMPEG or "ffmpeg",
         face_recognition=False,  # eigene Tests mit echten Modellen: test_faces.py
+        import_quiet_seconds=0,  # Testdateien sind gerade erst entstanden
         dev=True,
     )
 

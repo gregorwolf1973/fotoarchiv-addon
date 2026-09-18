@@ -18,6 +18,7 @@ class Settings:
     exiftool: str
     ffmpeg: str
     trash_days: int = 30
+    import_quiet_seconds: int = 60  # so lange unverändert, bevor eine Datei als fertig kopiert gilt
     face_recognition: bool = True
     face_threads: int = 2  # Kerne für die Gesichtserkennung (1–8)
     duplicate_detection: bool = True

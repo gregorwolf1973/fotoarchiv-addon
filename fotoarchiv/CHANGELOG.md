@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17
+
+- Behoben: Der Import konnte Dateien übernehmen, die per Samba noch kopiert wurden. Weil Import-Ordner (`/share`) und Bibliothek (`/media`) in Home Assistant getrennt eingehängt sind, wird dabei kopiert statt umbenannt – das Addon kopierte einen halben Stand und löschte danach das Original. So entstanden abgeschnittene Videos („moov atom not found“)
+- Dateien, die sich in der letzten Minute geändert haben, gelten als „wird noch kopiert“ und kommen beim nächsten Import dran
+- Beim Kopieren zwischen Import-Ordner und Bibliothek wird geprüft, ob sich das Original währenddessen verändert hat; dann bleibt es liegen und nichts wird gelöscht
+
 ## 0.16
 
 - Beschädigte Dateien kommen nicht mehr ins Archiv: Beim Import wird geprüft, ob sich ein Foto öffnen bzw. ein Video lesen lässt. Halbe Dateien (abgebrochen kopiert) landen in `_defekt` im Import-Ordner und stehen im Bericht unter „Beschädigt“

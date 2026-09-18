@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.16)
+## Funktionen (Version 0.17)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -280,4 +280,4 @@ Der Hauptport des Add-ons ist nur über Home Assistant (Ingress) erreichbar. Dir
 - **Ein Video lässt sich nicht abspielen, obwohl es ein MP4 ist:** Die Endung verrät nur den Container, nicht den Codec darin. Neuere Handys nehmen oft in H.265/HEVC auf, das die meisten Browser nicht abspielen können. Das Vorschaubild erscheint trotzdem, weil ffmpeg den Codec lesen kann. Die Einzelansicht zeigt dann einen Hinweis; das Original lässt sich herunterladen und lokal abspielen.
 - **Datei landet in `_defekt` im Import-Ordner:** Sie ist beschädigt, meist weil das Kopieren oder Hochladen abgebrochen ist (bei Videos: „Video unvollständig“, das Inhaltsverzeichnis am Dateiende fehlt). Die Datei noch einmal vom Original kopieren. Abgebrochene Uploads über den Browser werden ebenfalls abgelehnt.
 - **Beschädigte Dateien schon im Archiv finden:** *Speicherplatz* → *Beschädigt* listet alles, woraus sich kein Vorschaubild erzeugen ließ. Gibt es das Original noch, die Einträge löschen und das Original neu importieren. Bei abgeschnittenen Videos ohne Original kann das Werkzeug `untrunc` den vorhandenen Teil oft retten (es braucht dafür ein heiles Video vom selben Gerät).
-- **Dateien bleiben im Import-Ordner liegen:** Den Bericht im Import-Fenster unter „Fehler“ und „Übersprungen“ prüfen. Dateien, die beim Start noch kopiert wurden, werden übersprungen und beim nächsten Import übernommen.
+- **Dateien bleiben im Import-Ordner liegen:** Den Bericht im Import-Fenster unter „Fehler“ und „Übersprungen“ prüfen. Dateien, die beim Start noch kopiert wurden oder sich in der letzten Minute geändert haben, werden übersprungen und beim nächsten Import übernommen. Große Videos also erst fertig kopieren lassen, dann importieren – oder einfach später noch einmal auf *Import starten* tippen.
