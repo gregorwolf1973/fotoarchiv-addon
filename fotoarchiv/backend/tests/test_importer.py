@@ -194,3 +194,43 @@ def test_move_across_filesystems_keeps_source_if_it_changes(tmp_path, monkeypatc
     monkeypatch.setattr(module.shutil, "copy2", real_copy)
     module.move_file(source, target)  # fertig geschrieben: klappt
     assert target.stat().st_size == 2000 and not source.exists()
+
+
+def deep_check(importer):
+    """Wie ein Klick auf „Bibliothek abgleichen“ mit gründlicher Prüfung: frischer Bericht je Lauf."""
+    from fotoarchiv.importer import Job
+
+    importer.job = Job(mode="library", deep=True, running=True)
+    importer._run("library", deep=True)
+    return importer.job
+
+
+def test_deep_check_finds_truncated_and_changed_files(settings, importer, make_jpeg):
+    folder = settings.library / "2019" / "05"
+    good = make_jpeg(folder / "heil.jpg", width=800, height=600)
+    half = make_jpeg(folder / "halb.jpg", width=800, height=600)
+    data = half.read_bytes()
+    half.write_bytes(data[: len(data) // 2])  # Kopf heil, Rest fehlt: fällt erst beim Dekodieren auf
+
+    importer._run("library")  # normaler Abgleich merkt nichts
+    assert importer.job.counts["damaged"] == 0
+
+    job = deep_check(importer)
+    assert job.counts["checked"] == 2 and job.counts["damaged"] == 1 and job.counts["changed"] == 0
+    assert job.damaged[0]["name"] == "2019/05/halb.jpg" and "nicht vollständig" in job.damaged[0]["message"]
+    rows = {r["path"]: r["damaged"] for r in importer.db.query("SELECT path, damaged FROM assets")}
+    assert rows["2019/05/heil.jpg"] is None and rows["2019/05/halb.jpg"]
+
+    with open(good, "ab") as f:  # außerhalb verändert (hier: angehängte Bytes, Bild bleibt lesbar)
+        f.write(b"\x00" * 16)
+    job = deep_check(importer)
+    assert job.counts["changed"] == 1 and job.changed[0]["name"] == "2019/05/heil.jpg"
+    assert deep_check(importer).counts["changed"] == 0  # nur einmal melden
+
+
+def test_deep_check_can_be_cancelled(settings, importer, make_jpeg):
+    make_jpeg(settings.library / "2020" / "01" / "a.jpg")
+    importer._run("library")
+    importer._cancel.set()
+    importer._check_files()
+    assert importer.job.cancelled and importer.job.counts["checked"] == 0

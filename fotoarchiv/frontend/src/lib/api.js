@@ -92,7 +92,8 @@ export const api = {
     installCrowdsec: () => request('api/admin/crowdsec/install', { method: 'POST' }),
   },
   importStatus: () => request('api/import'),
-  startImport: (mode) => request('api/import', send('POST', { mode })),
+  startImport: (mode, deep = false) => request('api/import', send('POST', { mode, deep })),
+  cancelImport: () => request('api/import/cancel', { method: 'POST' }),
 };
 
 // Kennung der Datenbank aus api/state: Bild-URLs werden lange gecacht, nach einem Neuaufbau ändern sie sich

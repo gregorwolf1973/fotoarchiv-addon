@@ -47,6 +47,7 @@ def role_of(request: Request) -> str:
 
 class ImportRequest(BaseModel):
     mode: Literal["import", "library"] = "import"
+    deep: bool = False  # nur beim Abgleich: jede Datei ganz lesen (dauert Stunden)
 
 
 class Location(BaseModel):
@@ -201,21 +202,22 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         """Die größten Dateien zuerst, zum Aufräumen. Einträge wie /api/assets plus Größe, Name und Dauer."""
         where, params = ["deleted_at IS NULL", "size >= ?"], [min_mb * 1024 * 1024]
         if kind == "damaged":
-            where.append("thumb_ok != 1")  # Vorschaubild ließ sich nicht erzeugen: Datei meist beschädigt
+            # Befund der gründlichen Prüfung oder kein Vorschaubild erzeugbar: Datei meist beschädigt
+            where.append("(damaged IS NOT NULL OR thumb_ok != 1)")
         elif kind != "all":
             where.append("kind = ?")
             params.append(kind)
         condition = " AND ".join(where)
         rows = db.query(
-            f"""SELECT id, taken_ts, width, height, kind, rev, size, path, duration FROM assets
+            f"""SELECT id, taken_ts, width, height, kind, rev, size, path, duration, damaged FROM assets
                 WHERE {condition} ORDER BY size DESC, id DESC LIMIT ?""",
             (*params, limit),
         )
         total = db.one(f"SELECT COUNT(*) AS count, COALESCE(SUM(size), 0) AS bytes FROM assets WHERE {condition}", params)
         return {
             "revision": db.revision,
-            "fields": INDEX_FIELDS + ["size", "name", "duration"],
-            "items": [index_item(r) + [r["size"], Path(r["path"]).name, r["duration"]] for r in rows],
+            "fields": INDEX_FIELDS + ["size", "name", "duration", "damaged"],
+            "items": [index_item(r) + [r["size"], Path(r["path"]).name, r["duration"], r["damaged"]] for r in rows],
             "count": total["count"],
             "bytes": total["bytes"],
         }
@@ -383,9 +385,15 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
 
         @app.post("/api/import")
         def import_start(body: ImportRequest):
-            if not importer.start(body.mode, on_done=faces.wake):
+            if not importer.start(body.mode, on_done=faces.wake, deep=body.deep):
                 raise HTTPException(409, "Es läuft bereits ein Import")
             return {"started": True}
+
+        @app.post("/api/import/cancel")
+        def import_cancel():
+            if not importer.cancel():
+                raise HTTPException(409, "Es läuft kein Import")
+            return {"cancelled": True}
 
     @app.put("/api/upload")
     async def upload(request: Request, name: str, mtime: float | None = None):

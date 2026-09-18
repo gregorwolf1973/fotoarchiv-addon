@@ -96,6 +96,18 @@ def damage(path: Path, kind: str, ffprobe: str) -> str | None:
     return None
 
 
+def deep_damage(path: Path, kind: str, ffprobe: str) -> str | None:
+    """Wie damage(), aber Fotos werden vollständig dekodiert: findet auch abgeschnittene JPEGs,
+    deren Kopf noch heil ist (libvips erzeugt daraus sonst still ein halb graues Bild)."""
+    if kind != "image" or pyvips is None:
+        return damage(path, kind, ffprobe)
+    try:
+        pyvips.Image.new_from_file(str(path), access="sequential", fail_on="truncated").avg()
+    except Exception as exc:
+        return f"Bild nicht vollständig lesbar ({_first_line(exc)})"
+    return None
+
+
 def _first_line(error) -> str:
     lines = [line.strip() for line in str(error).splitlines() if line.strip()]
     return (lines[-1] if lines else "unbekannter Fehler")[:160]

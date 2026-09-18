@@ -24,7 +24,7 @@
   const selected = new SvelteSet();
   let lastIndex = null;
 
-  // Eintrag: [id, ts, w, h, video, rev, size, name, duration]; die ersten sechs wie in der Galerie
+  // Eintrag: [id, ts, w, h, video, rev, size, name, duration, damaged]; die ersten sechs wie in der Galerie
   const items = $derived(data?.items ?? []);
   const largest = $derived(items[0]?.[6] || 1);
   const selectedBytes = $derived(items.reduce((sum, item) => sum + (selected.has(item[0]) ? item[6] : 0), 0));
@@ -124,6 +124,9 @@
         <div class="meta">
           <span class="name" title={item[7]}>{item[7]}</span>
           <small>{details(item)}</small>
+          {#if kind === 'damaged'}
+            <small class="reason">{item[9] ?? 'Vorschaubild ließ sich nicht erzeugen'}</small>
+          {/if}
           <span class="bar"><span style:width="{Math.max(1, (item[6] / largest) * 100)}%"></span></span>
         </div>
         <strong class="size">{formatBytes(item[6])}</strong>
@@ -282,6 +285,9 @@
   }
   small {
     color: var(--muted);
+  }
+  .reason {
+    color: var(--danger);
   }
   .bar {
     height: 4px;

@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.17)
+## Funktionen (Version 0.18)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -102,6 +102,12 @@ Die Bibliothek besteht aus normalen Dateien. Du kannst sie also auch per Samba o
 Bis zum Abgleich erscheint ein von Hand gelöschtes Foto weiter in der Galerie (aus dem Vorschaubild-Cache), lässt sich aber nicht öffnen oder bearbeiten.
 
 Legst du eine von Hand gelöschte Datei später wieder in den Import-Ordner oder lädst sie hoch, übernimmt sie ihren alten Eintrag und wird nicht als Duplikat abgewiesen.
+
+**Gründlich prüfen:** Mit dem Häkchen *Dateien gründlich prüfen* liest der Abgleich zusätzlich jede Datei vollständig. Fotos werden ganz dekodiert, Videos mit ffprobe gelesen, und die Prüfsumme wird mit der gespeicherten verglichen. So fallen auch Schäden auf, die beim Import noch nicht zu sehen waren: abgeschnittene JPEGs, deren Anfang noch heil ist, oder Dateien, die auf einer alternden Festplatte kaputtgegangen sind.
+
+- Befunde stehen im Bericht unter **Beschädigt** und bleiben unter **Speicherplatz → Beschädigt** mit Grund sichtbar, bis die Datei bei einer späteren Prüfung wieder in Ordnung ist oder ersetzt wurde.
+- **Außerhalb verändert** heißt: Der Inhalt passt nicht mehr zur gespeicherten Prüfsumme. Hast du die Datei mit einem anderen Programm bearbeitet, ist das in Ordnung. Sonst ist es ein Hinweis auf einen Fehler des Datenträgers. Jede Änderung wird nur einmal gemeldet.
+- Das dauert auf dem Raspberry Pi mehrere Stunden (jede Datei wird ganz gelesen) und lässt sich mit **Prüfung abbrechen** beenden. Einmal nach einem großen Import und danach alle paar Monate reicht.
 
 **Schutz vor Datenverlust:** Fehlende Einträge werden nie automatisch entfernt. Ist die Bibliothek leer, etwa weil das Laufwerk gerade nicht eingebunden ist, lehnt das Add-on das Entfernen ab.
 

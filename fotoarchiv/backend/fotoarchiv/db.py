@@ -155,6 +155,10 @@ MIGRATIONS = [
     ALTER TABLE assets ADD COLUMN convert_error TEXT;
     CREATE INDEX assets_convert ON assets (convert, deleted_at);
     """,
+    """
+    -- Befund der gründlichen Prüfung: Grund, warum die Datei beschädigt ist (NULL = in Ordnung oder ungeprüft)
+    ALTER TABLE assets ADD COLUMN damaged TEXT;
+    """,
 ]
 
 

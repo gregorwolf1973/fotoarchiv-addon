@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.18
+
+- Bibliothek abgleichen mit **gründlicher Prüfung** (Häkchen im Import-Fenster): jede Datei wird vollständig gelesen – Fotos ganz dekodiert, Videos mit ffprobe – und mit der gespeicherten Prüfsumme verglichen
+- Findet abgeschnittene JPEGs mit heilem Kopf (daraus entstand bisher still ein halb graues Vorschaubild) und Dateien, die auf dem Datenträger kaputtgegangen oder außerhalb verändert wurden
+- Befunde werden gespeichert und unter Speicherplatz → Beschädigt mit Grund angezeigt; im Bericht neue Listen „Beschädigt“ und „Außerhalb verändert“
+- Die Prüfung lässt sich abbrechen
+
 ## 0.17
 
 - Behoben: Der Import konnte Dateien übernehmen, die per Samba noch kopiert wurden. Weil Import-Ordner (`/share`) und Bibliothek (`/media`) in Home Assistant getrennt eingehängt sind, wird dabei kopiert statt umbenannt – das Addon kopierte einen halben Stand und löschte danach das Original. So entstanden abgeschnittene Videos („moov atom not found“)

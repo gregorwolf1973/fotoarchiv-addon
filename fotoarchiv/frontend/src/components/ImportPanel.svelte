@@ -10,6 +10,7 @@
   let job = $state(null);
   let error = $state('');
   let confirmRemove = $state(false);
+  let deep = $state(false); // Abgleich mit gründlicher Prüfung jeder Datei
   const count = (key) => formatNumber(job?.counts[key] ?? 0);
   const plural = (key, one, many) => ((job?.counts[key] ?? 0) === 1 ? one : many);
 
@@ -39,7 +40,16 @@
 
   async function start(mode) {
     try {
-      await api.startImport(mode);
+      await api.startImport(mode, mode === 'library' && deep);
+      await refresh();
+    } catch (e) {
+      error = e.message;
+    }
+  }
+
+  async function cancel() {
+    try {
+      await api.cancelImport();
       await refresh();
     } catch (e) {
       error = e.message;
@@ -96,7 +106,17 @@
         aufgenommen, von Hand verschobene oder umbenannte Dateien werden ihrem Eintrag wieder zugeordnet, und Einträge,
         deren Datei gelöscht wurde, werden aufgelistet.
       </p>
-      <button disabled={job?.running} onclick={() => start('library')}>Bibliothek abgleichen</button>
+      <label class="check">
+        <input type="checkbox" bind:checked={deep} disabled={job?.running} />
+        <span>
+          <strong>Dateien gründlich prüfen</strong> – liest jede Datei vollständig und vergleicht sie mit der
+          gespeicherten Prüfsumme. Findet abgeschnittene Fotos und Videos und Dateien, die auf dem Datenträger kaputtgegangen
+          sind. Dauert auf dem Raspberry Pi mehrere Stunden, lässt sich abbrechen.
+        </span>
+      </label>
+      <button disabled={job?.running} onclick={() => start('library')}>
+        {deep ? 'Abgleichen und prüfen' : 'Bibliothek abgleichen'}
+      </button>
     </section>
 
     {#if error}<p class="error">{error}</p>{/if}
@@ -109,6 +129,7 @@
           <span>{percent} %</span>
         </div>
         {#if job.current}<div class="current muted">{job.current}</div>{/if}
+        {#if job.deep}<button class="cancel" onclick={cancel}>Prüfung abbrechen</button>{/if}
       </section>
     {/if}
 
@@ -120,6 +141,8 @@
           {#if job.counts.relinked}<span class="count ok">{count('relinked')} wieder zugeordnet</span>{/if}
           <span class="count warn">{count('duplicate')} Duplikate</span>
           {#if job.counts.damaged}<span class="count bad">{count('damaged')} beschädigt</span>{/if}
+          {#if job.deep}<span class="count ok">{count('checked')} geprüft</span>{/if}
+          {#if job.counts.changed}<span class="count warn">{count('changed')} verändert</span>{/if}
           {#if job.counts.similar}<span class="count warn">{count('similar')} sehr ähnlich</span>{/if}
           <span class="count">{count('skipped')} übersprungen</span>
           <span class="count bad">{count('error')} Fehler</span>
@@ -166,13 +189,23 @@
             </ul>
           </details>
         {/if}
+        {#if job.cancelled}
+          <p class="muted">Die Prüfung wurde abgebrochen. Bis dahin gefundene Befunde sind gespeichert.</p>
+        {/if}
         {#if job.damaged?.length}
           <details open>
             <summary>Beschädigt</summary>
-            <p class="muted">
-              Nicht ins Archiv übernommen, meist weil das Kopieren abgebrochen ist. Verschoben nach <code>_defekt</code>
-              im Import-Ordner – die Datei noch einmal vom Original kopieren.
-            </p>
+            {#if job.mode === 'library'}
+              <p class="muted">
+                Im Archiv, aber nicht vollständig lesbar. Alle Befunde stehen unter <strong>Speicherplatz → Beschädigt</strong>.
+                Gibt es das Original noch, den Eintrag löschen und das Original neu importieren.
+              </p>
+            {:else}
+              <p class="muted">
+                Nicht ins Archiv übernommen, meist weil das Kopieren abgebrochen ist. Verschoben nach <code>_defekt</code>
+                im Import-Ordner – die Datei noch einmal vom Original kopieren.
+              </p>
+            {/if}
             <ul>
               {#each job.damaged as entry}<li><span>{entry.name}</span> <span class="error">{entry.message}</span></li>{/each}
             </ul>
@@ -186,6 +219,18 @@
               {#each job.similar as entry}
                 <li><span>{entry.name}</span> <span class="muted">≈ {entry.existing}</span></li>
               {/each}
+            </ul>
+          </details>
+        {/if}
+        {#if job.changed?.length}
+          <details>
+            <summary>Außerhalb verändert</summary>
+            <p class="muted">
+              Der Inhalt passt nicht mehr zur gespeicherten Prüfsumme. Das ist in Ordnung, wenn du die Datei mit einem anderen
+              Programm bearbeitet hast – sonst ein Hinweis auf einen Fehler des Datenträgers. Wird nur einmal gemeldet.
+            </p>
+            <ul>
+              {#each job.changed as entry}<li><span>{entry.name}</span></li>{/each}
             </ul>
           </details>
         {/if}
@@ -222,6 +267,20 @@
 {/if}
 
 <style>
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 4px 0 12px;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .check input {
+    margin-top: 3px;
+  }
+  .cancel {
+    margin-top: 8px;
+  }
   .backdrop {
     position: fixed;
     inset: 0;

@@ -29,7 +29,7 @@ RETRY_FAILED = 3600  # s: gescheiterte Vorschaubilder nicht bei jedem Scrollen n
 
 @dataclass
 class Result:
-    status: str                  # imported | relinked | duplicate | damaged | skipped | error
+    status: str                  # imported | relinked | duplicate | damaged | changed | skipped | error
     name: str
     message: str = ""
     asset_id: int | None = None
@@ -40,6 +40,8 @@ class Result:
 @dataclass
 class Job:
     mode: str = ""               # import | library
+    deep: bool = False           # Abgleich mit gründlicher Prüfung jeder Datei
+    cancelled: bool = False
     running: bool = False
     started_at: str | None = None
     finished_at: str | None = None
@@ -48,12 +50,13 @@ class Job:
     current: str = ""
     counts: dict = field(default_factory=lambda: {
         "imported": 0, "relinked": 0, "duplicate": 0, "damaged": 0, "skipped": 0, "error": 0, "missing": 0,
-        "similar": 0})
+        "similar": 0, "checked": 0, "changed": 0})
     similar: list = field(default_factory=list)   # neu, aber einem vorhandenen Foto sehr ähnlich
     relinked: list = field(default_factory=list)
     missing: list = field(default_factory=list)   # Einträge, deren Datei fehlt (nur beim Abgleich)
     duplicates: list = field(default_factory=list)
-    damaged: list = field(default_factory=list)    # beschädigt, liegen in _defekt
+    damaged: list = field(default_factory=list)    # beschädigt (Import: liegen in _defekt)
+    changed: list = field(default_factory=list)    # gründliche Prüfung: Inhalt außerhalb geändert
     errors: list = field(default_factory=list)
     skipped: list = field(default_factory=list)
 
@@ -121,6 +124,7 @@ class Importer:
         self.ffprobe = media.ffprobe_for(settings.ffmpeg)
         self._file_lock = threading.Lock()  # immer nur eine Datei gleichzeitig (Duplikatprüfung)
         self._job_lock = threading.Lock()
+        self._cancel = threading.Event()
         # (Variante, asset_id) -> (rev, Zeitpunkt): gescheiterte Vorschaubilder. Eine neue Revision
         # (Datei bearbeitet oder ersetzt) oder eine Stunde Abstand erlaubt einen neuen Versuch.
         self._failed: dict[tuple[str, int], tuple[int, float]] = {}
@@ -219,7 +223,7 @@ class Importer:
             conn.execute(
                 """UPDATE assets SET path = ?, size = ?, md5 = ?, taken_at = ?, taken_ts = ?, date_source = ?,
                        tz_offset = ?, width = ?, height = ?, duration = ?, lat = ?, lon = ?, camera = ?,
-                       rev = rev + 1, thumb_ok = 0, phash = NULL
+                       rev = rev + 1, thumb_ok = 0, phash = NULL, damaged = NULL
                    WHERE id = ?""",
                 (rel, size, checksum, meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
                  meta.width, meta.height, meta.duration, meta.lat, meta.lon, meta.camera, asset_id),
@@ -336,14 +340,16 @@ class Importer:
             temp.unlink(missing_ok=True)  # Duplikate und Fehler nicht liegen lassen
 
     # ── Hintergrund-Job ────────────────────────────────────────────
-    def start(self, mode: str, on_done=None) -> bool:
+    def start(self, mode: str, on_done=None, *, deep: bool = False) -> bool:
+        deep = deep and mode == "library"
         with self._job_lock:
             if self.job.running:
                 return False
-            self.job = Job(mode=mode, running=True, started_at=datetime.now().isoformat(timespec="seconds"))
+            self._cancel.clear()
+            self.job = Job(mode=mode, deep=deep, running=True, started_at=datetime.now().isoformat(timespec="seconds"))
 
         def run():
-            self._run(mode)
+            self._run(mode, deep=deep)
             if on_done:
                 on_done()
 
@@ -371,6 +377,43 @@ class Importer:
         """Beim Kopieren per Samba ändert sich die Datei laufend; Windows setzt das alte Datum erst am Ende."""
         return time.time() - path.stat().st_mtime < self.settings.import_quiet_seconds
 
+    def cancel(self) -> bool:
+        """Laufenden Import bzw. Abgleich nach der aktuellen Datei beenden."""
+        if not self.job.running:
+            return False
+        self._cancel.set()
+        return True
+
+    def _check_files(self):
+        """Gründliche Prüfung: jede Datei ganz lesen und mit der gespeicherten Prüfsumme vergleichen.
+        Findet, was beim Import noch nicht auffiel oder später auf dem Datenträger kaputtging."""
+        job = self.job
+        rows = self.db.query("SELECT id, path, kind, md5 FROM assets WHERE deleted_at IS NULL ORDER BY id")
+        job.total += len(rows)
+        for row in rows:
+            if self._cancel.is_set():
+                job.cancelled = True
+                return
+            path = self.settings.library / row["path"]
+            job.current = f"Prüfe {row['path']}"
+            if path.is_file():  # fehlende Dateien meldet schon der Abgleich
+                try:
+                    problem = media.deep_damage(path, row["kind"], self.ffprobe)
+                    checksum = media.md5_file(path)
+                except OSError as exc:
+                    problem, checksum = f"Datei nicht lesbar: {exc}", row["md5"]
+                self.db.execute("UPDATE assets SET damaged = ? WHERE id = ?", (problem, row["id"]))
+                if problem:
+                    self._record(Result("damaged", row["path"], problem, row["id"]), row["path"])
+                if checksum != row["md5"]:
+                    # Einmal melden und merken, sonst meldet jede Prüfung eine gewollte Bearbeitung erneut
+                    self.db.execute("UPDATE assets SET md5 = ?, size = ? WHERE id = ?",
+                                    (checksum, path.stat().st_size, row["id"]))
+                    self._record(Result("changed", row["path"], "Inhalt wurde außerhalb des Fotoarchivs geändert",
+                                        row["id"]), row["path"])
+                job.counts["checked"] = job.counts.get("checked", 0) + 1
+            job.done += 1
+
     def _record(self, result: Result, rel: str):
         job = self.job
         job.counts[result.status] = job.counts.get(result.status, 0) + 1
@@ -378,15 +421,15 @@ class Importer:
             job.counts["similar"] = job.counts.get("similar", 0) + 1
             if len(job.similar) < REPORT_LIMIT:
                 job.similar.append({"name": rel, "existing": result.similar})
-        bucket = {"duplicate": job.duplicates, "damaged": job.damaged, "error": job.errors, "skipped": job.skipped,
-                  "relinked": job.relinked}.get(result.status)
+        bucket = {"duplicate": job.duplicates, "damaged": job.damaged, "changed": job.changed, "error": job.errors,
+                  "skipped": job.skipped, "relinked": job.relinked}.get(result.status)
         if bucket is not None and len(bucket) < REPORT_LIMIT:
             entry = {"name": rel, "message": result.message}
             if result.existing:
                 entry["existing"] = result.existing
             bucket.append(entry)
 
-    def _run(self, mode: str):
+    def _run(self, mode: str, *, deep: bool = False):
         job = self.job
         try:
             files = self._scan(mode)
@@ -419,6 +462,8 @@ class Importer:
                 missing = self.missing_assets()
                 job.counts["missing"] = len(missing)
                 job.missing = [{"id": r["id"], "name": r["path"]} for r in missing[:REPORT_LIMIT]]
+                if deep:
+                    self._check_files()
         except Exception as exc:
             log.exception("Import abgebrochen")
             self._record(Result("error", "", f"Import abgebrochen: {exc}"), "")
