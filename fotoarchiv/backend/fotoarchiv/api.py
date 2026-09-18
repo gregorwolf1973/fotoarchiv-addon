@@ -191,6 +191,32 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         items = [index_item(r) for r in index_rows(filters)]
         return {"revision": db.revision, "fields": INDEX_FIELDS, "items": items}
 
+    @app.get("/api/largest")
+    def asset_largest(
+        kind: Literal["all", "image", "video"] = "all",
+        min_mb: int = Query(0, ge=0),
+        limit: int = Query(300, ge=1, le=2000),
+    ):
+        """Die größten Dateien zuerst, zum Aufräumen. Einträge wie /api/assets plus Größe, Name und Dauer."""
+        where, params = ["deleted_at IS NULL", "size >= ?"], [min_mb * 1024 * 1024]
+        if kind != "all":
+            where.append("kind = ?")
+            params.append(kind)
+        condition = " AND ".join(where)
+        rows = db.query(
+            f"""SELECT id, taken_ts, width, height, kind, rev, size, path, duration FROM assets
+                WHERE {condition} ORDER BY size DESC, id DESC LIMIT ?""",
+            (*params, limit),
+        )
+        total = db.one(f"SELECT COUNT(*) AS count, COALESCE(SUM(size), 0) AS bytes FROM assets WHERE {condition}", params)
+        return {
+            "revision": db.revision,
+            "fields": INDEX_FIELDS + ["size", "name", "duration"],
+            "items": [index_item(r) + [r["size"], Path(r["path"]).name, r["duration"]] for r in rows],
+            "count": total["count"],
+            "bytes": total["bytes"],
+        }
+
     @app.get("/api/geo")
     def asset_geo(filters: AssetFilter = Depends()):
         """Wie /api/assets, nur Bilder mit Ort und zusätzlich Breite/Länge."""

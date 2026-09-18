@@ -19,6 +19,7 @@
   import PeopleView from './components/PeopleView.svelte';
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
+  import StorageView from './components/StorageView.svelte';
   import Uploader from './components/Uploader.svelte';
   import Viewer from './components/Viewer.svelte';
 
@@ -31,7 +32,7 @@
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | map | people | trash | duplicates
+  let view = $state('photos'); // photos | map | people | trash | duplicates | storage
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
@@ -335,7 +336,7 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || view === 'map' || view === 'people' || view === 'duplicates' || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     else if (e.key === 'Delete' && selected.size) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
@@ -400,6 +401,15 @@
       </div>
       <span class="grow"></span>
     </header>
+  {:else if view === 'storage'}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">Speicherplatz</strong>
+        <span class="sub">Die größten Dateien zuerst · Gelöschtes landet im Papierkorb</span>
+      </div>
+      <span class="grow"></span>
+    </header>
   {:else}
     <header class="topbar">
       <div class="brand" title={info ? `${formatNumber(info.counts.images)} Fotos · ${formatNumber(info.counts.videos)} Videos · ${formatBytes(info.counts.bytes)}` : ''}>
@@ -428,6 +438,7 @@
         {/if}
         {#if canEdit}
           <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos"><Icon name="duplicate" /></button>
+          <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – die größten Dateien"><Icon name="storage" /></button>
           <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
             <Icon name="delete" />
             {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
@@ -453,7 +464,7 @@
   {#if missingTools.length}
     <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
   {/if}
-  {#if filtered && view !== 'people' && view !== 'duplicates'}
+  {#if filtered && view !== 'people' && view !== 'duplicates' && view !== 'storage'}
     <div class="resultbar">
       <span>{formatNumber(items.length)} Treffer</span>
       <button class="link" onclick={() => setFilters(NO_FILTERS)}>Filter zurücksetzen</button>
@@ -473,6 +484,8 @@
     />
   {:else if view === 'duplicates'}
     <DuplicatesView revision={info?.revision} onopen={openList} ontask={trackTask} onchanged={kick} />
+  {:else if view === 'storage'}
+    <StorageView revision={info?.revision} {canEdit} onopen={openList} onbatch={runBatch} />
   {:else if view === 'map'}
     <MapView {filters} {canEdit} revision={info?.revision} onopen={openViewer} onbatch={runBatch} />
   {:else if items.length}

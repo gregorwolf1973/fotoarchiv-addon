@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13
+
+- Neue Ansicht „Speicherplatz“ (Datenbank-Symbol oben rechts): die größten Dateien zuerst, Filter nach Videos/Fotos und Mindestgröße, Summe der Auswahl, Mehrfachauswahl mit Shift-Bereich und Löschen in den Papierkorb
+- API: `/api/largest`
+
 ## 0.12
 
 - Personen entfernen: neuer Knopf im Personen-Dialog. Der Name wird aus allen Fotos genommen, erkannte Gesichter werden wieder unbekannt

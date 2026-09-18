@@ -231,3 +231,19 @@ def test_broken_thumbnail_gives_placeholder_and_is_not_retried(client, monkeypat
         assert thumb.headers["content-type"].startswith("image/svg+xml")
         assert "immutable" not in thumb.headers["cache-control"]
     assert len(calls) == 1  # einmal beim Import versucht, danach gemerkt
+
+
+def test_largest_files_first_with_filters(client, make_jpeg, tmp_path):
+    small = upload(client, make_jpeg, tmp_path, "klein.jpg", width=200, height=150)
+    big = upload(client, make_jpeg, tmp_path, "gross.jpg", width=1600, height=1200)
+
+    data = client.get("/api/largest").json()
+    assert [item[0] for item in data["items"]] == [big, small]
+    assert data["items"][0][7] == "gross.jpg" and data["items"][0][6] > data["items"][1][6]
+    assert data["count"] == 2 and data["bytes"] == data["items"][0][6] + data["items"][1][6]
+
+    assert client.get("/api/largest", params={"kind": "video"}).json()["items"] == []
+    assert client.get("/api/largest", params={"min_mb": 1000}).json()["count"] == 0
+
+    client.delete(f"/api/assets/{big}")  # Papierkorb zählt nicht mit
+    assert [item[0] for item in client.get("/api/largest").json()["items"]] == [small]

@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.10)
+## Funktionen (Version 0.13)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
@@ -18,6 +18,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum und Ort setzen, drehen und löschen für viele Dateien auf einmal.
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
+- **Speicherplatz:** Die größten Dateien zuerst, gefiltert nach Videos oder Fotos und Mindestgröße, zum Ansehen und Aussortieren. Siehe [Speicherplatz und Backups](#speicherplatz-und-backups).
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
@@ -187,6 +188,8 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 4. Änderungsdatum der Datei. Dieses Datum wird in der Einzelansicht als **unsicher** markiert.
 
 ## Speicherplatz und Backups
+
+**Große Dateien finden:** Das Datenbank-Symbol oben rechts öffnet die Ansicht **Speicherplatz**. Sie listet die größten Dateien zuerst, mit Größe, Datum, Dauer und Auflösung. Oben wählst du *Alle*, *Videos* oder *Fotos* und eine Mindestgröße; daneben steht, wie viel Platz diese Auswahl zusammen belegt. Antippen öffnet die Datei, der Kreis links wählt sie aus (Shift + Klick wählt einen Bereich). **In den Papierkorb** verschiebt die Auswahl, der Platz wird erst frei, wenn der Papierkorb geleert wird oder die Frist abläuft.
 
 - Die Datenbank, die Vorschaubilder und die Gesichtsausschnitte liegen im Add-on-Datenordner. Pro Bild braucht das etwa 30–40 KB, dazu etwa 6 KB für die kleine Vorschau. Die kleine Vorschau entsteht erst, wenn ein Bild zum ersten Mal in einer kleinen Zoomstufe angezeigt wird.
 - **Vorschaubilder sind vom Add-on-Backup ausgenommen.** Sie werden bei Bedarf neu erzeugt.

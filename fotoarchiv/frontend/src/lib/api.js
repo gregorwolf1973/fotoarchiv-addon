@@ -49,6 +49,7 @@ export const api = {
   logout: () => request('api/auth/logout', { method: 'POST' }),
   state: () => request('api/state'),
   index: (filters, trash, extra) => request(`api/assets?${filterQuery(filters, trash, extra)}`),
+  largest: (kind, minMb) => request(`api/largest?${new URLSearchParams({ kind, min_mb: String(minMb) })}`),
   geo: (filters) => request(`api/geo?${filterQuery(filters)}`),
   labels: () => request('api/labels'),
   asset: (id) => request(`api/assets/${id}`),
