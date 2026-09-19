@@ -23,6 +23,7 @@ class Settings:
     face_threads: int = 2  # Kerne für die Gesichtserkennung (1–8)
     duplicate_detection: bool = True
     convert_on_import: bool = False  # HEIC und nicht abspielbare Videos beim Import umwandeln
+    auto_import: bool = False  # Import-Ordner jede Minute prüfen und neue Dateien selbst einlesen (Handy-Sync)
     # Internetzugang (eigener Port, nur hinter Reverse Proxy mit TLS veröffentlichen)
     public_enabled: bool = False
     public_port: int = 8301
@@ -77,6 +78,7 @@ def load() -> Settings:
         face_threads=min(8, max(1, int(pick("FOTOARCHIV_FACE_THREADS", "face_threads", 2)))),
         duplicate_detection=_bool(os.environ.get("FOTOARCHIV_DUPLICATES", options.get("duplicate_detection")), True),
         convert_on_import=_bool(os.environ.get("FOTOARCHIV_CONVERT", options.get("convert_on_import")), False),
+        auto_import=_bool(os.environ.get("FOTOARCHIV_AUTO_IMPORT", options.get("auto_import")), False),
         public_enabled=_bool(os.environ.get("FOTOARCHIV_PUBLIC", options.get("public_enabled")), False),
         public_port=int(pick("FOTOARCHIV_PUBLIC_PORT", "public_port", 8301)),
         public_trusted_proxies=tuple(str(p).strip() for p in proxies if str(p).strip()),

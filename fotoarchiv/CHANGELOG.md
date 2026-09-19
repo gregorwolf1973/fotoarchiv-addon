@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.26
+
+- Neue Option **`auto_import`**: Das Add-on prüft den Import-Ordner jede Minute und liest neue, fertig kopierte Dateien selbst ein. Gedacht für Handys, die per FolderSync oder PhotoSync im WLAN hochladen, nur in eine Richtung
+- Beim automatischen Import werden Duplikate (byte-gleich, schon im Archiv oder Papierkorb) gelöscht statt nach `_duplikate` verschoben
+- Nicht unterstützte Dateien im Import-Ordner stoßen den automatischen Import nicht immer wieder an
+- Doku: Abschnitt „Handy automatisch sichern“ mit Einstellungen für FolderSync und PhotoSync
+
 ## 0.25
 
 - Internetzugang: neue Rolle **Ansehen + Hochladen** – darf alles ansehen und Fotos und Videos hochladen, aber nichts ändern oder löschen

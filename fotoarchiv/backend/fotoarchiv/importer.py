@@ -41,6 +41,7 @@ class Result:
 class Job:
     mode: str = ""               # import | library
     deep: bool = False           # Abgleich mit gründlicher Prüfung jeder Datei
+    auto: bool = False           # automatischer Import (Handy-Sync): Duplikate werden gelöscht statt verschoben
     cancelled: bool = False
     running: bool = False
     started_at: str | None = None
@@ -338,23 +339,25 @@ class Importer:
             temp.unlink(missing_ok=True)  # Duplikate und Fehler nicht liegen lassen
 
     # ── Hintergrund-Job ────────────────────────────────────────────
-    def start(self, mode: str, on_done=None, *, deep: bool = False) -> bool:
+    def start(self, mode: str, on_done=None, *, deep: bool = False, auto: bool = False) -> bool:
         deep = deep and mode == "library"
+        auto = auto and mode == "import"
         with self._job_lock:
             if self.job.running:
                 return False
             self._cancel.clear()
-            self.job = Job(mode=mode, deep=deep, running=True, started_at=datetime.now().isoformat(timespec="seconds"))
+            self.job = Job(mode=mode, deep=deep, auto=auto, running=True,
+                           started_at=datetime.now().isoformat(timespec="seconds"))
 
         def run():
-            self._run(mode, deep=deep)
+            self._run(mode, deep=deep, auto=auto)
             if on_done:
                 on_done()
 
         threading.Thread(target=run, daemon=True, name=f"import-{mode}").start()
         return True
 
-    def _scan(self, mode: str) -> list[Path]:
+    def _scan(self, mode: str, *, progress: bool = True) -> list[Path]:
         root = self.settings.import_dir if mode == "import" else self.settings.library
         if not root.is_dir():
             return []
@@ -384,11 +387,27 @@ class Importer:
                     path = Path(entry.path)
                     if path.relative_to(root).as_posix() not in known:
                         files.append(path)
-            if len(files) - reported >= 1000:
+            if progress and len(files) - reported >= 1000:
                 reported = len(files)
                 self.job.current = f"Dateien suchen … {reported:,} gefunden".replace(",", ".")
         files.sort()
         return files
+
+    def ready_files(self) -> dict[str, tuple[int, float]]:
+        """Unterstützte, fertig kopierte Dateien im Import-Ordner mit (Größe, Änderungszeit) – für den
+        automatischen Import. Dateien, die gerade noch übertragen werden, fehlen hier."""
+        root = self.settings.import_dir
+        ready = {}
+        for path in self._scan("import", progress=False):
+            if media.kind_of(path) is None:
+                continue
+            try:
+                stat = path.stat()
+            except OSError:
+                continue  # inzwischen verschoben oder gelöscht
+            if time.time() - stat.st_mtime >= self.settings.import_quiet_seconds:
+                ready[path.relative_to(root).as_posix()] = (stat.st_size, stat.st_mtime)
+        return ready
 
     def _recently_written(self, path: Path) -> bool:
         """Beim Kopieren per Samba ändert sich die Datei laufend; Windows setzt das alte Datum erst am Ende."""
@@ -446,7 +465,7 @@ class Importer:
                 entry["existing"] = result.existing
             bucket.append(entry)
 
-    def _run(self, mode: str, *, deep: bool = False):
+    def _run(self, mode: str, *, deep: bool = False, auto: bool = False):
         job = self.job
         try:
             files = self._scan(mode)
@@ -463,7 +482,12 @@ class Importer:
                         result = Result("skipped", rel, "Datei wird noch kopiert – beim nächsten Import dabei")
                     else:
                         result = self.import_file(path, move=(mode == "import"))
-                    if result.status == "duplicate" and mode == "import":
+                    if result.status == "duplicate" and mode == "import" and auto:
+                        # Byte-gleiche Kopie (MD5) von etwas, das schon im Archiv oder im Papierkorb liegt.
+                        # Beim Handy-Sync kommt das ständig vor; in _duplikate würde es sich nur sammeln.
+                        path.unlink()
+                        result.message += " – Kopie gelöscht"
+                    elif result.status == "duplicate" and mode == "import":
                         move_file(path, unique_path(root / DUPLICATE_DIR / rel))
                     elif result.status == "damaged" and mode == "import":
                         move_file(path, unique_path(root / DAMAGED_DIR / rel))
@@ -493,4 +517,4 @@ class Importer:
                 self._report_path.write_text(json.dumps(asdict(job), ensure_ascii=False), encoding="utf-8")
             except OSError:
                 pass
-            log.info("Import (%s) fertig: %s", mode, job.counts)
+            log.info("Import (%s%s) fertig: %s", mode, ", automatisch" if auto else "", job.counts)

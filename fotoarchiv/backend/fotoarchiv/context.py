@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from . import config
+from .autoimport import AutoImport
 from .convert import ConvertService
 from .accesslog import AccessLog
 from .auth import AuthService
@@ -38,6 +39,7 @@ class Context:
     limiter: Limiter
     access: AccessLog
     auth: AuthService
+    auto_import: AutoImport
     _stop: threading.Event = field(default_factory=threading.Event)
 
     def start(self):
@@ -48,16 +50,18 @@ class Context:
                 folder.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 log.error("Ordner %s nicht anlegbar: %s", folder, exc)
-        log.info("Bibliothek: %s | Import: %s | Papierkorb: %d Tage | Internetzugang: %s",
-                 settings.library, settings.import_dir, settings.trash_days,
-                 f"Port {settings.public_port}" if settings.public_enabled else "aus")
+        log.info("Bibliothek: %s | Import: %s%s | Papierkorb: %d Tage | Internetzugang: %s",
+                 settings.library, settings.import_dir, " (automatisch)" if settings.auto_import else "",
+                 settings.trash_days, f"Port {settings.public_port}" if settings.public_enabled else "aus")
         threading.Thread(target=self._maintenance, daemon=True, name="wartung").start()
         self.tasks.start()  # setzt auch Aufgaben fort, die ein Neustart unterbrochen hat
         self.faces.start()
         self.duplicates.start()
         self.converter.start()
+        self.auto_import.start()
 
     def stop(self):
+        self.auto_import.stop()
         self.faces.stop()
         self.duplicates.stop()
         self.converter.stop()
@@ -108,4 +112,6 @@ def build(settings: config.Settings) -> Context:
     if settings.public_log_export_path:
         access.set_export(settings.public_log_export_path, slot="export")
     auth = AuthService(db, limiter, access, settings.public_session_hours)
-    return Context(settings, db, exiftool, importer, editor, tasks, faces, duplicates, converter, limiter, access, auth)
+    auto_import = AutoImport(settings, importer, on_done=faces.wake, enabled=settings.auto_import)
+    return Context(settings, db, exiftool, importer, editor, tasks, faces, duplicates, converter, limiter, access, auth,
+                   auto_import)

@@ -33,6 +33,13 @@ configuration:
       HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann (z. B. H.265/HEVC), zu MP4 mit H.264.
       MOV mit H.264 wird nur verlustfrei umgepackt. Das Original kommt in den Papierkorb. Videos brauchen auf dem
       Raspberry Pi etwa so lange, wie sie dauern. Vorhandene Dateien wandelst du über die Auswahl um.
+  auto_import:
+    name: Automatisch importieren
+    description: >-
+      Den Import-Ordner jede Minute prüfen und neue, fertig kopierte Dateien selbst einlesen – etwa für ein Handy,
+      das per FolderSync oder PhotoSync im WLAN in den Samba-Ordner hochlädt. Nur in eine Richtung: aufs Handy
+      wird nie geschrieben. Dateien, die schon im Archiv oder im Papierkorb liegen, werden gelöscht statt in
+      _duplikate verschoben.
   public_enabled:
     name: Internetzugang
     description: >-

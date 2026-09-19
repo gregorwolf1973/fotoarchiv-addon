@@ -135,7 +135,7 @@
 
     {#if job && (job.running || job.finished_at)}
       <section class="report">
-        <h3>{job.running ? 'Bisher' : `Letzter Lauf · ${finished}`}</h3>
+        <h3>{job.running ? 'Bisher' : `Letzter Lauf · ${finished}`}{job.auto ? ' · automatisch' : ''}</h3>
         <div class="counts">
           <span class="count ok">{count('imported')} neu</span>
           {#if job.counts.relinked}<span class="count ok">{count('relinked')} wieder zugeordnet</span>{/if}
@@ -179,7 +179,9 @@
         {#if job.duplicates.length}
           <details>
             <summary>Duplikate</summary>
-            {#if job.mode === 'import'}
+            {#if job.auto}
+              <p class="muted">Liegen schon im Archiv oder im Papierkorb – die Kopien im Import-Ordner wurden gelöscht.</p>
+            {:else if job.mode === 'import'}
               <p class="muted">Verschoben nach <code>_duplikate</code> im Import-Ordner. Dort prüfen und löschen.</p>
             {/if}
             <ul>

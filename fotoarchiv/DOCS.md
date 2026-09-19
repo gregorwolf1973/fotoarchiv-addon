@@ -7,6 +7,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 ## Funktionen (Version 0.19)
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
+- **Handy automatisch sichern:** Eine Sync-App lädt im WLAN in den Import-Ordner hoch, das Add-on liest neue Dateien von selbst ein. Nur in eine Richtung. Siehe [Handy automatisch sichern](#handy-automatisch-sichern).
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
 - **Duplikaterkennung per MD5.** Bereits vorhandene Dateien werden nicht noch einmal aufgenommen. Beim Ordner-Import landen sie in `_duplikate` im Import-Ordner. Die Prüfsumme vom Import wird dauerhaft gespeichert, damit ein Bild auch nach späterer Bearbeitung noch als Duplikat erkannt wird.
 - **Doppelte und ähnliche Fotos finden:** verkleinerte Kopien, anders gespeicherte Fassungen und Serien. Die beste Fassung wird vorgeschlagen, der Rest kommt in den Papierkorb. Siehe [Doppelte Fotos](#doppelte-fotos).
@@ -44,6 +45,7 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `face_threads` | `2` | Prozessorkerne für die Gesichtserkennung (1–8). Auf dem Pi 5 sind 3 ein guter Wert, wenn Home Assistant flüssig bleiben soll. Wirkt nach einem Neustart des Add-ons. |
 | `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
 | `convert_on_import` | `false` | HEIC und nicht abspielbare Videos beim Import umwandeln, siehe [Umwandeln](#umwandeln) |
+| `auto_import` | `false` | Import-Ordner jede Minute prüfen und neue Dateien selbst einlesen, siehe [Handy automatisch sichern](#handy-automatisch-sichern) |
 | `public_enabled` | `false` | Internetzugang auf Port 8301 starten |
 | `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
 | `public_cookie_secure` | `true` | Sitzungs-Cookie nur über HTTPS (nur zum Testen ausschalten) |
@@ -68,6 +70,22 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Infobereich ein/aus | i | ⓘ |
 | Gesichtsrahmen ein/aus | f | Gesichts-Symbol |
 | Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |
+
+## Handy automatisch sichern
+
+Das Handy lädt neue Fotos und Videos im WLAN in den Import-Ordner hoch, das Add-on liest sie von selbst ein. Das geht **nur in eine Richtung**: Das Fotoarchiv schreibt nie aufs Handy, und Löschen auf dem Handy löscht nichts im Archiv.
+
+1. In der Konfiguration des Add-ons **`auto_import`** einschalten. Sinnvoll ist dazu `convert_on_import`, damit HEIC-Fotos und HEVC-Videos vom iPhone gleich abspielbar sind.
+2. Auf dem Handy eine Sync-App einrichten, Ziel ist die Samba-Freigabe `share`, Ordner `fotoarchiv-import`. Am besten einen Unterordner pro Handy nehmen, etwa `fotoarchiv-import/gregor`.
+   - **Android, FolderSync:** Ordnerpaar mit dem Kamera-Ordner (`DCIM/Camera`) als Quelle, Richtung **„Zum Remote-Ordner“**. Unbedingt **„Only resync source files if modified (ignore target deletion)“** anhaken. Der Import verschiebt die Dateien aus dem Ordner, ohne diese Option lädt FolderSync sie bei jedem Lauf erneut hoch. **„Löschungen synchronisieren“** aus. Unter *Sync-Einstellungen* „Nur WLAN“ oder gezielt das Heim-WLAN wählen, als Zeitplan zum Beispiel stündlich.
+   - **iPhone, PhotoSync:** Ziel SMB mit dem Ordner oben und „nur neue Fotos übertragen“. Automatisch läuft das über eine Kurzbefehle-Automation, etwa beim Verbinden mit dem Heim-WLAN oder beim Laden.
+
+**Was das Add-on dabei tut:**
+
+- Jede Minute schaut es in den Import-Ordner. Dateien, die sich seit einer Minute nicht mehr geändert haben, gelten als fertig übertragen und werden importiert, wie beim Knopf *Import starten*.
+- **Duplikate** sind byte-gleiche Kopien von etwas, das schon im Archiv oder im Papierkorb liegt, erkannt über MD5. Sie werden beim automatischen Import **gelöscht** statt nach `_duplikate` verschoben. So räumt sich der Ordner selbst auf, wenn die App ein Foto noch einmal schickt. Fotos, die du im Archiv in den Papierkorb gelegt hast, kommen dadurch nicht zurück.
+- Beschädigte Dateien landen wie gewohnt in `_defekt`. Nicht unterstützte Dateien bleiben liegen und stoßen erst wieder einen Import an, wenn sie sich ändern.
+- Der letzte Lauf steht im Import-Fenster mit dem Zusatz *automatisch*.
 
 ## Bearbeiten
 

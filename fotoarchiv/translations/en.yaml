@@ -31,6 +31,12 @@ configuration:
       HEIC photos become JPEG, videos the browser cannot play (e.g. H.265/HEVC) become H.264 MP4. H.264 MOV files
       are only repackaged losslessly. The original goes to the trash. Videos take about as long as their running
       time on a Raspberry Pi. Convert existing files via the selection.
+  auto_import:
+    name: Import automatically
+    description: >-
+      Check the import folder every minute and import new, completely copied files on its own – e.g. for a phone
+      uploading to the Samba share via FolderSync or PhotoSync over Wi-Fi. One way only: nothing is ever written
+      back to the phone. Files already in the archive or trash are deleted instead of moved to _duplikate.
   public_enabled:
     name: Internet access
     description: >-
