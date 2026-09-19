@@ -276,6 +276,7 @@ Das Datum wird in dieser Reihenfolge bestimmt:
    - **Hochladen + Bearbeiten (ohne Löschen):** zusätzlich hochladen, Schlagworte, Personen, Orte und Datum ändern, drehen und Gesichter benennen. Bilder löschen geht nicht: kein Papierkorb, kein Wiederherstellen, keine Duplikat-Bereinigung.
    - **Bearbeiten:** zusätzlich hochladen, Datum, Ort, Schlagworte und Personen ändern, drehen, in den Papierkorb legen und Gesichter benennen.
    - Import, Abgleich, endgültiges Löschen und die Kontenverwaltung gibt es nur über Home Assistant.
+   - **Löschen vorschlagen:** Wer nicht löschen darf, findet in der Einzelansicht und in der Auswahl den Knopf *Löschen vorschlagen*, auf Wunsch mit Grund. In Home Assistant zeigt ein Symbol mit Zahl oben rechts die offenen Vorschläge. Es öffnet die Ansicht **Löschvorschläge**: Fotos auswählen und in den Papierkorb legen oder *Ablehnen*. In der Einzelansicht steht, wer das Löschen vorgeschlagen hat und warum; auch dort lässt sich direkt entscheiden.
 3. Den Internetzugang über deinen Reverse Proxy mit TLS veröffentlichen, siehe unten. **Port 8301 nie direkt im Router freigeben.**
 
 ### Nginx Proxy Manager (Add-on)

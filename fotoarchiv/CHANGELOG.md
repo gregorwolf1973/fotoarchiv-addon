@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.34
+
+- **Löschen vorschlagen:** Konten ohne Löschrecht („Ansehen“ und „Hochladen + Bearbeiten“) schlagen Fotos zum Löschen vor, einzeln oder in der Auswahl, auf Wunsch mit Grund
+- In Home Assistant zeigt ein Symbol mit Zahl die offenen Vorschläge; die Ansicht **Löschvorschläge** listet die Fotos zum Löschen oder Ablehnen. Die Einzelansicht nennt, wer was vorgeschlagen hat
+
 ## 0.33
 
 - Behoben: Im Internetzugang kam beim Scrollen durch die Galerie „Zu viele Anfragen“ (429), und Manifest und App-Symbole ließen sich dann gar nicht laden. Angemeldete haben jetzt einen eigenen Zähler je Konto statt je IP (eine Familie teilt sich zu Hause eine Adresse), Vorschaubilder zählen nicht mehr mit, und Anfragen ohne Anmeldung haben ihren eigenen Zähler

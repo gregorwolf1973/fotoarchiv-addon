@@ -8,6 +8,7 @@
   import { isIos, openedFromShare, registerServiceWorker, standalone, takeShared } from './lib/pwa.js';
   import AccessPanel from './components/AccessPanel.svelte';
   import PasswordDialog from './components/PasswordDialog.svelte';
+  import ProposeDeleteDialog from './components/ProposeDeleteDialog.svelte';
   import Confirm from './components/Confirm.svelte';
   import DateDialog from './components/DateDialog.svelte';
   import DuplicatesView from './components/DuplicatesView.svelte';
@@ -57,12 +58,16 @@
   let lastToggled = null;
 
   const trash = $derived(view === 'trash');
+  const proposals = $derived(view === 'proposals'); // Löschvorschläge (nur Admin)
+  const listExtra = $derived(proposals ? { proposed: true } : {});
   // Rechte: admin = Home Assistant, editor/viewer = Konten des Internetzugangs
   // uploader: hochladen und bearbeiten, aber keine Bilder löschen
   const canEdit = $derived(['admin', 'editor', 'uploader'].includes(session?.role));
   const canDelete = $derived(session?.role === 'admin' || session?.role === 'editor');
   const isAdmin = $derived(session?.role === 'admin');
   const canUpload = $derived(canEdit);
+  // Wer nicht löschen darf, kann es dem Admin vorschlagen
+  const canPropose = $derived(!!session?.authenticated && !canDelete);
   const filtered = $derived(
     !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
   );
@@ -91,9 +96,9 @@
     try {
       const next = await api.state();
       cache.instance = next.instance;
-      const query = filterQuery(filters, trash);
+      const query = filterQuery(filters, trash, listExtra);
       if (next.revision !== revision || query !== loadedQuery) {
-        const index = await api.index(filters, trash);
+        const index = await api.index(filters, trash, listExtra);
         if (seq !== sequence) return;
         items = index.items;
         revision = index.revision;
@@ -339,6 +344,27 @@
     }
   }
 
+  async function sendProposal(ids, reason) {
+    try {
+      await api.requestDelete(ids, reason);
+      notify(ids.length === 1 ? 'Löschen vorgeschlagen – der Admin entscheidet' : `${ids.length} Fotos zum Löschen vorgeschlagen`);
+      selected.clear();
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
+  async function dismissProposals(ids) {
+    try {
+      await api.dismissDeleteRequests(ids);
+      notify(ids.length === 1 ? 'Vorschlag abgelehnt – das Foto bleibt' : `${ids.length} Vorschläge abgelehnt`);
+      selected.clear();
+      kick();
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
   async function restoreOne(id) {
     const next = neighbour(id);
     try {
@@ -463,8 +489,17 @@
         {#if isAdmin}
           <button class="icon" onclick={() => confirmConvert([...selected])} title="Umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4"><Icon name="convert" /></button>
         {/if}
+        {#if proposals && isAdmin}
+          <button onclick={() => dismissProposals([...selected])} title="Vorschläge ablehnen, die Fotos bleiben">
+            <Icon name="close" size={20} /><span class="label">Ablehnen</span>
+          </button>
+        {/if}
         {#if canDelete}
           <button class="icon" onclick={deleteSelected} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
+        {:else if canPropose}
+          <button onclick={() => (dialog = { type: 'propose', ids: [...selected] })} title="Dem Admin zum Löschen vorschlagen">
+            <Icon name="delete" size={20} /><span class="label">Löschen vorschlagen</span>
+          </button>
         {/if}
       {/if}
     </header>
@@ -479,6 +514,15 @@
       {#if info?.counts.trash && isAdmin}
         <button class="danger" onclick={confirmEmptyTrash}><Icon name="deleteForever" size={20} /><span class="label">Papierkorb leeren</span></button>
       {/if}
+    </header>
+  {:else if proposals}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">Löschvorschläge</strong>
+        <span class="sub">Auswählen, dann in den Papierkorb legen oder ablehnen</span>
+      </div>
+      <span class="grow"></span>
     </header>
   {:else if view === 'duplicates'}
     <header class="topbar">
@@ -527,6 +571,12 @@
         {#if canDelete}
           <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos"><Icon name="duplicate" /></button>
           <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – Dateien nach Größe"><Icon name="storage" /></button>
+          {#if isAdmin && info?.delete_requests}
+            <button class="icon trash" onclick={() => setView('proposals')} title="Löschvorschläge der Familie">
+              <Icon name="alert" />
+              <span class="badge">{info.delete_requests > 99 ? '99+' : info.delete_requests}</span>
+            </button>
+          {/if}
           <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
             <Icon name="delete" />
             {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
@@ -621,6 +671,9 @@
       {#if trash}
         <Icon name="delete" size={64} />
         <h2>Der Papierkorb ist leer</h2>
+      {:else if proposals}
+        <Icon name="checkCircle" size={64} />
+        <h2>Keine offenen Löschvorschläge</h2>
       {:else if filtered}
         <Icon name="search" size={64} />
         <h2>Keine Treffer</h2>
@@ -644,6 +697,9 @@
     index={openIndex}
     {canEdit}
     {canDelete}
+    {canPropose}
+    canDismiss={isAdmin}
+    myName={session?.user?.username ?? ''}
     canPurge={isAdmin}
     {trash}
     {labels}
@@ -695,6 +751,16 @@
       // ein pauschales Zurücksetzen auf "kein Ort" würde die alten Angaben verlieren.
       runBatch({ ids: [...selected], action: 'location', location });
       dialog = null;
+    }}
+  />
+{:else if dialog?.type === 'propose'}
+  <ProposeDeleteDialog
+    count={dialog.ids.length}
+    oncancel={() => (dialog = null)}
+    onsave={(reason) => {
+      const ids = dialog.ids;
+      dialog = null;
+      sendProposal(ids, reason);
     }}
   />
 {:else if dialog?.type === 'confirm'}

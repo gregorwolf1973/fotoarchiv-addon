@@ -5,12 +5,13 @@
   import { clampView, RESET, zoomAt } from '../lib/zoom.js';
   import ChipInput from './ChipInput.svelte';
   import Confirm from './Confirm.svelte';
+  import ProposeDeleteDialog from './ProposeDeleteDialog.svelte';
   import DateDialog from './DateDialog.svelte';
   import FaceBoxes from './FaceBoxes.svelte';
   import LocationDialog from './LocationDialog.svelte';
   import Icon from './Icon.svelte';
 
-  let { items, index, trash = false, canEdit: allowed = true, canDelete = true, canPurge = true, labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
+  let { items, index, trash = false, canEdit: allowed = true, canDelete = true, canPropose = false, canDismiss = false, canPurge = true, myName = "", labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
 
   const INFO_KEY = 'fotoarchiv.info';
   let showInfo = $state(readInfoSetting());
@@ -37,6 +38,7 @@
   let personInput = $state();
   let tagInput = $state();
   let leaving = $state(null); // Aktion, die auf "Änderungen verwerfen?" wartet
+  let proposing = $state(false);
 
   // Ein .mp4 sagt nichts über den Codec darin. Kann der Browser ihn nicht dekodieren,
   // bleibt sonst nur das Vorschaubild stehen, ohne jeden Hinweis.
@@ -198,6 +200,20 @@
   }
 
   const rotate = (degrees) => save(() => api.rotate(itemId, degrees));
+
+  // Löschen vorschlagen (ohne Löschrecht) bzw. Vorschlag ablehnen (Admin)
+  async function propose(reason) {
+    proposing = false;
+    if (await save(async () => (await api.requestDelete([itemId], reason), api.asset(itemId)))) {
+      notify('Löschen vorgeschlagen – der Admin entscheidet');
+    }
+  }
+  async function dismissProposal() {
+    if (await save(async () => (await api.dismissDeleteRequests([itemId]), api.asset(itemId)))) {
+      notify('Vorschlag abgelehnt – das Foto bleibt');
+    }
+  }
+  const mine = $derived(detail?.delete_requests?.some((r) => r.username === myName) ?? false);
   const setLabels = (kind, values) => (draft[kind] = values);
   function setDate(value) {
     editDate = false;
@@ -402,6 +418,10 @@
           <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title="Gesichter zeigen (f)"><Icon name="face" /></button>
         {/if}
         <a class="round" href={originalUrl(item, true)} title="Original herunterladen"><Icon name="download" /></a>
+        {#if canPropose && !canDelete}
+          <button class="round" class:on={mine} disabled={busy || mine} onclick={() => (proposing = true)}
+            title={mine ? 'Löschen schon vorgeschlagen' : 'Dem Admin zum Löschen vorschlagen'}><Icon name="delete" /></button>
+        {/if}
         {#if canDelete}<button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>{/if}
       {/if}
       <button class="round" class:on={showInfo} onclick={toggleInfo} title="Informationen (i)"><Icon name="info" /></button>
@@ -422,6 +442,21 @@
       {:else if !detail}
         <p class="muted">Wird geladen …</p>
       {:else}
+        {#if detail.delete_requests?.length && !trash}
+          <div class="notice proposal">
+            <Icon name="delete" size={16} />
+            <div>
+              Löschen vorgeschlagen von
+              {#each detail.delete_requests as r, i}{i ? ', ' : ' '}<strong>{r.display_name}</strong>{#if r.reason} („{r.reason}“){/if}{/each}
+              {#if canDismiss}
+                <div class="proposal-actions">
+                  <button disabled={busy} onclick={dismissProposal}>Ablehnen</button>
+                  <button class="danger" disabled={busy} onclick={() => ondelete(itemId)}>In den Papierkorb</button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
         {#if trash}
           <p class="notice"><Icon name="delete" size={16} /> Im Papierkorb – wird am {expires(detail)} endgültig gelöscht.</p>
         {:else if !detail.editable && allowed}
@@ -527,6 +562,10 @@
 {#if editLocation && detail}
   <LocationDialog lat={location?.lat ?? null} lon={location?.lon ?? null} saveLabel="Übernehmen" onsave={setLocation}
     oncancel={() => (editLocation = false)} />
+{/if}
+
+{#if proposing}
+  <ProposeDeleteDialog onsave={propose} oncancel={() => (proposing = false)} />
 {/if}
 
 {#if leaving}
@@ -749,6 +788,12 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
+  }
+  .proposal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
   }
   .draft-bar {
     position: sticky;

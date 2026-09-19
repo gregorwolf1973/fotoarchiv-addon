@@ -266,11 +266,14 @@ class Editor:
             if source.is_file():
                 move_file(source, target)
                 _prune_empty_dirs(source.parent, self.settings.library)
-            self.db.execute(
-                "UPDATE assets SET path = ?, orig_path = ?, deleted_at = ? WHERE id = ?",
-                (target.relative_to(self.settings.library).as_posix(), row["path"],
-                 datetime.now().isoformat(timespec="seconds"), asset_id),
-            )
+            with self.db.transaction() as conn:
+                conn.execute(
+                    "UPDATE assets SET path = ?, orig_path = ?, deleted_at = ? WHERE id = ?",
+                    (target.relative_to(self.settings.library).as_posix(), row["path"],
+                     datetime.now().isoformat(timespec="seconds"), asset_id),
+                )
+                # Löschvorschläge sind damit erledigt; nach dem Wiederherstellen sollen sie nicht wieder auftauchen
+                conn.execute("DELETE FROM delete_requests WHERE asset_id = ?", (asset_id,))
             self.db.bump()
 
     def restore(self, asset_id: int):

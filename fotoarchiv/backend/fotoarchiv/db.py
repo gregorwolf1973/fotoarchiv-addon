@@ -172,6 +172,16 @@ MIGRATIONS = [
     -- Einmal neue Kennung für alle Bild-URLs: räumt Vorschauen auf, die schon falsch im Browser-Cache liegen
     DELETE FROM meta WHERE key = 'instance';
     """,
+    """
+    -- Löschvorschläge von Konten, die selbst nicht löschen dürfen; der Admin entscheidet
+    CREATE TABLE delete_requests (
+        asset_id   INTEGER NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
+        username   TEXT NOT NULL,
+        reason     TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (asset_id, username)
+    );
+    """,
 ]
 
 # Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID

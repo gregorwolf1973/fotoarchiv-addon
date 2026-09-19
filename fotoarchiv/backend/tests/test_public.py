@@ -351,3 +351,33 @@ def test_household_shares_ip_without_blocking_each_other(admin, public, make_jpe
     assert kind.get("/api/state").status_code == 200
     stranger = visitor(public, ip="203.0.113.7")  # z. B. der Browser, der das Manifest ohne Cookie lädt
     assert stranger.get("/api/auth/session").status_code == 200
+
+
+def test_delete_proposals_reach_the_admin(admin, public, make_jpeg, tmp_path):
+    photo = make_jpeg(tmp_path / "IMG_20200404_120000.jpg")
+    asset_id = admin.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes()).json()["asset_id"]
+    other = admin.put("/api/upload", params={"name": "b.jpg"},
+                      content=make_jpeg(tmp_path / "IMG_20200405_120000.jpg").read_bytes()).json()["asset_id"]
+    make_user(admin, "oma", role="uploader")
+    make_user(admin, "gast")
+    oma = visitor(public, ip="198.51.100.50")
+    gast = visitor(public, ip="198.51.100.51")
+    login(oma, "oma")
+    login(gast, "gast")
+
+    assert oma.post("/api/delete-requests", json={"ids": [asset_id], "reason": "unscharf"}).json() == {"requested": 1}
+    assert gast.post("/api/delete-requests", json={"ids": [asset_id, other, 99999]}).json() == {"requested": 2}
+    assert oma.get("/api/state").json()["delete_requests"] is None  # die Zahl sieht nur der Admin
+    assert admin.get("/api/state").json()["delete_requests"] == 2
+    requests = admin.get(f"/api/assets/{asset_id}").json()["delete_requests"]
+    assert [(r["username"], r["reason"]) for r in requests] == [("oma", "unscharf"), ("gast", "")]
+    listed = admin.get("/api/assets", params={"proposed": "true"}).json()["items"]
+    assert sorted(item[0] for item in listed) == sorted([asset_id, other])
+
+    # Der Admin lehnt einen ab und löscht den anderen: beide Vorschläge sind danach erledigt
+    assert admin.post("/api/delete-requests/dismiss", json={"ids": [other]}).json() == {"dismissed": 1}
+    assert admin.delete(f"/api/assets/{asset_id}").status_code == 200
+    assert admin.get("/api/state").json()["delete_requests"] == 0
+    assert admin.post(f"/api/assets/{asset_id}/restore").status_code == 200
+    assert admin.get(f"/api/assets/{asset_id}").json()["delete_requests"] == []
+    assert oma.post("/api/delete-requests/dismiss", json={"ids": [other]}).status_code == 404  # nur über Home Assistant

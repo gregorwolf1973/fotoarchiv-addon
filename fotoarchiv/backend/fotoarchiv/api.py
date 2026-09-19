@@ -97,6 +97,15 @@ class AssetPatch(BaseModel):
     persons: list[str] | None = None
 
 
+class DeleteRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=2000)
+    reason: str = Field("", max_length=300)
+
+
+class DeleteRequestIds(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=5000)
+
+
 class RotateRequest(BaseModel):
     degrees: Literal[90, 180, 270]
 
@@ -127,6 +136,7 @@ class AssetFilter:
     trash: bool = False
     located: bool | None = None   # nur mit / nur ohne Aufnahmeort
     editable: bool | None = None  # nur Formate, die Metadaten speichern können
+    proposed: bool = False        # nur Fotos, deren Löschen jemand vorgeschlagen hat
 
     def clause(self) -> tuple[str, list]:
         where = ["deleted_at IS NOT NULL" if self.trash else "deleted_at IS NULL"]
@@ -154,6 +164,8 @@ class AssetFilter:
             params += [f"%{word}%"] * 4
         if self.located is not None:
             where.append("lat IS NOT NULL" if self.located else "lat IS NULL")
+        if self.proposed:
+            where.append("EXISTS (SELECT 1 FROM delete_requests r WHERE r.asset_id = a.id)")
         if self.editable is not None:
             suffixes = " OR ".join("lower(path) LIKE ?" for _ in WRITABLE)
             where.append(f"({suffixes})" if self.editable else f"NOT ({suffixes})")
@@ -204,6 +216,10 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             "tasks_running": tasks.any_running(),
             "faces": {"enabled": faces.enabled, "status": faces.state["status"]},
             "converting": ctx.converter.status(),
+            # Offene Löschvorschläge – nur für den Admin in Home Assistant, der darüber entscheidet
+            "delete_requests": None if public else db.one(
+                """SELECT COUNT(DISTINCT r.asset_id) AS n FROM delete_requests r
+                   JOIN assets a ON a.id = r.asset_id AND a.deleted_at IS NULL""")["n"],
             "tools": {
                 "vips": media.pyvips is not None,
                 "exiftool": shutil.which(settings.exiftool) is not None,
@@ -289,10 +305,33 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             persons = labels.current(conn, asset_id, "persons")
         result = {key: row[key] for key in row.keys() if key not in ("md5_import", "thumb_ok")}
         result.update(capabilities(row["path"]), name=Path(row["path"]).name, tags=tags, persons=persons)
+        result["delete_requests"] = [dict(r) for r in db.query(
+            """SELECT r.username, COALESCE(NULLIF(u.display_name, ''), r.username) AS display_name, r.reason, r.created_at
+               FROM delete_requests r LEFT JOIN users u ON u.username = r.username
+               WHERE r.asset_id = ? ORDER BY r.created_at, r.rowid""", (asset_id,))]
         if row["deleted_at"]:
             expires = datetime.fromisoformat(row["deleted_at"]) + timedelta(days=settings.trash_days)
             result["expires_at"] = expires.isoformat(timespec="seconds")
         return result
+
+    @app.post("/api/delete-requests")
+    def delete_request_create(body: DeleteRequest, request: Request):
+        """Löschen vorschlagen – für Konten, die selbst nicht löschen dürfen. Der Admin entscheidet."""
+        session = getattr(request.state, "session", None)
+        username = session["username"] if session else "Home Assistant"
+        now = datetime.now().isoformat(timespec="seconds")
+        ids = sorted(set(body.ids))
+        with db.transaction() as conn:
+            existing = {r["id"] for r in conn.execute(
+                f"SELECT id FROM assets WHERE deleted_at IS NULL AND id IN ({','.join('?' * len(ids))})", ids)}
+            for asset_id in ids:
+                if asset_id in existing:
+                    conn.execute(
+                        """INSERT INTO delete_requests (asset_id, username, reason, created_at) VALUES (?, ?, ?, ?)
+                           ON CONFLICT (asset_id, username) DO UPDATE SET reason = excluded.reason, created_at = excluded.created_at""",
+                        (asset_id, username, body.reason.strip(), now))
+        db.bump()
+        return {"requested": len(existing)}
 
     @app.get("/api/assets/{asset_id}")
     def asset_detail(asset_id: int):
@@ -411,6 +450,14 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         @app.post("/api/convert/dismiss")
         def convert_dismiss():
             return {"dismissed": ctx.converter.dismiss_failed()}
+
+        @app.post("/api/delete-requests/dismiss")
+        def delete_request_dismiss(body: DeleteRequestIds):
+            """Löschvorschläge ablehnen: die Fotos bleiben, die Vorschläge verschwinden."""
+            ids = sorted(set(body.ids))
+            count = db.execute(f"DELETE FROM delete_requests WHERE asset_id IN ({','.join('?' * len(ids))})", ids).rowcount
+            db.bump()
+            return {"dismissed": count}
 
         @app.post("/api/library/remove-missing")
         def remove_missing():
