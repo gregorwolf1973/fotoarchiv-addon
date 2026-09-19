@@ -4,7 +4,7 @@
 
 Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz normale Dateien auf deinem Datenträger, sortiert nach `JJJJ/MM`. Die Datenbank ist nur ein Index daneben.
 
-## Funktionen (Version 0.19)
+## Funktionen
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Handy automatisch sichern:** Eine Sync-App lädt im WLAN in den Import-Ordner hoch, das Add-on liest neue Dateien von selbst ein. Nur in eine Richtung. Siehe [Handy automatisch sichern](#handy-automatisch-sichern).
@@ -23,7 +23,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Speicherplatz:** Nach Größe sortiert – größte oder kleinste zuerst –, gefiltert nach Videos oder Fotos und Mindestgröße, zum Ansehen und Aussortieren. Siehe [Speicherplatz und Backups](#speicherplatz-und-backups).
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
-- **Weltkarte:** Fotos gruppiert nach Aufnahmeort. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
+- **Weltkarte:** Fotos gruppiert nach Aufnahmeort, mit Zeitregler für ein Jahr oder mehrere. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
 - **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI und MTS.
 
 Alle ursprünglich geplanten Funktionen sind umgesetzt.
@@ -207,6 +207,7 @@ Mit `duplicate_detection: false` wird die Suche abgeschaltet.
 - **Ohne Ort** listet alle bearbeitbaren Fotos ohne Aufnahmeort. Antippen wählt Fotos aus. Ziehen legt ein Foto oder die ganze Auswahl an der Stelle ab, an der du loslässt. Mit der Maus beginnt das Ziehen sofort, am Handy nach kurzem langem Drücken. Der Ort wird im Hintergrund in die Dateien geschrieben und lässt sich über „Rückgängig“ wieder entfernen.
 - **Ortssuche** oben links springt zu einer Stadt oder Adresse, damit du Fotos genau ablegen kannst.
 - In der **Einzelansicht** lässt sich der Ort über das Stift-Symbol setzen oder korrigieren: in die Karte tippen oder die Stecknadel verschieben.
+- **Zeitraum:** Unten auf der Karte schaltet *Zeitraum* einen Zeitregler ein. Dann zeigt die Karte nur Fotos aus diesem Zeitraum, standardmäßig ein Jahr; die Länge lässt sich auf 2, 3, 5 oder 10 Jahre stellen. Mit dem Regler oder den Pfeilen ◀ ▶ wandert der Zeitraum vom ältesten Foto bis zum aktuellen Jahr. Die Zahl daneben sagt, wie viele Fotos hineinfallen. Ein Klick auf das Jahr schaltet zurück auf alle Jahre.
 
 Die Kartenkacheln kommen von **OpenStreetMap**, die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
 

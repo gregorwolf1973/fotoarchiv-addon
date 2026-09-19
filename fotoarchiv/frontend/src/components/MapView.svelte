@@ -1,6 +1,6 @@
 <script module>
-  // Kartenausschnitt beim Wechsel der Ansicht behalten
-  const saved = { center: null, zoom: null };
+  // Kartenausschnitt und Zeitraum beim Wechsel der Ansicht behalten
+  const saved = { center: null, zoom: null, period: null };
 </script>
 
 <script>
@@ -9,6 +9,7 @@
   import { api, thumbUrl } from '../lib/api.js';
   import { createMap, L } from '../lib/map.js';
   import { notifyError } from '../lib/notices.svelte.js';
+  import MapTimeline from './MapTimeline.svelte';
   import PlaceSearch from './PlaceSearch.svelte';
   import UnlocatedPanel from './UnlocatedPanel.svelte';
 
@@ -66,6 +67,36 @@
     untrack(() => load(current));
   });
 
+  // ── Zeitraum ───────────────────────────────────────────────────
+  const THIS_YEAR = new Date().getFullYear();
+  const yearOf = (ts) => new Date(ts * 1000).getUTCFullYear(); // taken_ts: Ortszeit als UTC-Sekunden
+  const years = $derived.by(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of points) {
+      const year = yearOf(p[1]);
+      if (year < min) min = year;
+      if (year > max) max = year;
+    }
+    return Number.isFinite(min) ? { min, max: Math.max(max, THIS_YEAR), newest: max } : { min: THIS_YEAR, max: THIS_YEAR, newest: THIS_YEAR };
+  });
+  let period = $state(saved.period ?? { on: false, start: null, span: 1 });
+
+  function changePeriod(next) {
+    // Beim Einschalten mit dem neuesten Jahr beginnen, in dem es Fotos gibt
+    if (next.on && next.start === null) next = { ...next, start: Math.max(years.min, years.newest - next.span + 1) };
+    period = next;
+    saved.period = next;
+  }
+
+  // Die Karte zeigt nur, was in den Zeitraum fällt; aus dem Fenster "Ohne Ort" geht das nicht
+  const shown = $derived.by(() => {
+    if (!period.on || period.start === null) return points;
+    const from = Date.UTC(period.start, 0, 1) / 1000;
+    const to = Date.UTC(period.start + period.span, 0, 1) / 1000;
+    return points.filter((p) => p[1] >= from && p[1] < to);
+  });
+
   const clusters = $derived.by(() => {
     const index = new Supercluster({
       // extent 256 = Leaflets Kachelgröße, damit radius in Bildschirmpixeln zählt. Etwas mehr als ein
@@ -83,7 +114,7 @@
       },
     });
     index.load(
-      points.map((item, i) => ({
+      shown.map((item, i) => ({
         type: 'Feature',
         properties: { index: i, ts: item[1] },
         geometry: { type: 'Point', coordinates: [item[7], item[6]] },
@@ -135,7 +166,7 @@
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties;
       const count = props.cluster ? props.point_count : 1;
-      const item = points[props.cluster ? props.best : props.index];
+      const item = shown[props.cluster ? props.best : props.index];
       const size = count > 1 ? MARKER : 52;
       const icon = L.divIcon({
         className: 'photo-marker',
@@ -156,14 +187,14 @@
       return;
     }
     // Alle am selben Ort: direkt ansehen
-    const leaves = clusters.getLeaves(feature.properties.cluster_id, Infinity).map((l) => points[l.properties.index]);
+    const leaves = clusters.getLeaves(feature.properties.cluster_id, Infinity).map((l) => shown[l.properties.index]);
     leaves.sort((a, b) => b[1] - a[1] || b[0] - a[0]);
     onopen(leaves.map((i) => i[0]), leaves[0][0]);
   }
 
   function openInView(id) {
     const bounds = map.getBounds();
-    const inView = points.filter((p) => bounds.contains([p[6], p[7]]));
+    const inView = shown.filter((p) => bounds.contains([p[6], p[7]]));
     onopen(inView.map((p) => p[0]), id);
   }
 
@@ -197,6 +228,9 @@
   <div class="map-wrap" class:drop={dropActive}>
     <div class="map" bind:this={container}></div>
     <div class="overlay"><PlaceSearch onselect={goTo} /></div>
+    <div class="period">
+      <MapTimeline {period} minYear={years.min} maxYear={years.max} count={shown.length} onchange={changePeriod} />
+    </div>
     {#if dropActive}<div class="drop-hint">Hier loslassen, um den Ort zu setzen</div>{/if}
   </div>
   {#if canEdit}
@@ -246,6 +280,15 @@
   }
   .overlay :global(form) {
     pointer-events: auto;
+  }
+  .period {
+    position: absolute;
+    left: 50%;
+    bottom: 28px; /* über der Quellenangabe von OpenStreetMap */
+    z-index: 600;
+    transform: translateX(-50%);
+    max-width: calc(100% - 24px);
+    pointer-events: none;
   }
   .drop-hint {
     position: absolute;

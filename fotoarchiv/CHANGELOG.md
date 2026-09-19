@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.32
+
+- Karte: **Zeitregler** – nur Fotos aus einem Zeitraum zeigen (1 Jahr, einstellbar bis 10 Jahre), per Regler oder ◀ ▶ vom ältesten Foto bis heute verschieben, mit Anzahl der Fotos im Zeitraum
+- README neu: englisch für die Suche auf GitHub, Knopf zum Hinzufügen in Home Assistant, Übersicht aller Funktionen
+
 ## 0.31
 
 - Behoben: Ein neu hochgeladenes Foto konnte die Vorschau eines endgültig gelöschten zeigen. SQLite vergab dessen ID erneut, und der Browser hatte die Vorschau unter derselben Adresse im Cache. IDs werden jetzt nie wiederverwendet
