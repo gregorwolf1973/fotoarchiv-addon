@@ -6,6 +6,7 @@
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
   import AccessPanel from './components/AccessPanel.svelte';
+  import PasswordDialog from './components/PasswordDialog.svelte';
   import Confirm from './components/Confirm.svelte';
   import DateDialog from './components/DateDialog.svelte';
   import DuplicatesView from './components/DuplicatesView.svelte';
@@ -44,6 +45,7 @@
   let listKey = $state(''); // neue Suche/Ansicht: Galerie neu aufbauen, oben beginnen
   let session = $state(null); // { authenticated, public, role, user, csrf }
   let showAccess = $state(false);
+  let showPassword = $state(false);
   let uploader = $state();
   let fileInput = $state();
 
@@ -161,7 +163,7 @@
     items = [];
     info = null;
     openId = null;
-    showImport = showAccess = false;
+    showImport = showAccess = showPassword = false;
     dialog = null;
     selected.clear();
     session = { ...(session ?? {}), authenticated: false, public: true, role: null, user: null, csrf: null };
@@ -363,7 +365,7 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     else if (e.key === 'Delete' && selected.size) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
@@ -478,6 +480,7 @@
           <button class="icon" onclick={() => (showAccess = true)} title="Zugang übers Internet"><Icon name="shield" /></button>
         {/if}
         {#if session.public}
+          <button class="icon" onclick={() => (showPassword = true)} title="Passwort ändern"><Icon name="lock" /></button>
           <button class="icon" onclick={logout} title="Abmelden ({session.user?.display_name || session.user?.username})"><Icon name="logout" /></button>
         {/if}
         <input bind:this={fileInput} type="file" multiple accept="image/*,video/*,.heic,.heif" hidden onchange={pickFiles} />
@@ -642,6 +645,10 @@
 
 {#if showAccess}
   <AccessPanel onclose={() => (showAccess = false)} />
+{/if}
+
+{#if showPassword}
+  <PasswordDialog onclose={() => (showPassword = false)} />
 {/if}
 
 <Uploader bind:this={uploader} enabled={canUpload} onchanged={kick} />

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from starlette.routing import Match
 
 from . import api
-from .auth import LoginFailed, LoginLocked
+from .auth import AuthError, LoginFailed, LoginLocked
 from .context import Context
 from .ratelimit import LOCK_BASE, LOCK_CAP, REQ_ANON_PER_IP, REQ_AUTH_PER_IP, SCAN_PER_IP
 
@@ -33,7 +33,7 @@ OPEN = {"auth_session", "auth_login", "auth_logout"}
 VIEW = {
     "state", "asset_index", "asset_largest", "asset_geo", "label_list", "asset_detail", "asset_thumb", "asset_preview",
     "asset_original", "task_list", "face_status", "people", "group_faces", "person_faces", "asset_faces",
-    "face_crop",
+    "face_crop", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
 }
 EDIT = {
     "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload",
@@ -56,6 +56,11 @@ CSP = (
 class LoginRequest(BaseModel):
     username: str = Field(max_length=64)
     password: str = Field(max_length=256)
+
+
+class PasswordChange(BaseModel):
+    current: str = Field(max_length=256)
+    new: str = Field(max_length=256)
 
 
 def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
@@ -208,6 +213,20 @@ def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
         response.set_cookie(COOKIE, token, max_age=settings.public_session_hours * 3600, httponly=True,
                             secure=settings.public_cookie_secure, samesite="lax", path="/")
         return response
+
+    @app.post("/api/auth/password")
+    def auth_password(body: PasswordChange, request: Request):
+        try:
+            auth.change_password(request.state.session, body.current, body.new, request.state.ip)
+        except LoginLocked as exc:
+            minutes = max(1, round(exc.retry_after / 60))
+            return reply(429, f"Zu viele Fehlversuche. Bitte in {minutes} Minuten erneut versuchen.",
+                         retry_after=exc.retry_after)
+        except LoginFailed:
+            return reply(400, "Das bisherige Passwort stimmt nicht")
+        except AuthError as exc:
+            return reply(400, str(exc))
+        return {"changed": True}
 
     @app.post("/api/auth/logout")
     def auth_logout(request: Request):

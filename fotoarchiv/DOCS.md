@@ -293,6 +293,7 @@ Den Host-Port wie oben eintragen und die Adresse des Proxy-Geräts unter `public
 - **Proxy-Angaben:** Die Besucheradresse aus `X-Forwarded-For` bzw. `CF-Connecting-IP` wird **nur** von Adressen aus `public_trusted_proxies` übernommen. Gefälschte Angaben bei direktem Zugriff bleiben wirkungslos.
 - **Sitzungen:** Sie werden auf dem Server geführt. Das Cookie ist `HttpOnly`, `Secure` und `SameSite=Lax`. Ändernde Anfragen brauchen zusätzlich ein CSRF-Token.
 - **Passwörter:** Sie werden mit scrypt gespeichert, mindestens 10 Zeichen. Ein neues Passwort oder das Deaktivieren eines Kontos beendet sofort alle seine Sitzungen.
+- **Eigenes Passwort:** Jede angemeldete Person kann ihr Passwort über das Schloss-Symbol oben rechts selbst ändern. Dafür braucht sie das bisherige Passwort. Falsche Eingaben zählen wie fehlgeschlagene Anmeldungen und führen zur selben Sperre. Die eigene Sitzung bleibt bestehen, alle anderen Geräte werden abgemeldet.
 - **Sicherheits-Header:** CSP, HSTS über HTTPS, keine Einbettung in fremde Seiten.
 
 Unter **Schild-Symbol → Sitzungen & Sperren** siehst du angemeldete Nutzer und aktive Sperren. Dort lassen sich Sitzungen beenden und Sperren aufheben, etwa wenn du dich beim Testen selbst ausgesperrt hast. Unter **Protokoll** stehen Anmeldungen, Fehlversuche, Sperren und Änderungen.

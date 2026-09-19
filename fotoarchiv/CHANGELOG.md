@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27
+
+- Internetzugang: Jede angemeldete Person kann ihr **Passwort selbst ändern** (Schloss-Symbol oben rechts). Dafür ist das bisherige Passwort nötig, falsche Eingaben zählen wie fehlgeschlagene Anmeldungen. Danach werden alle anderen Geräte abgemeldet
+
 ## 0.26
 
 - Neue Option **`auto_import`**: Das Add-on prüft den Import-Ordner jede Minute und liest neue, fertig kopierte Dateien selbst ein. Gedacht für Handys, die per FolderSync oder PhotoSync im WLAN hochladen, nur in eine Richtung

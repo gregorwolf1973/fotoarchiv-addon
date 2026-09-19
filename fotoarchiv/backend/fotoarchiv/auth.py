@@ -197,6 +197,31 @@ class AuthService:
             self.db.execute("UPDATE sessions SET last_seen = ? WHERE id = ?", (now, row["session_id"]))
         return {key: row[key] for key in ("session_id", "csrf", "user_id", "username", "display_name", "role")}
 
+    def change_password(self, session: dict, current: str, new: str, ip: str):
+        """Eigenes Passwort ändern. Ein falsches aktuelles Passwort zählt wie ein fehlgeschlagener Login,
+        sonst ließe sich mit einer offenen Sitzung ungebremst raten. Andere Sitzungen werden beendet."""
+        username = session["username"]
+        ip_key = f"authfail:ip:{ip}"
+        user_key = f"authfail:user:{username.lower()}"
+        for key, limit_window in ((ip_key, AUTHFAIL_IP), (user_key, AUTHFAIL_USER)):
+            if self.limiter.locked(key, *limit_window):
+                raise LoginLocked(self._retry_after(key, limit_window[1]))
+        user = self._user(session["user_id"])
+        if not verify_password(current or "", user["password_hash"]):
+            time.sleep(random.uniform(0.15, 0.35))
+            self._fail(ip_key, AUTHFAIL_IP, ip)
+            self._fail(user_key, AUTHFAIL_USER, ip)
+            self.access.log("auth_fail", ip=ip, user=username, detail="password change")
+            raise LoginFailed()
+        self._check_password(new)
+        if new == current:
+            raise AuthError("Das neue Passwort muss sich vom bisherigen unterscheiden")
+        with self.db.transaction() as conn:
+            conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(new), user["id"]))
+            conn.execute("DELETE FROM sessions WHERE user_id = ? AND id != ?", (user["id"], session["session_id"]))
+        self.limiter.clear(key=user_key)
+        self.access.log("password_changed", ip=ip, user=username)
+
     def logout(self, token: str | None):
         if token:
             self.db.execute("DELETE FROM sessions WHERE id = ?", (_token_id(token),))

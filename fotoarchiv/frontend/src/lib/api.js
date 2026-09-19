@@ -55,6 +55,7 @@ export const api = {
   session: () => request('api/auth/session'),
   login: (username, password) => request('api/auth/login', send('POST', { username, password })),
   logout: () => request('api/auth/logout', { method: 'POST' }),
+  changePassword: (current, next) => request('api/auth/password', send('POST', { current, new: next })),
   state: () => request('api/state'),
   index: (filters, trash, extra) => request(`api/assets?${filterQuery(filters, trash, extra)}`),
   largest: (kind, minMb, order) =>

@@ -256,3 +256,38 @@ def test_crowdsec_install(admin, ctx, tmp_path, monkeypatch):
     assert str(export) in (crowdsec / "acquis.d" / "fotoarchiv-public.yaml").read_text(encoding="utf-8")
     ctx.access.log("auth_fail", ip="192.0.2.1", user="x")
     assert '"event": "auth_fail"' in export.read_text(encoding="utf-8")
+
+
+def test_users_change_their_own_password(admin, public):
+    make_user(admin, "anna")
+    phone = visitor(public, ip="198.51.100.20")
+    laptop = visitor(public, ip="198.51.100.21")
+    login(phone, "anna")
+    login(laptop, "anna")
+    new = "ganz-neues-passwort"
+
+    wrong = phone.post("/api/auth/password", json={"current": "falsch-falsch", "new": new})
+    assert wrong.status_code == 400 and "stimmt nicht" in wrong.json()["detail"]
+    assert phone.post("/api/auth/password", json={"current": PASSWORD, "new": "kurz"}).status_code == 400
+    assert phone.post("/api/auth/password", json={"current": PASSWORD, "new": PASSWORD}).status_code == 400
+    token = phone.headers.pop("X-CSRF-Token")
+    assert phone.post("/api/auth/password", json={"current": PASSWORD, "new": new}).status_code == 403  # ohne CSRF
+    phone.headers["X-CSRF-Token"] = token
+
+    assert phone.post("/api/auth/password", json={"current": PASSWORD, "new": new}).json() == {"changed": True}
+    assert phone.get("/api/state").status_code == 200    # eigene Sitzung bleibt
+    assert laptop.get("/api/state").status_code == 401   # andere Geräte abgemeldet
+    assert login(visitor(public, ip="198.51.100.22"), "anna").status_code == 401
+    assert login(visitor(public, ip="198.51.100.23"), "anna", new).status_code == 200
+    assert visitor(public, ip="198.51.100.24").post(
+        "/api/auth/password", json={"current": new, "new": "noch-ein-passwort"}).status_code == 401  # ohne Anmeldung
+
+
+def test_guessing_the_current_password_locks_like_login(admin, public):
+    make_user(admin, "bert")
+    browser = visitor(public, ip="198.51.100.30")
+    login(browser, "bert")
+    for _ in range(10):
+        browser.post("/api/auth/password", json={"current": "geraten-geraten", "new": "ganz-neues-passwort"})
+    locked = browser.post("/api/auth/password", json={"current": PASSWORD, "new": "ganz-neues-passwort"})
+    assert locked.status_code == 429
