@@ -700,9 +700,6 @@
   .next {
     right: 0;
   }
-  .stage:has(video) .nav {
-    top: 40%;
-  }
   .info {
     width: 360px;
     flex: none;
@@ -795,7 +792,8 @@
     }
     .info {
       width: auto;
-      max-height: 50vh;
+      /* feste Höhe: sonst ändert sich mit jedem Bild die Höhe der Bühne, und die Pfeile wandern mit */
+      height: 45vh;
     }
     .nav {
       width: 44px;

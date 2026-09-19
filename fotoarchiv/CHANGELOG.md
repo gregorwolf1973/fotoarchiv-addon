@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28
+
+- Einzelansicht: Die Pfeile zum Blättern bleiben an derselben Stelle – bei Videos saßen sie bisher höher als bei Fotos, und am Handy wanderten sie mit der Höhe des Infobereichs
+
 ## 0.27
 
 - Internetzugang: Jede angemeldete Person kann ihr **Passwort selbst ändern** (Schloss-Symbol oben rechts). Dafür ist das bisherige Passwort nötig, falsche Eingaben zählen wie fehlgeschlagene Anmeldungen. Danach werden alle anderen Geräte abgemeldet
