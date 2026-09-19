@@ -62,6 +62,7 @@ export const api = {
   tasks: () => request('api/tasks'),
   emptyTrash: () => request('api/trash/empty', { method: 'POST' }),
   removeMissing: () => request('api/library/remove-missing', { method: 'POST' }),
+  dismissConvertErrors: () => request('api/convert/dismiss', { method: 'POST' }),
   faceStatus: () => request('api/faces/status'),
   people: () => request('api/people'),
   groupFaces: (id) => request(`api/groups/${id}/faces`),

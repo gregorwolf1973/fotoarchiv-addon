@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21
+
+- Karte: Fotos werden jetzt bis zur höchsten Zoomstufe gebündelt und überlappen sich nicht mehr – vorher lagen sie ab Zoom 18 als Haufen übereinander
+- Hinweis „Datei ließ sich nicht umwandeln“ nennt Dateiname und Grund direkt (das Protokoll ist nach einem Neustart leer) und lässt sich mit dem **X** ausblenden
+- Ort, Datum und Schlagworte lassen sich auch in Videos mit Anhang am Dateiende schreiben (etwa Samsungs SEF-Anhang, exiftool meldete „Possible garbage at end of file“); der Anhang entfällt dabei, das Video bleibt unverändert
+
 ## 0.20
 
 - Speicherplatz: neue Auswahl **Reihenfolge** – neben den größten Dateien lassen sich jetzt auch die kleinsten zuerst anzeigen

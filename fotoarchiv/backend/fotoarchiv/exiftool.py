@@ -11,6 +11,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 TIMEOUT = 120  # Sekunden pro Aufruf; große Videos brauchen etwas
+GARBAGE_AT_END = "[minor] Possible garbage at end of file"
 
 
 class ExifToolError(RuntimeError):
@@ -101,6 +102,12 @@ class ExifTool:
         """Metadaten in die Datei schreiben; Dateidatum bleibt erhalten. Wirft bei Fehlern."""
         out, err = self.run("-overwrite_original", "-P", *assignments, str(path))
         errors = [line.removeprefix("Error: ").strip() for line in err.splitlines() if line.startswith("Error")]
+        if errors and all(e.startswith(GARBAGE_AT_END) for e in errors):
+            # Anhang hinter dem letzten Block (etwa Samsungs SEF-Trailer in Videos): exiftool schreibt
+            # erst mit -m und lässt den Anhang dabei weg. Das Video selbst bleibt unverändert abspielbar.
+            log.warning("%s: %s – schreibe trotzdem, der Anhang entfällt", path, errors[0])
+            out, err = self.run("-m", "-overwrite_original", "-P", *assignments, str(path))
+            errors = [line.removeprefix("Error: ").strip() for line in err.splitlines() if line.startswith("Error")]
         if errors or re.search(r"\b[1-9]\d* files? weren't updated", out):
             raise ExifToolError(errors[0] if errors else "Datei wurde nicht geändert")
         if not re.search(r"\b[1-9]\d* image files? (updated|unchanged)", out):

@@ -369,6 +369,10 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
                 raise HTTPException(400, "Der Papierkorb ist leer")
             return tasks.submit("purge", f"Papierkorb leeren ({len(ids)} Dateien)", ids)
 
+        @app.post("/api/convert/dismiss")
+        def convert_dismiss():
+            return {"dismissed": ctx.converter.dismiss_failed()}
+
         @app.post("/api/library/remove-missing")
         def remove_missing():
             """Einträge ohne Datei entfernen – erst nach dem Abgleich und ausdrücklich vom Nutzer ausgelöst."""

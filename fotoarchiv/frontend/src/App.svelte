@@ -341,6 +341,16 @@
     };
   }
 
+  async function dismissConvertErrors() {
+    info.converting.failed = 0; // sofort weg, nicht erst beim nächsten Abfragen
+    try {
+      await api.dismissConvertErrors();
+    } catch (e) {
+      notifyError(e);
+    }
+    kick();
+  }
+
   function deleteSelected() {
     const ids = [...selected];
     runBatch({ ids, action: 'delete' }, () => runBatch({ ids, action: 'restore' }));
@@ -483,7 +493,16 @@
   {#if info?.converting?.pending}
     <div class="banner"><span class="busy"></span> {`Umwandeln läuft: noch ${formatNumber(info.converting.pending)}${info.converting.current ? ` · gerade ${info.converting.current}` : ''}`}</div>
   {:else if info?.converting?.failed && isAdmin}
-    <div class="banner error"><Icon name="alert" size={18} /> {formatNumber(info.converting.failed)} {info.converting.failed === 1 ? 'Datei ließ' : 'Dateien ließen'} sich nicht umwandeln – den Grund zeigt das Protokoll des Add-ons. Die Originale sind unverändert.</div>
+    <div class="banner error">
+      <Icon name="alert" size={18} />
+      <span class="banner-text">
+        {formatNumber(info.converting.failed)} {info.converting.failed === 1 ? 'Datei ließ' : 'Dateien ließen'} sich nicht umwandeln. Die Originale sind unverändert.
+        {#each info.converting.errors ?? [] as error (error.id)}
+          <br /><span class="reason">{error.name}: {error.reason}</span>
+        {/each}
+      </span>
+      <button class="icon small" onclick={dismissConvertErrors} title="Hinweis ausblenden"><Icon name="close" size={16} /></button>
+    </div>
   {/if}
   {#if missingTools.length}
     <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
@@ -763,6 +782,15 @@
   }
   .banner.error {
     background: var(--danger-bg);
+  }
+  .banner-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .banner .reason {
+    color: var(--muted);
+    font-size: 0.85rem;
   }
   .resultbar {
     display: flex;

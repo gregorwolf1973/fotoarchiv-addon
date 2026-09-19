@@ -13,7 +13,7 @@ const PIN = 'M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.
 export { L };
 
 export function createMap(element, options = {}) {
-  const map = L.map(element, { worldCopyJump: true, minZoom: 2, zoomControl: true, ...options });
+  const map = L.map(element, { worldCopyJump: true, minZoom: 2, maxZoom: 19, zoomControl: true, ...options });
   L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION, referrerPolicy: REFERRER_POLICY }).addTo(map);
   return map;
 }

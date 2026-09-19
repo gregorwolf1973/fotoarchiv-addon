@@ -83,3 +83,12 @@ def test_tags_persons_and_camera():
     assert meta.persons == ["Müller, Hans", "Anna"]
     assert meta.camera == "Apple iPhone 13"
     assert extract({"IFD0:Make": "Canon", "IFD0:Model": "Canon EOS 5D"}, Path("a.jpg"), "UTC", MTIME).camera == "Canon EOS 5D"
+
+
+def test_write_video_with_trailer_after_last_atom(exiftool, make_video, tmp_path):
+    """Samsung hängt an Videos einen SEF-Anhang an; exiftool verweigert dann das Schreiben ohne -m."""
+    video = make_video(tmp_path / "samsung.mp4")
+    with open(video, "ab") as f:
+        f.write(b"SEFH" + bytes(60) + b"SEFT")
+    exiftool.write(video, "-XMP-dc:Subject=Urlaub")
+    assert exiftool.read(video).get("XMP-dc:Subject") == "Urlaub"

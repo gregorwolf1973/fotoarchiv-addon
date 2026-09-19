@@ -15,7 +15,8 @@
   // onopen(ids, id): Einzelansicht mit dieser Liste; onbatch(body, undo): Mehrfachaktion starten
   let { filters, revision, canEdit = true, onopen, onbatch } = $props();
 
-  const MAX_ZOOM = 17;
+  const MAX_ZOOM = 19; // wie die OSM-Kacheln; bis hierhin wird gebündelt, sonst stapeln sich die Bilder
+  const MARKER = 64; // px, größtes Vorschaubild auf der Karte
   const PANEL_KEY = 'fotoarchiv.map.panel';
 
   let container = $state();
@@ -67,7 +68,10 @@
 
   const clusters = $derived.by(() => {
     const index = new Supercluster({
-      radius: 64,
+      // extent 256 = Leaflets Kachelgröße, damit radius in Bildschirmpixeln zählt. Etwas mehr als ein
+      // Vorschaubild samt Rahmen, sonst überlappen sich benachbarte Bilder.
+      extent: 256,
+      radius: MARKER + 8,
       maxZoom: MAX_ZOOM,
       // Jede Gruppe merkt sich ihr neuestes Foto als Titelbild
       map: (p) => ({ best: p.index, ts: p.ts }),
@@ -127,12 +131,12 @@
     const b = map.getBounds();
     const bbox = b.getEast() - b.getWest() >= 360 ? [-180, -85, 180, 85] : [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     layer.clearLayers();
-    for (const feature of clusters.getClusters(bbox, Math.round(map.getZoom()))) {
+    for (const feature of clusters.getClusters(bbox, Math.min(Math.round(map.getZoom()), MAX_ZOOM))) {
       const [lon, lat] = feature.geometry.coordinates;
       const props = feature.properties;
       const count = props.cluster ? props.point_count : 1;
       const item = points[props.cluster ? props.best : props.index];
-      const size = count > 1 ? 64 : 52;
+      const size = count > 1 ? MARKER : 52;
       const icon = L.divIcon({
         className: 'photo-marker',
         html: `<img src="${thumbUrl(item)}" alt="" loading="lazy">${count > 1 ? `<span>${count > 9999 ? '9999+' : count}</span>` : ''}`,

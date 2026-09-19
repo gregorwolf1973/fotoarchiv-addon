@@ -136,7 +136,19 @@ class ConvertService:
         row = self.db.one(
             """SELECT COALESCE(SUM(convert = 1), 0) AS pending, COALESCE(SUM(convert = -1), 0) AS failed
                FROM assets WHERE deleted_at IS NULL""")
-        return {"pending": row["pending"], "failed": row["failed"], "current": self.current}
+        # Grund gleich mitliefern: das Add-on-Protokoll ist nach einem Neustart weg
+        errors = [{"id": r["id"], "name": Path(r["path"]).name, "reason": r["convert_error"] or ""}
+                  for r in self.db.query(
+                      """SELECT id, path, convert_error FROM assets WHERE convert = -1 AND deleted_at IS NULL
+                         ORDER BY id DESC LIMIT 3""")] if row["failed"] else []
+        return {"pending": row["pending"], "failed": row["failed"], "errors": errors, "current": self.current}
+
+    def dismiss_failed(self) -> int:
+        """Fehlschläge zur Kenntnis genommen: Hinweis ausblenden. Der Grund bleibt in convert_error,
+        und die Datei lässt sich später erneut zum Umwandeln vormerken."""
+        count = self.db.execute("UPDATE assets SET convert = 0 WHERE convert = -1").rowcount
+        self.db.bump()
+        return count
 
     # ── Hintergrund ────────────────────────────────────────────────
     def start(self):

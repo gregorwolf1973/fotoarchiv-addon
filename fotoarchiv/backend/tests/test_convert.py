@@ -88,7 +88,27 @@ def test_convert_hevc_video_replaces_file_and_trashes_original(settings, importe
     trashed = importer.db.one("SELECT * FROM assets WHERE id != ? AND deleted_at IS NOT NULL", (asset_id,))
     assert trashed["path"].startswith(f"{TRASH_DIR}/") and trashed["orig_path"].endswith("clip.mov")
     assert (settings.library / trashed["path"]).is_file()
-    assert service.status() == {"pending": 0, "failed": 0, "current": None}
+    assert service.status() == {"pending": 0, "failed": 0, "errors": [], "current": None}
 
     service.request(asset_id)  # schon abspielbar: nichts mehr zu tun
     assert service.work_once() and importer.db.one("SELECT path FROM assets WHERE id = ?", (asset_id,))["path"] == row["path"]
+
+
+def test_failed_conversion_shows_reason_and_can_be_dismissed(settings, importer, editor, make_video):
+    from fotoarchiv.convert import ConvertService
+
+    asset_id = importer.import_file(make_video(settings.import_dir / "kaputt.avi")).asset_id
+    path = importer.db.one("SELECT path FROM assets WHERE id = ?", (asset_id,))["path"]
+    service = ConvertService(settings, importer.db, importer, editor)
+    service.request(asset_id)
+    (settings.library / path).unlink()  # Umwandeln scheitert
+    assert service.work_once()
+
+    status = service.status()
+    assert status["failed"] == 1
+    assert status["errors"] == [{"id": asset_id, "name": "kaputt.avi", "reason": "Datei fehlt auf dem Datenträger"}]
+
+    assert service.dismiss_failed() == 1
+    assert service.status()["failed"] == 0 and service.status()["errors"] == []
+    row = importer.db.one("SELECT convert, convert_error FROM assets WHERE id = ?", (asset_id,))
+    assert row["convert"] == 0 and row["convert_error"] == "Datei fehlt auf dem Datenträger"  # Grund bleibt
