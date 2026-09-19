@@ -291,3 +291,18 @@ def test_guessing_the_current_password_locks_like_login(admin, public):
         browser.post("/api/auth/password", json={"current": "geraten-geraten", "new": "ganz-neues-passwort"})
     locked = browser.post("/api/auth/password", json={"current": PASSWORD, "new": "ganz-neues-passwort"})
     assert locked.status_code == 429
+
+
+def test_uploader_may_upload_in_chunks(admin, public, make_jpeg, tmp_path):
+    make_user(admin, "tante", role="uploader")
+    make_user(admin, "leserin")
+    body = make_jpeg(tmp_path / "IMG_20220202_101010.jpg").read_bytes()
+    params = {"upload_id": "d" * 20, "name": "IMG_20220202_101010.jpg", "total": len(body)}
+    reader = visitor(public, ip="198.51.100.40")
+    login(reader, "leserin")
+    assert reader.put("/api/upload/chunk", params=params | {"offset": 0}, content=body[:10]).status_code == 403
+    uploader = visitor(public, ip="198.51.100.41")
+    login(uploader, "tante")
+    assert uploader.put("/api/upload/chunk", params=params | {"offset": 0}, content=body[:10]).status_code == 202
+    done = uploader.put("/api/upload/chunk", params=params | {"offset": 10}, content=body[10:])
+    assert done.json()["status"] == "imported"

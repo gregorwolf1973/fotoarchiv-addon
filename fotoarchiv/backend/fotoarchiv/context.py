@@ -3,6 +3,7 @@
 import logging
 import shutil
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -69,11 +70,25 @@ class Context:
         self.exiftool.close()
         self.db.close()
 
+    def _drop_stale_uploads(self, max_age: float = 24 * 3600):
+        """Teil-Uploads, die niemand fortgesetzt hat, nach einem Tag löschen."""
+        folder = self.settings.upload_tmp
+        if not folder.is_dir():
+            return
+        now = time.time()
+        for part in folder.glob("part-*"):
+            try:
+                if now - part.stat().st_mtime > max_age:
+                    part.unlink()
+            except OSError:
+                pass
+
     def _maintenance(self):
         while not self._stop.is_set():
             try:
                 self.editor.purge_expired(self.settings.trash_days)
                 self.auth.cleanup()
+                self._drop_stale_uploads()
             except Exception:
                 log.exception("Wartung fehlgeschlagen")
             self._stop.wait(MAINTENANCE_INTERVAL)

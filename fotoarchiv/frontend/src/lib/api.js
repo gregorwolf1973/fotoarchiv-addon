@@ -118,28 +118,81 @@ export const previewUrl = (item) => `api/assets/${item[0]}/preview?r=${item[5]}&
 export const originalUrl = (item, download = false) =>
   `api/assets/${item[0]}/original?r=${item[5]}&i=${cache.instance}${download ? '&download=true' : ''}`;
 
+// Große Dateien in Stücken: Cloudflare lässt im kostenlosen Tarif nur 100 MB je Anfrage durch,
+// und am Handy reißt die Verbindung öfter ab – dann geht es mit dem fehlenden Stück weiter
+const CHUNK = 32 * 1024 * 1024;
+const RETRIES = 6;
+const RETRY_STATUS = new Set([0, 408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
+
 /** Upload mit Fortschritt; löst immer auf, Fehler stehen im Ergebnis. */
 export function upload(file, onprogress) {
+  return file.size > CHUNK ? uploadChunked(file, onprogress) : uploadWhole(file, onprogress);
+}
+
+function put(url, body, onprogress) {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    const query = new URLSearchParams({ name: file.name, mtime: String(file.lastModified || '') });
-    xhr.open('PUT', `api/upload?${query}`);
+    xhr.open('PUT', url);
     if (auth.csrf) xhr.setRequestHeader('X-CSRF-Token', auth.csrf);
-    xhr.upload.onprogress = (e) => e.lengthComputable && onprogress(e.loaded / e.total);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onprogress(e.loaded);
     xhr.onload = () => {
-      let body;
+      let json = null;
       try {
-        body = JSON.parse(xhr.responseText);
+        json = JSON.parse(xhr.responseText);
       } catch {
-        body = { status: 'error', message: xhr.status === 413 ? 'Datei zu groß für den Proxy' : xhr.statusText };
+        /* keine JSON-Antwort, z. B. Fehlerseite des Proxys */
       }
       if (xhr.status === 401) auth.onUnauthorized();
-      if (body.detail) body = { status: 'error', message: body.detail };
-      resolve(body);
+      resolve({ status: xhr.status, json, text: xhr.statusText });
     };
-    xhr.onerror = () => resolve({ status: 'error', message: 'Netzwerkfehler' });
-    xhr.send(file);
+    xhr.onerror = () => resolve({ status: 0, json: null, text: 'Netzwerkfehler' });
+    xhr.send(body);
   });
+}
+
+const failed = (r) => ({
+  status: 'error',
+  message: r.json?.detail || (r.status === 413 ? 'Datei zu groß für den Proxy' : r.text || 'Netzwerkfehler'),
+});
+
+async function uploadWhole(file, onprogress) {
+  const query = new URLSearchParams({ name: file.name, mtime: String(file.lastModified || '') });
+  const r = await put(`api/upload?${query}`, file, (loaded) => onprogress(loaded / file.size));
+  return r.json && !r.json.detail ? r.json : failed(r);
+}
+
+function uploadId() {
+  // crypto.randomUUID gibt es nur über HTTPS; Home Assistant läuft im Heimnetz oft über http
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function uploadChunked(file, onprogress) {
+  const id = uploadId();
+  let offset = 0;
+  let failures = 0;
+  while (offset < file.size) {
+    const end = Math.min(offset + CHUNK, file.size);
+    const query = new URLSearchParams({
+      upload_id: id, name: file.name, offset: String(offset), total: String(file.size), mtime: String(file.lastModified || ''),
+    });
+    const start = offset;
+    const r = await put(`api/upload/chunk?${query}`, file.slice(start, end), (loaded) => onprogress((start + loaded) / file.size));
+    if (r.status === 202) {
+      offset = r.json.received;
+      failures = 0;
+    } else if (r.status === 409 && typeof r.json?.received === 'number') {
+      offset = r.json.received; // Server nennt den Stand: dort weitermachen
+      if (++failures > RETRIES) return failed(r);
+    } else if (RETRY_STATUS.has(r.status) && !r.json?.status) {
+      // Funkloch oder Proxy: ob das Stück ankam, klärt der nächste Versuch (409 mit dem Stand)
+      if (++failures > RETRIES) return failed(r);
+      await new Promise((resolve) => setTimeout(resolve, 1500 * failures));
+    } else {
+      return r.json && !r.json.detail ? r.json : failed(r); // letztes Stück: Ergebnis des Imports
+    }
+  }
+  return { status: 'error', message: 'Upload unvollständig' };
 }
 
 export const SUPPORTED = /\.(jpe?g|png|gif|webp|tiff?|hei[cf]|avif|mp4|m4v|mov|3gp|mkv|webm|avi|m2?ts)$/i;

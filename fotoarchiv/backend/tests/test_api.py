@@ -281,3 +281,31 @@ def test_damaged_filter_lists_files_without_preview(client, monkeypatch, make_jp
     bad = upload(client, make_jpeg, tmp_path, "kaputt.jpg")
     ids = [item[0] for item in client.get("/api/largest", params={"kind": "damaged"}).json()["items"]]
     assert ids == [bad] and good != bad
+
+
+def test_chunked_upload_resumes_and_imports(client, settings, make_jpeg, tmp_path):
+    body = make_jpeg(tmp_path / "IMG_20230704_101010.jpg", width=640, height=480).read_bytes()
+    total, cut = len(body), len(body) // 3
+    params = {"upload_id": "a" * 20, "name": "IMG_20230704_101010.jpg", "total": total}
+
+    first = client.put("/api/upload/chunk", params=params | {"offset": 0}, content=body[:cut])
+    assert first.status_code == 202 and first.json()["received"] == cut
+    # Verbindung abgerissen, Browser weiß nicht, was ankam: der Server nennt den Stand
+    lost = client.put("/api/upload/chunk", params=params | {"offset": cut * 2}, content=body[cut * 2:])
+    assert lost.status_code == 409 and lost.json()["received"] == cut
+    second = client.put("/api/upload/chunk", params=params | {"offset": cut}, content=body[cut:cut * 2])
+    assert second.status_code == 202
+    last = client.put("/api/upload/chunk", params=params | {"offset": cut * 2}, content=body[cut * 2:])
+    assert last.status_code == 200 and last.json()["status"] == "imported"
+    assert not list(settings.upload_tmp.glob("part-*"))  # Teildatei aufgeräumt
+
+    again = client.put("/api/upload/chunk", params=params | {"upload_id": "b" * 20, "offset": 0}, content=body)
+    assert again.json()["status"] == "duplicate"
+
+
+def test_chunked_upload_rejects_bad_input(client):
+    base = {"upload_id": "c" * 20, "name": "clip.mp4", "offset": 0, "total": 10}
+    assert client.put("/api/upload/chunk", params=base | {"upload_id": "../x"}, content=b"x").status_code == 400
+    assert client.put("/api/upload/chunk", params=base | {"name": "virus.exe"}, content=b"x").status_code == 415
+    assert client.put("/api/upload/chunk", params=base, content=b"x" * 11).status_code == 413
+    assert client.put("/api/upload/chunk", params=base | {"offset": 10}, content=b"x").status_code == 400

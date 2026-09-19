@@ -2,6 +2,8 @@
 Internetzugang (angemeldet, Rechte je Rolle, ohne Verwaltungsfunktionen)."""
 
 import calendar
+import mimetypes
+import re
 import shutil
 import uuid
 from dataclasses import asdict, dataclass
@@ -19,6 +21,23 @@ from . import duplicates_api, faces_api, labels, media
 from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
+
+UPLOAD_ID = re.compile(r"[A-Za-z0-9_-]{16,64}")
+UPLOAD_MAX = 50 * 1024**3  # 50 GB je Datei
+CHUNK_MAX = 96 * 1024**2  # knapp unter Cloudflares 100 MB je Anfrage
+
+
+def _truncate(path: Path, size: int):
+    """Teildatei auf den Stand vor dem Stück zurücksetzen (bzw. löschen, wenn es das erste war)."""
+    try:
+        if size:
+            with open(path, "r+b") as f:
+                f.truncate(size)
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
 
 LONG_CACHE = {"Cache-Control": "private, max-age=31536000, immutable"}
 
@@ -127,6 +146,8 @@ class AssetFilter:
 
 
 def install_common(app: FastAPI):
+    # Web-App-Manifest; ohne Eintrag liefert StaticFiles es als application/octet-stream aus
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
     # Nur Text/JSON komprimieren; Bilder und Videos sind es schon, das kostet auf dem Pi nur Zeit
     binary_types = ("image/webp", *media.IMAGE_TYPES.values(), *media.VIDEO_TYPES.values())
     app.add_middleware(GZipMiddleware, minimum_size=1024, exclude_content_types=tuple(set(binary_types)))
@@ -425,6 +446,9 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         if expected.isdigit() and received != int(expected):
             temp.unlink(missing_ok=True)
             raise HTTPException(400, f"Upload unvollständig ({received} von {expected} Bytes) – bitte erneut hochladen")
+        return await finish_upload(temp, name, mtime)
+
+    async def finish_upload(temp: Path, name: str, mtime: float | None) -> JSONResponse:
         # Browser liefern lastModified in Millisekunden
         seconds = mtime / 1000 if mtime and mtime > 1e11 else mtime
         result = await run_in_threadpool(importer.import_upload, temp, name, seconds)
@@ -432,6 +456,44 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         ctx.duplicates.wake()
         status = 500 if result.status == "error" else 422 if result.status == "damaged" else 200
         return JSONResponse(result.__dict__, status_code=status)
+
+    @app.put("/api/upload/chunk")
+    async def upload_chunk(request: Request, upload_id: str, name: str, offset: int, total: int,
+                           mtime: float | None = None):
+        """Große Dateien in Stücken: Cloudflare lässt im kostenlosen Tarif nur 100 MB je Anfrage durch.
+        Die Stücke werden in einer Teildatei aneinandergehängt; mit dem letzten wird sie importiert.
+        Passt offset nicht zum bisher Empfangenen, meldet 409 den Stand, und der Browser macht dort weiter."""
+        if not UPLOAD_ID.fullmatch(upload_id):
+            raise HTTPException(400, "Ungültige Upload-Kennung")
+        if media.kind_of(Path(name)) is None:
+            raise HTTPException(415, "Dateityp wird nicht unterstützt")
+        if not 0 < total <= UPLOAD_MAX or not 0 <= offset < total:
+            raise HTTPException(400, "Ungültige Größenangabe")
+        session = getattr(request.state, "session", None)
+        owner = f"u{session['user_id']}" if session else "ha"  # fremde Uploads lassen sich nicht fortsetzen
+        settings.upload_tmp.mkdir(parents=True, exist_ok=True)
+        temp = settings.upload_tmp / f"part-{owner}-{upload_id}{Path(safe_name(name)).suffix}"
+        have = temp.stat().st_size if temp.exists() else 0
+        if offset != 0 and offset != have:
+            return JSONResponse({"detail": "Upload an anderer Stelle fortsetzen", "received": have}, status_code=409)
+        received = 0
+        try:
+            with open(temp, "wb" if offset == 0 else "ab") as f:
+                async for chunk in request.stream():
+                    received += len(chunk)
+                    if offset + received > total or received > CHUNK_MAX:
+                        raise HTTPException(413, "Stück zu groß")
+                    f.write(chunk)
+        except Exception:
+            _truncate(temp, offset)
+            raise
+        expected = request.headers.get("content-length", "")
+        if expected.isdigit() and received != int(expected):
+            _truncate(temp, offset)  # halbes Stück verwerfen, der Browser schickt es noch einmal
+            return JSONResponse({"detail": "Stück unvollständig angekommen", "received": offset}, status_code=409)
+        if offset + received < total:
+            return JSONResponse({"status": "partial", "received": offset + received}, status_code=202)
+        return await finish_upload(temp, name, mtime)
 
     faces_api.register(app, db, faces, tasks)
     duplicates_api.register(app, ctx)

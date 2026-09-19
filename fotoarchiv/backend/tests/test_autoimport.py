@@ -28,6 +28,9 @@ def test_imports_ready_files_and_deletes_duplicates(settings, importer, make_jpe
 
     assert auto.check()
     wait(importer)
+    deadline = time.time() + 5
+    while not done and time.time() < deadline:  # on_done läuft direkt nach dem Ende des Imports
+        time.sleep(0.02)
     assert importer.job.auto and importer.job.counts["imported"] == 1 and done == [1]
     assert not photo.exists()
     assert auto.check() is False  # nichts Neues

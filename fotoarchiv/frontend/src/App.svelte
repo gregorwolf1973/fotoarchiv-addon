@@ -5,6 +5,7 @@
   import { ZOOM_LEVELS } from './lib/layout.js';
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
+  import { isIos, openedFromShare, registerServiceWorker, standalone, takeShared } from './lib/pwa.js';
   import AccessPanel from './components/AccessPanel.svelte';
   import PasswordDialog from './components/PasswordDialog.svelte';
   import Confirm from './components/Confirm.svelte';
@@ -46,6 +47,9 @@
   let session = $state(null); // { authenticated, public, role, user, csrf }
   let showAccess = $state(false);
   let showPassword = $state(false);
+  let installPrompt = $state(null); // Android/Chrome: "App installieren" anbieten
+  let iosHint = $state(false);
+  const IOS_HINT_KEY = 'fotoarchiv.iosHint';
   let uploader = $state();
   let fileInput = $state();
 
@@ -147,6 +151,39 @@
     revision = null; // alles neu laden
     labelsRevision = null;
     kick();
+    if (next.public) afterPublicLogin();
+  }
+
+  async function afterPublicLogin() {
+    try {
+      iosHint = isIos() && !standalone() && localStorage.getItem(IOS_HINT_KEY) !== '1';
+    } catch {
+      iosHint = false;
+    }
+    if (!openedFromShare()) return;
+    // Aus dem Teilen-Menü der Galerie (Android): die Dateien liegen beim Service Worker bereit
+    const files = await takeShared().catch(() => []);
+    if (!files.length) return;
+    if (!canUpload) {
+      notify('Dein Konto darf keine Fotos hochladen.', { kind: 'error' });
+      return;
+    }
+    uploader.add(files);
+  }
+
+  function hideIosHint() {
+    iosHint = false;
+    try {
+      localStorage.setItem(IOS_HINT_KEY, '1');
+    } catch {
+      /* dann eben beim nächsten Mal wieder */
+    }
+  }
+
+  function installApp() {
+    const prompt = installPrompt;
+    installPrompt = null;
+    prompt?.prompt();
   }
 
   async function logout() {
@@ -172,11 +209,26 @@
   onMount(() => {
     // Abgelaufene Sitzung: sofort zur Anmeldung, nicht weiter Anfragen schicken (die zählen sonst als Scan)
     auth.onUnauthorized = () => session?.public && session.authenticated && signedOut();
+    const beforeInstall = (e) => {
+      e.preventDefault(); // eigener Knopf statt der Leiste des Browsers
+      installPrompt = e;
+    };
+    const installed = () => (installPrompt = null);
+    window.addEventListener('beforeinstallprompt', beforeInstall);
+    window.addEventListener('appinstalled', installed);
     api.session().then(
-      (next) => (next.authenticated ? signedIn(next) : (session = next)),
+      (next) => {
+        if (next.public) registerServiceWorker(); // auch vor der Anmeldung: installierbar ab der ersten Seite
+        if (next.authenticated) signedIn(next);
+        else session = next;
+      },
       (e) => ((failure = e.message), (loaded = true), (session = { authenticated: true, public: false, role: 'admin' })),
     );
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeinstallprompt', beforeInstall);
+      window.removeEventListener('appinstalled', installed);
+    };
   });
 
   // Zoomstufe pro Gerät merken; Handys starten kleiner
@@ -479,6 +531,11 @@
         {#if isAdmin && !session.public}
           <button class="icon" onclick={() => (showAccess = true)} title="Zugang übers Internet"><Icon name="shield" /></button>
         {/if}
+        {#if session.public && installPrompt}
+          <button onclick={installApp} title="Als App auf diesem Gerät installieren">
+            <Icon name="download" size={20} /><span class="label">App installieren</span>
+          </button>
+        {/if}
         {#if session.public}
           <button class="icon" onclick={() => (showPassword = true)} title="Passwort ändern"><Icon name="lock" /></button>
           <button class="icon" onclick={logout} title="Abmelden ({session.user?.display_name || session.user?.username})"><Icon name="logout" /></button>
@@ -506,6 +563,13 @@
         {/each}
       </span>
       <button class="icon small" onclick={dismissConvertErrors} title="Hinweis ausblenden"><Icon name="close" size={16} /></button>
+    </div>
+  {/if}
+  {#if iosHint && session?.authenticated}
+    <div class="banner">
+      <Icon name="info" size={18} />
+      <span class="banner-text">Als App aufs iPhone: unten auf <strong>Teilen</strong> tippen, dann <strong>„Zum Home-Bildschirm“</strong>.</span>
+      <button class="icon small" onclick={hideIosHint} title="Hinweis ausblenden"><Icon name="close" size={16} /></button>
     </div>
   {/if}
   {#if missingTools.length}

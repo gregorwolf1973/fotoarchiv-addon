@@ -36,12 +36,12 @@ VIEW = {
     "face_crop", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
 }
 EDIT = {
-    "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload",
+    "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload", "upload_chunk",
     "group_name", "group_hide", "person_rename", "person_merge", "person_delete", "face_assign", "face_remove",
     "duplicate_list", "duplicate_resolve", "duplicate_ignore",
 }
 # Was eine Rolle über das Ansehen hinaus darf
-ALLOWED = {"viewer": set(), "uploader": {"upload"}, "editor": EDIT}
+ALLOWED = {"viewer": set(), "uploader": {"upload", "upload_chunk"}, "editor": EDIT}
 # Bilder zählen nicht als Scan: ein abgelaufenes Cookie lädt sonst dutzende Vorschaubilder und sperrt sich selbst
 IMAGES = {"asset_thumb", "asset_preview", "asset_original", "face_crop"}
 
@@ -164,7 +164,8 @@ def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
                     return secure(request, reply(403, "Sicherheitsprüfung fehlgeschlagen – bitte die Seite neu laden"))
 
         response = await call_next(request)
-        if session and name in EDIT and response.status_code < 400:
+        # 202 = weiteres Stück eines Uploads; protokolliert wird die fertige Datei
+        if session and name in EDIT and response.status_code < 400 and response.status_code != 202:
             access.log("change", ip=ip, user=session["username"], path=request.url.path, detail=request.method)
         return secure(request, response)
 

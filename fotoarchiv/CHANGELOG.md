@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.29
+
+- **Als App installierbar** (Internetzugang): unter Android mit Knopf *App installieren*, am iPhone über „Zum Home-Bildschirm“ (die Seite zeigt einmal einen Hinweis). Eigenes Symbol, Vollbild ohne Browserleiste
+- **Teilen-Menü unter Android:** In der Galerie Fotos auswählen, *Teilen*, *Fotoarchiv*, und sie werden hochgeladen
+- **Große Dateien in Stücken hochladen** (32 MB): Videos über 100 MB passen jetzt durch Cloudflare, und nach einem Verbindungsabbruch geht der Upload an der Abbruchstelle weiter
+- Abgebrochene Teil-Uploads werden nach einem Tag aufgeräumt
+
 ## 0.28
 
 - Einzelansicht: Die Pfeile zum Blättern bleiben an derselben Stelle – bei Videos saßen sie bisher höher als bei Fotos, und am Handy wanderten sie mit der Höhe des Infobereichs

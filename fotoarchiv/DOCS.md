@@ -8,6 +8,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 
 - **Import aus einem Samba-Ordner.** Fotos und Videos in den Import-Ordner legen und in der Oberfläche **Import starten** klicken. Die Dateien werden nach Aufnahmedatum in die Bibliothek verschoben.
 - **Handy automatisch sichern:** Eine Sync-App lädt im WLAN in den Import-Ordner hoch, das Add-on liest neue Dateien von selbst ein. Nur in eine Richtung. Siehe [Handy automatisch sichern](#handy-automatisch-sichern).
+- **Als App aufs Handy:** installierbar über den Internetzugang, unter Android mit Teilen-Menü. Siehe [Als App aufs Handy](#als-app-aufs-handy-familie).
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
 - **Duplikaterkennung per MD5.** Bereits vorhandene Dateien werden nicht noch einmal aufgenommen. Beim Ordner-Import landen sie in `_duplikate` im Import-Ordner. Die Prüfsumme vom Import wird dauerhaft gespeichert, damit ein Bild auch nach späterer Bearbeitung noch als Duplikat erkannt wird.
 - **Doppelte und ähnliche Fotos finden:** verkleinerte Kopien, anders gespeicherte Fassungen und Serien. Die beste Fassung wird vorgeschlagen, der Rest kommt in den Papierkorb. Siehe [Doppelte Fotos](#doppelte-fotos).
@@ -70,6 +71,16 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Infobereich ein/aus | i | ⓘ |
 | Gesichtsrahmen ein/aus | f | Gesichts-Symbol |
 | Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |
+
+## Als App aufs Handy (Familie)
+
+Über den Internetzugang lässt sich das Fotoarchiv wie eine App installieren, ganz ohne App-Store. Jede Person bekommt ein eigenes Konto, zum Hochladen mit der Rolle **Ansehen + Hochladen**.
+
+**Android (Chrome):** Die Adresse öffnen, zum Beispiel `https://foto.example.org`, und anmelden. Oben erscheint **App installieren**, antippen und fertig. Danach steht das Fotoarchiv im **Teilen-Menü** der Galerie: Fotos auswählen, *Teilen*, *Fotoarchiv*. Die Fotos werden sofort hochgeladen.
+
+**iPhone (Safari):** Die Adresse öffnen und anmelden. Unten auf *Teilen* tippen und dann **„Zum Home-Bildschirm“**. Einen Hinweis dazu zeigt die Seite einmal selbst an. Hochladen geht über den Knopf *Hochladen*, der die Mediathek öffnet, auch mit vielen Fotos auf einmal. Ins Teilen-Menü von Fotos lässt Apple Web-Apps nicht.
+
+Große Videos werden in Stücken von 32 MB übertragen. So passen sie durch Cloudflare (100 MB je Anfrage im kostenlosen Tarif), und nach einem Funkloch geht es an der Abbruchstelle weiter, statt von vorn. Automatisch im Hintergrund hochladen kann eine Web-App nicht, das erlauben die Handys nur echten Apps.
 
 ## Handy automatisch sichern
 
