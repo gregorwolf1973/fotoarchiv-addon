@@ -205,4 +205,4 @@ async function uploadChunked(file, onprogress, signal) {
   return { status: 'error', message: 'Upload unvollständig' };
 }
 
-export const SUPPORTED = /\.(jpe?g|png|gif|webp|tiff?|hei[cf]|avif|mp4|m4v|mov|3gp|mkv|webm|avi|m2?ts)$/i;
+export const SUPPORTED = /\.(jpe?g|png|gif|webp|tiff?|hei[cf]|avif|mp4|m4v|mov|3gp|mkv|webm|avi|m2?ts|mpe?g|wmv)$/i;

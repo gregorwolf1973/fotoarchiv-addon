@@ -112,3 +112,42 @@ def test_failed_conversion_shows_reason_and_can_be_dismissed(settings, importer,
     assert service.status()["failed"] == 0 and service.status()["errors"] == []
     row = importer.db.one("SELECT convert, convert_error FROM assets WHERE id = ?", (asset_id,))
     assert row["convert"] == 0 and row["convert_error"] == "Datei fehlt auf dem Datenträger"  # Grund bleibt
+
+
+
+def test_old_formats_mpg_and_wmv_become_mp4():
+    mpg = decide(".mpg", "video", streams("mpeg2video", audio="mp2"))
+    assert (mpg.action, mpg.suffix, mpg.copy_audio) == ("transcode", ".mp4", False)
+    wmv = decide(".WMV", "video", streams("wmv3", audio="wmav2"))
+    assert (wmv.action, wmv.copy_audio) == ("transcode", False)
+
+
+@pytest.mark.parametrize("suffix, codecs", [
+    (".mpg", ["-c:v", "mpeg1video", "-c:a", "mp2"]),
+    (".wmv", ["-c:v", "wmv2", "-c:a", "wmav2"]),
+])
+def test_import_and_convert_mpg_wmv(settings, importer, editor, suffix, codecs):
+    """Echte Dateien: einlesen, Vorschaubild, umwandeln in ein abspielbares MP4."""
+    from conftest import FFMPEG
+    from fotoarchiv.convert import ConvertService
+
+    if not FFMPEG:
+        pytest.skip("ffmpeg nicht vorhanden")
+    source = settings.import_dir / f"VID_20090807_101010{suffix}"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    made = subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
+                           "-f", "lavfi", "-i", "testsrc=size=320x240:rate=25",
+                           "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100",
+                           "-t", "2", *codecs, str(source)], capture_output=True)
+    if made.returncode:
+        pytest.skip(f"ffmpeg kann {suffix} nicht erzeugen")
+    result = importer.import_file(source)
+    assert result.status == "imported", result.message
+    assert importer.ensure_thumbnail(result.asset_id) is not None
+
+    service = ConvertService(settings, importer.db, importer, editor)
+    service.request(result.asset_id)
+    assert service.work_once()
+    row = importer.db.one("SELECT path, mime, convert, convert_error FROM assets WHERE id = ?", (result.asset_id,))
+    assert row["convert"] == 0, row["convert_error"]
+    assert row["path"].endswith(".mp4") and row["mime"] == "video/mp4"

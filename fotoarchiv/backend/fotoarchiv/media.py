@@ -33,6 +33,10 @@ VIDEO_TYPES = {
     ".avi": "video/x-msvideo",
     ".mts": "video/mp2t",
     ".m2ts": "video/mp2t",
+    # Ältere Kameras und Windows: spielt kein Browser ab, "Umwandeln" macht daraus H.264-MP4
+    ".mpg": "video/mpeg",
+    ".mpeg": "video/mpeg",
+    ".wmv": "video/x-ms-wmv",
 }
 
 THUMB_HEIGHT = 400     # Galerie, reicht für Zeilenhöhe 200 px bei doppelter Pixeldichte

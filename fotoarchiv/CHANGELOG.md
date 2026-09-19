@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.36
+
+- Neue Videoformate: **MPG/MPEG** (ältere Kameras, DVD-Rekorder) und **WMV** (Windows). Browser spielen sie nicht ab; mit „Beim Import umwandeln“ werden sie gleich zu H.264-MP4, sonst über „Umwandeln“ in der Auswahl
+
 ## 0.35
 
 - Anmeldung: Die Sperre einer **Adresse** greift erst nach 30 statt 10 Fehlversuchen in 15 Minuten. Zu Hause teilt sich die Familie eine IP; die Tippfehler mehrerer Leute sperrten sonst alle aus. Die Sperre des einzelnen **Kontos** bleibt bei 10 Fehlversuchen

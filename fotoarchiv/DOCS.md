@@ -24,7 +24,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort, mit Zeitregler für ein Jahr oder mehrere. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
-- **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI und MTS.
+- **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI, MTS, MPG und WMV.
 
 Alle ursprünglich geplanten Funktionen sind umgesetzt.
 
