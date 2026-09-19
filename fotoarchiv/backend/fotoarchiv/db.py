@@ -100,7 +100,7 @@ MIGRATIONS = [
         username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
         display_name  TEXT NOT NULL DEFAULT '',
         password_hash TEXT NOT NULL,
-        role          TEXT NOT NULL DEFAULT 'viewer',  -- viewer | editor
+        role          TEXT NOT NULL DEFAULT 'viewer',  -- viewer | uploader | editor
         enabled       INTEGER NOT NULL DEFAULT 1,
         created_at    TEXT NOT NULL,
         last_login    TEXT

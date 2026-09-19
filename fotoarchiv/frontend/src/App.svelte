@@ -54,6 +54,7 @@
   // Rechte: admin = Home Assistant, editor/viewer = Konten des Internetzugangs
   const canEdit = $derived(session?.role === 'admin' || session?.role === 'editor');
   const isAdmin = $derived(session?.role === 'admin');
+  const canUpload = $derived(canEdit || session?.role === 'uploader');
   const filtered = $derived(
     !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
   );
@@ -455,7 +456,7 @@
       <div class="actions">
         {#if info?.importing}<span class="busy" title="Import läuft"></span>{/if}
         <button class="icon search-toggle" class:on={searchOpen} onclick={() => (searchOpen = !searchOpen)} title="Suchen"><Icon name="search" /></button>
-        {#if canEdit}
+        {#if canUpload}
           <button onclick={() => fileInput.click()} title="Dateien hochladen">
             <Icon name="upload" size={20} /><span class="label">Hochladen</span>
           </button>
@@ -643,7 +644,7 @@
   <AccessPanel onclose={() => (showAccess = false)} />
 {/if}
 
-<Uploader bind:this={uploader} enabled={canEdit} onchanged={kick} />
+<Uploader bind:this={uploader} enabled={canUpload} onchanged={kick} />
 {/if}
 <Notices {tasks} />
 

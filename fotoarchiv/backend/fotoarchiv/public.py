@@ -40,6 +40,8 @@ EDIT = {
     "group_name", "group_hide", "person_rename", "person_merge", "person_delete", "face_assign", "face_remove",
     "duplicate_list", "duplicate_resolve", "duplicate_ignore",
 }
+# Was eine Rolle über das Ansehen hinaus darf
+ALLOWED = {"viewer": set(), "uploader": {"upload"}, "editor": EDIT}
 # Bilder zählen nicht als Scan: ein abgelaufenes Cookie lädt sonst dutzende Vorschaubilder und sperrt sich selbst
 IMAGES = {"asset_thumb", "asset_preview", "asset_original", "face_crop"}
 
@@ -144,7 +146,7 @@ def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
                         count_scan(ip)
                         access.log("unauthorized", ip=ip, path=request.url.path, ua=request.headers.get("user-agent"))
                     return secure(request, reply(401, "Anmeldung erforderlich"))
-                if name in EDIT and session["role"] != "editor":
+                if name in EDIT and name not in ALLOWED.get(session["role"], set()):
                     access.log("forbidden", ip=ip, user=session["username"], path=request.url.path)
                     return secure(request, reply(403, "Dafür fehlt die Berechtigung"))
             else:

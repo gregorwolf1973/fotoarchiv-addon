@@ -6,7 +6,7 @@
 
   let { onclose } = $props();
 
-  const ROLES = { viewer: 'Ansehen', editor: 'Bearbeiten' };
+  const ROLES = { viewer: 'Ansehen', uploader: 'Ansehen + Hochladen', editor: 'Bearbeiten' };
   const EVENTS = {
     auth_ok: 'Anmeldung',
     auth_fail: 'Fehlversuch',
@@ -178,6 +178,7 @@
         </label>
         <p class="muted hint">
           <strong>Ansehen:</strong> Fotos, Karte und Personen ansehen und herunterladen.
+          <strong>Ansehen + Hochladen:</strong> zusätzlich Fotos und Videos hochladen, aber nichts ändern oder löschen.
           <strong>Bearbeiten:</strong> zusätzlich hochladen, beschriften, drehen, in den Papierkorb legen und Gesichter benennen.
           Import, Abgleich und endgültiges Löschen gibt es nur hier in Home Assistant.
         </p>

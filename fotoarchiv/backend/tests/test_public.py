@@ -128,6 +128,21 @@ def test_roles_csrf_and_hidden_admin_functions(admin, public, make_jpeg, tmp_pat
     assert editor.get("/api/state").status_code == 401
 
 
+def test_uploader_may_view_and_upload_but_not_edit(admin, public, make_jpeg, tmp_path):
+    make_user(admin, "oma", role="uploader")
+    uploader = visitor(public, ip="198.51.100.4")
+    assert login(uploader, "oma").json()["role"] == "uploader"
+    photo = make_jpeg(tmp_path / "IMG_20210101_120000.jpg")
+    uploaded = uploader.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes())
+    assert uploaded.status_code == 200, uploaded.text
+    asset_id = uploaded.json()["asset_id"]
+    assert uploader.get(f"/api/assets/{asset_id}").status_code == 200
+    assert uploader.patch(f"/api/assets/{asset_id}", json={"tags": ["x"]}).status_code == 403
+    assert uploader.delete(f"/api/assets/{asset_id}").status_code == 403
+    assert uploader.post("/api/batch", json={"ids": [asset_id], "action": "delete"}).status_code == 403
+    assert admin.patch(f"/api/admin/users/{make_user(admin, 'opa')['id']}", json={"role": "uploader"}).status_code == 200
+
+
 def test_escalating_lockout_per_ip(admin, ctx, public):
     clock = Clock()
     ctx.limiter._clock = clock

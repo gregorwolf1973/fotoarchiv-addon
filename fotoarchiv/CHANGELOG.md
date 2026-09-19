@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25
+
+- Internetzugang: neue Rolle **Ansehen + Hochladen** – darf alles ansehen und Fotos und Videos hochladen, aber nichts ändern oder löschen
+
 ## 0.24
 
 - Einzelansicht: Personen, Schlagworte und Ort werden erst mit **Speichern** in die Datei geschrieben, nicht mehr bei jeder einzelnen Eingabe. Solange etwas offen ist, zeigt der Infobereich unten *Speichern* und *Verwerfen*

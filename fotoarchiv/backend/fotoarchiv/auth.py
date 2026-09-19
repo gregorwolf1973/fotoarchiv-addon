@@ -15,7 +15,7 @@ from .ratelimit import AUTHFAIL_IP, AUTHFAIL_USER, LOCK_BASE, LOCK_CAP, Limiter
 
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9._@-]{2,64}$")
 PASSWORD_MIN = 10
-ROLES = ("viewer", "editor")
+ROLES = ("viewer", "uploader", "editor")  # uploader: ansehen und hochladen
 SCRYPT = {"n": 2**14, "r": 8, "p": 1}
 LAST_SEEN_EVERY = 300  # Sekunden: "zuletzt aktiv" nicht bei jedem Vorschaubild schreiben
 

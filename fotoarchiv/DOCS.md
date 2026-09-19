@@ -237,6 +237,7 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 1. In den Add-on-Einstellungen `public_enabled: true` setzen und das Add-on neu starten.
 2. In der Oberfläche auf das **Schild-Symbol** klicken und Konten anlegen:
    - **Ansehen:** Fotos, Karte und Personen ansehen und Originale herunterladen.
+   - **Ansehen + Hochladen:** zusätzlich Fotos und Videos hochladen. Ändern, Beschriften oder Löschen geht nicht, auch nicht bei den eigenen Uploads.
    - **Bearbeiten:** zusätzlich hochladen, Datum, Ort, Schlagworte und Personen ändern, drehen, in den Papierkorb legen und Gesichter benennen.
    - Import, Abgleich, endgültiges Löschen und die Kontenverwaltung gibt es nur über Home Assistant.
 3. Den Internetzugang über deinen Reverse Proxy mit TLS veröffentlichen, siehe unten. **Port 8301 nie direkt im Router freigeben.**
