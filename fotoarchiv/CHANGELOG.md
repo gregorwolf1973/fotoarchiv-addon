@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.23
+
+- Fängt Cloudflare eine Anfrage mit einer Sicherheitsabfrage ab (etwa eine WAF-Regel auf `/login`), nennt die Oberfläche das jetzt klar statt nur „Forbidden“
+- Doku: WAF-Regeln für den Login-Pfad
+
 ## 0.22
 
 - Port 8301 für den Internetzugang ist ab Werk am Host freigegeben und unter *Konfiguration → Netzwerk* einstellbar – vorher war er leer, und ein Proxy, der auf die IP von Home Assistant zeigt, meldete 502 Bad Gateway

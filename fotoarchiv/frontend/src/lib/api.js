@@ -9,6 +9,14 @@ async function request(path, options = {}) {
     options = { ...options, headers: { ...(options.headers || {}), 'X-CSRF-Token': auth.csrf } };
   }
   const response = await fetch(path, options);
+  // Eine Sicherheitsabfrage von Cloudflare (WAF-Regel, Bot-Schutz) lässt sich nur beim Aufruf einer
+  // ganzen Seite lösen, nicht bei einer Anfrage im Hintergrund – sonst käme nur "Forbidden"
+  if (response.headers.get('cf-mitigated') === 'challenge') {
+    throw new Error(
+      'Cloudflare hat die Anfrage mit einer Sicherheitsabfrage abgefangen. Eine WAF-Regel oder der Bot-Schutz ' +
+        `trifft diesen Pfad (${path.split('?')[0]}); er muss dort ausgenommen werden.`,
+    );
+  }
   if (response.status === 401 && !path.startsWith('api/auth/')) auth.onUnauthorized();
   const text = await response.text();
   let body = null;
