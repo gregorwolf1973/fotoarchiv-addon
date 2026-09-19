@@ -6,7 +6,7 @@
 
   let text = $state('');
   let open = $state(false);
-  let active = $state(0);
+  let active = $state(-1); // markierte Zeile; -1 = keine
   let showDates = $state(false);
   let input = $state();
 
@@ -14,9 +14,16 @@
     filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q,
   );
 
+  const browsing = $derived(!text.trim()); // leeres Feld: alle Schlagworte zur Auswahl
+
   const suggestions = $derived.by(() => {
     const needle = text.trim().toLocaleLowerCase();
-    if (!needle) return [];
+    if (!needle) {
+      return labels.tags
+        .filter((t) => !filters.tags.some((f) => f.id === t.id))
+        .sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name, 'de'))
+        .map((t) => ({ kind: 'tags', id: t.id, name: t.name, count: t.count }));
+    }
     const pick = (list, kind) =>
       list
         .filter((l) => l.name.toLocaleLowerCase().includes(needle))
@@ -35,7 +42,7 @@
     else onchange({ ...filters, [suggestion.kind]: [...filters[suggestion.kind], { id: suggestion.id, name: suggestion.name }] });
     text = '';
     open = false;
-    active = 0;
+    active = -1;
   }
 
   function keydown(e) {
@@ -43,7 +50,10 @@
       active = (active + 1) % suggestions.length;
       open = true;
     } else if (e.key === 'ArrowUp' && suggestions.length) {
-      active = (active - 1 + suggestions.length) % suggestions.length;
+      active = active <= 0 ? suggestions.length - 1 : active - 1;
+    } else if (e.key === 'Enter' && browsing) {
+      // Leeres Feld: Enter nimmt nur ein Schlagwort, das man mit den Pfeiltasten gewählt hat
+      if (active >= 0 && suggestions[active]) choose(suggestions[active]);
     } else if (e.key === 'Enter' && suggestions.length) {
       // Genau ein passendes Label: direkt als Filter nehmen, sonst die gewählte Zeile
       const exact = suggestions.find((s) => s.kind !== 'q' && s.name.toLocaleLowerCase() === text.trim().toLocaleLowerCase());
@@ -101,8 +111,8 @@
       type="text"
       placeholder={hasFilters ? '' : 'Suchen: Personen, Schlagworte, Dateiname …'}
       onkeydown={keydown}
-      oninput={() => ((open = true), (active = 0))}
-      onfocus={() => (open = true)}
+      oninput={() => ((open = true), (active = text.trim() ? 0 : -1))}
+      onfocus={() => ((open = true), (active = text.trim() ? 0 : -1))}
       onblur={() => setTimeout(() => (open = false), 150)}
       enterkeyhint="search"
       aria-label="Suchen"
@@ -118,7 +128,8 @@
   {/if}
 
   {#if open && suggestions.length}
-    <ul class="suggestions" role="listbox">
+    <ul class="suggestions" class:browse={browsing} role="listbox">
+      {#if browsing}<li class="heading">Schlagworte</li>{/if}
       {#each suggestions as s, i}
         <li role="option" aria-selected={i === active}>
           <button class:active={i === active} onmousedown={(e) => (e.preventDefault(), choose(s))}>
@@ -217,6 +228,17 @@
     border-radius: 12px;
     background: var(--surface);
     box-shadow: 0 8px 30px rgb(0 0 0 / 0.25);
+  }
+  .suggestions.browse {
+    max-height: min(50vh, 420px);
+    overflow-y: auto;
+  }
+  .heading {
+    padding: 4px 16px 6px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
   }
   .suggestions button {
     width: 100%;

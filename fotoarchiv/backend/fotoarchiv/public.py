@@ -36,12 +36,15 @@ VIEW = {
     "face_crop", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
 }
 EDIT = {
-    "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload", "upload_chunk",
+    "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload", "upload_chunk", "upload_known",
     "group_name", "group_hide", "person_rename", "person_merge", "person_delete", "face_assign", "face_remove",
     "duplicate_list", "duplicate_resolve", "duplicate_ignore",
 }
 # Was eine Rolle über das Ansehen hinaus darf
-ALLOWED = {"viewer": set(), "uploader": {"upload", "upload_chunk"}, "editor": EDIT}
+# Alles, womit Bilder verschwinden: Papierkorb, Wiederherstellen und die Duplikat-Bereinigung
+DELETING = {"asset_delete", "asset_restore", "duplicate_list", "duplicate_resolve", "duplicate_ignore"}
+# uploader: hochladen und bearbeiten, aber keine Bilder löschen (Mehrfachaktion: siehe api.batch)
+ALLOWED = {"viewer": set(), "uploader": EDIT - DELETING, "editor": EDIT}
 # Bilder zählen nicht als Scan: ein abgelaufenes Cookie lädt sonst dutzende Vorschaubilder und sperrt sich selbst
 IMAGES = {"asset_thumb", "asset_preview", "asset_original", "face_crop"}
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.30
+
+- Rolle **Hochladen + Bearbeiten (ohne Löschen)** (vorher „Ansehen + Hochladen“): darf jetzt auch Schlagworte, Personen, Orte und Datum ändern, drehen und Gesichter benennen – nur keine Bilder löschen (kein Papierkorb, kein Wiederherstellen, keine Duplikat-Bereinigung)
+- Hochladen am Handy: Vorab-Prüfung, damit schon vorhandene Fotos gar nicht erst übertragen werden (gleicher Name und gleiche Größe)
+- Upload-Anzeige am Handy als schmale Leiste mit Gesamtfortschritt und Restzeit, aufklappbar; neuer Knopf **Abbrechen**
+- Während des Hochladens bleibt der Bildschirm an; beim Schließen der Seite mit offenen Uploads kommt eine Warnung
+- Suche: Ein Klick ins leere Suchfeld zeigt alle Schlagworte zur Auswahl, die häufigsten zuerst
+
 ## 0.29
 
 - **Als App installierbar** (Internetzugang): unter Android mit Knopf *App installieren*, am iPhone über „Zum Home-Bildschirm“ (die Seite zeigt einmal einen Hinweis). Eigenes Symbol, Vollbild ohne Browserleiste

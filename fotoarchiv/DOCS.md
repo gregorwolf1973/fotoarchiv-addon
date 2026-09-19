@@ -74,11 +74,17 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 
 ## Als App aufs Handy (Familie)
 
-Über den Internetzugang lässt sich das Fotoarchiv wie eine App installieren, ganz ohne App-Store. Jede Person bekommt ein eigenes Konto, zum Hochladen mit der Rolle **Ansehen + Hochladen**.
+Über den Internetzugang lässt sich das Fotoarchiv wie eine App installieren, ganz ohne App-Store. Jede Person bekommt ein eigenes Konto, zum Hochladen mit der Rolle **Hochladen + Bearbeiten (ohne Löschen)**.
 
 **Android (Chrome):** Die Adresse öffnen, zum Beispiel `https://foto.example.org`, und anmelden. Oben erscheint **App installieren**, antippen und fertig. Danach steht das Fotoarchiv im **Teilen-Menü** der Galerie: Fotos auswählen, *Teilen*, *Fotoarchiv*. Die Fotos werden sofort hochgeladen.
 
 **iPhone (Safari):** Die Adresse öffnen und anmelden. Unten auf *Teilen* tippen und dann **„Zum Home-Bildschirm“**. Einen Hinweis dazu zeigt die Seite einmal selbst an. Hochladen geht über den Knopf *Hochladen*, der die Mediathek öffnet, auch mit vielen Fotos auf einmal. Ins Teilen-Menü von Fotos lässt Apple Web-Apps nicht.
+
+Damit das Handy nicht stundenlang beschäftigt ist:
+
+- **Schon Vorhandenes wird nicht gesendet.** Vor dem Hochladen fragt die App, welche Dateien das Archiv schon kennt (gleicher Name und gleiche Größe, auch im Papierkorb). Teilt jemand ein ganzes Album noch einmal, gehen nur die neuen Fotos über die Leitung.
+- **Schmale Leiste statt Liste:** Am Handy zeigt der Upload nur eine Leiste mit Fortschritt und Restzeit; man kann währenddessen weiter blättern. Antippen klappt die Liste auf, **Abbrechen** stoppt alles Offene.
+- **Bildschirm bleibt an**, solange hochgeladen wird, damit der Upload nicht stehen bleibt. Wer die Seite schließt, wird vorher gewarnt.
 
 Große Videos werden in Stücken von 32 MB übertragen. So passen sie durch Cloudflare (100 MB je Anfrage im kostenlosen Tarif), und nach einem Funkloch geht es an der Abbruchstelle weiter, statt von vorn. Automatisch im Hintergrund hochladen kann eine Web-App nicht, das erlauben die Handys nur echten Apps.
 
@@ -266,7 +272,7 @@ Das Datum wird in dieser Reihenfolge bestimmt:
 1. In den Add-on-Einstellungen `public_enabled: true` setzen und das Add-on neu starten.
 2. In der Oberfläche auf das **Schild-Symbol** klicken und Konten anlegen:
    - **Ansehen:** Fotos, Karte und Personen ansehen und Originale herunterladen.
-   - **Ansehen + Hochladen:** zusätzlich Fotos und Videos hochladen. Ändern, Beschriften oder Löschen geht nicht, auch nicht bei den eigenen Uploads.
+   - **Hochladen + Bearbeiten (ohne Löschen):** zusätzlich hochladen, Schlagworte, Personen, Orte und Datum ändern, drehen und Gesichter benennen. Bilder löschen geht nicht: kein Papierkorb, kein Wiederherstellen, keine Duplikat-Bereinigung.
    - **Bearbeiten:** zusätzlich hochladen, Datum, Ort, Schlagworte und Personen ändern, drehen, in den Papierkorb legen und Gesichter benennen.
    - Import, Abgleich, endgültiges Löschen und die Kontenverwaltung gibt es nur über Home Assistant.
 3. Den Internetzugang über deinen Reverse Proxy mit TLS veröffentlichen, siehe unten. **Port 8301 nie direkt im Router freigeben.**

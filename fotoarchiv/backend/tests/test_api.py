@@ -309,3 +309,9 @@ def test_chunked_upload_rejects_bad_input(client):
     assert client.put("/api/upload/chunk", params=base | {"name": "virus.exe"}, content=b"x").status_code == 415
     assert client.put("/api/upload/chunk", params=base, content=b"x" * 11).status_code == 413
     assert client.put("/api/upload/chunk", params=base | {"offset": 10}, content=b"x").status_code == 400
+
+
+def test_name_forms_ignore_counter():
+    from fotoarchiv.api import _name_forms
+    assert _name_forms("IMG_1234_2.JPG") == {"img_1234_2.jpg", "img_1234.jpg"}
+    assert _name_forms("clip.mp4") == {"clip.mp4"}

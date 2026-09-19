@@ -58,9 +58,11 @@
 
   const trash = $derived(view === 'trash');
   // Rechte: admin = Home Assistant, editor/viewer = Konten des Internetzugangs
-  const canEdit = $derived(session?.role === 'admin' || session?.role === 'editor');
+  // uploader: hochladen und bearbeiten, aber keine Bilder löschen
+  const canEdit = $derived(['admin', 'editor', 'uploader'].includes(session?.role));
+  const canDelete = $derived(session?.role === 'admin' || session?.role === 'editor');
   const isAdmin = $derived(session?.role === 'admin');
-  const canUpload = $derived(canEdit || session?.role === 'uploader');
+  const canUpload = $derived(canEdit);
   const filtered = $derived(
     !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
   );
@@ -419,7 +421,7 @@
   function keydown(e) {
     if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
-    else if (e.key === 'Delete' && selected.size) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
+    else if (e.key === 'Delete' && selected.size && canDelete) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
     else return;
     e.preventDefault();
@@ -461,7 +463,9 @@
         {#if isAdmin}
           <button class="icon" onclick={() => confirmConvert([...selected])} title="Umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4"><Icon name="convert" /></button>
         {/if}
-        <button class="icon" onclick={deleteSelected} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
+        {#if canDelete}
+          <button class="icon" onclick={deleteSelected} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
+        {/if}
       {/if}
     </header>
   {:else if trash}
@@ -520,7 +524,7 @@
             <Icon name="import" size={20} /><span class="label">Importieren</span>
           </button>
         {/if}
-        {#if canEdit}
+        {#if canDelete}
           <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos"><Icon name="duplicate" /></button>
           <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – Dateien nach Größe"><Icon name="storage" /></button>
           <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
@@ -639,6 +643,7 @@
     items={viewerItems}
     index={openIndex}
     {canEdit}
+    {canDelete}
     canPurge={isAdmin}
     {trash}
     {labels}

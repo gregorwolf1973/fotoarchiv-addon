@@ -71,6 +71,7 @@ export const api = {
   tasks: () => request('api/tasks'),
   emptyTrash: () => request('api/trash/empty', { method: 'POST' }),
   removeMissing: () => request('api/library/remove-missing', { method: 'POST' }),
+  knownFiles: (files) => request('api/upload/known', send('POST', { files })),
   dismissConvertErrors: () => request('api/convert/dismiss', { method: 'POST' }),
   faceStatus: () => request('api/faces/status'),
   people: () => request('api/people'),
@@ -124,14 +125,19 @@ const CHUNK = 32 * 1024 * 1024;
 const RETRIES = 6;
 const RETRY_STATUS = new Set([0, 408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 
-/** Upload mit Fortschritt; löst immer auf, Fehler stehen im Ergebnis. */
-export function upload(file, onprogress) {
-  return file.size > CHUNK ? uploadChunked(file, onprogress) : uploadWhole(file, onprogress);
+const CANCELLED = { status: 'cancelled', message: 'abgebrochen' };
+
+/** Upload mit Fortschritt; löst immer auf, Fehler stehen im Ergebnis. signal: AbortSignal zum Abbrechen. */
+export function upload(file, onprogress, signal) {
+  return file.size > CHUNK ? uploadChunked(file, onprogress, signal) : uploadWhole(file, onprogress, signal);
 }
 
-function put(url, body, onprogress) {
+function put(url, body, onprogress, signal) {
   return new Promise((resolve) => {
+    if (signal?.aborted) return resolve({ status: -1, json: null, text: 'abgebrochen' });
     const xhr = new XMLHttpRequest();
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.onabort = () => resolve({ status: -1, json: null, text: 'abgebrochen' });
     xhr.open('PUT', url);
     if (auth.csrf) xhr.setRequestHeader('X-CSRF-Token', auth.csrf);
     xhr.upload.onprogress = (e) => e.lengthComputable && onprogress(e.loaded);
@@ -155,9 +161,10 @@ const failed = (r) => ({
   message: r.json?.detail || (r.status === 413 ? 'Datei zu groß für den Proxy' : r.text || 'Netzwerkfehler'),
 });
 
-async function uploadWhole(file, onprogress) {
+async function uploadWhole(file, onprogress, signal) {
   const query = new URLSearchParams({ name: file.name, mtime: String(file.lastModified || '') });
-  const r = await put(`api/upload?${query}`, file, (loaded) => onprogress(loaded / file.size));
+  const r = await put(`api/upload?${query}`, file, (loaded) => onprogress(loaded / file.size), signal);
+  if (r.status === -1) return CANCELLED;
   return r.json && !r.json.detail ? r.json : failed(r);
 }
 
@@ -167,7 +174,7 @@ function uploadId() {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function uploadChunked(file, onprogress) {
+async function uploadChunked(file, onprogress, signal) {
   const id = uploadId();
   let offset = 0;
   let failures = 0;
@@ -177,7 +184,8 @@ async function uploadChunked(file, onprogress) {
       upload_id: id, name: file.name, offset: String(offset), total: String(file.size), mtime: String(file.lastModified || ''),
     });
     const start = offset;
-    const r = await put(`api/upload/chunk?${query}`, file.slice(start, end), (loaded) => onprogress((start + loaded) / file.size));
+    const r = await put(`api/upload/chunk?${query}`, file.slice(start, end), (loaded) => onprogress((start + loaded) / file.size), signal);
+    if (r.status === -1 || signal?.aborted) return CANCELLED; // Teildatei räumt der Server nach einem Tag weg
     if (r.status === 202) {
       offset = r.json.received;
       failures = 0;

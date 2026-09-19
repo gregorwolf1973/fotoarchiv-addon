@@ -128,7 +128,7 @@ def test_roles_csrf_and_hidden_admin_functions(admin, public, make_jpeg, tmp_pat
     assert editor.get("/api/state").status_code == 401
 
 
-def test_uploader_may_view_and_upload_but_not_edit(admin, public, make_jpeg, tmp_path):
+def test_uploader_may_upload_and_edit_but_not_delete(admin, public, make_jpeg, tmp_path):
     make_user(admin, "oma", role="uploader")
     uploader = visitor(public, ip="198.51.100.4")
     assert login(uploader, "oma").json()["role"] == "uploader"
@@ -137,10 +137,36 @@ def test_uploader_may_view_and_upload_but_not_edit(admin, public, make_jpeg, tmp
     assert uploaded.status_code == 200, uploaded.text
     asset_id = uploaded.json()["asset_id"]
     assert uploader.get(f"/api/assets/{asset_id}").status_code == 200
-    assert uploader.patch(f"/api/assets/{asset_id}", json={"tags": ["x"]}).status_code == 403
+
+    changed = uploader.patch(f"/api/assets/{asset_id}", json={"tags": ["Urlaub"], "location": {"lat": 47.5, "lon": 11.3}})
+    assert changed.status_code == 200 and changed.json()["tags"] == ["Urlaub"]
+    assert uploader.post("/api/batch", json={"ids": [asset_id], "action": "tags", "add": ["Oma"]}).status_code == 200
+
     assert uploader.delete(f"/api/assets/{asset_id}").status_code == 403
-    assert uploader.post("/api/batch", json={"ids": [asset_id], "action": "delete"}).status_code == 403
+    assert uploader.post(f"/api/assets/{asset_id}/restore").status_code == 403
+    for action in ("delete", "restore", "purge", "convert"):
+        assert uploader.post("/api/batch", json={"ids": [asset_id], "action": action}).status_code == 403, action
+    assert uploader.get("/api/duplicates").status_code == 403
     assert admin.patch(f"/api/admin/users/{make_user(admin, 'opa')['id']}", json={"role": "uploader"}).status_code == 200
+
+
+def test_upload_precheck_skips_known_files(admin, public, make_jpeg, tmp_path):
+    make_user(admin, "onkel", role="uploader")
+    phone = visitor(public, ip="198.51.100.5")
+    login(phone, "onkel")
+    photo = make_jpeg(tmp_path / "IMG_20210102_120000.jpg")
+    size = len(photo.read_bytes())
+    assert phone.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes()).status_code == 200
+    known = phone.post("/api/upload/known", json={"files": [
+        {"name": "IMG_20210102_120000.JPG", "size": size},      # gleicher Name (Groß/klein egal), gleiche Größe
+        {"name": "IMG_20210102_120000.jpg", "size": size + 1},  # andere Größe
+        {"name": "anderes.jpg", "size": size},                  # anderer Name
+    ]})
+    assert known.status_code == 200 and known.json() == {"known": [True, False, False]}
+    viewer = visitor(public, ip="198.51.100.6")
+    make_user(admin, "gast")
+    login(viewer, "gast")
+    assert viewer.post("/api/upload/known", json={"files": []}).status_code == 403
 
 
 def test_escalating_lockout_per_ip(admin, ctx, public):

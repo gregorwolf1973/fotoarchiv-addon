@@ -10,7 +10,7 @@
   import LocationDialog from './LocationDialog.svelte';
   import Icon from './Icon.svelte';
 
-  let { items, index, trash = false, canEdit: allowed = true, canPurge = true, labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
+  let { items, index, trash = false, canEdit: allowed = true, canDelete = true, canPurge = true, labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
 
   const INFO_KEY = 'fotoarchiv.info';
   let showInfo = $state(readInfoSetting());
@@ -222,7 +222,7 @@
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'i') toggleInfo();
     else if (e.key === 'f' && !isVideo && !trash) showFaces = !showFaces;
-    else if (e.key === 'Delete' && !trash && allowed) ondelete(itemId);
+    else if (e.key === 'Delete' && !trash && canDelete) ondelete(itemId);
     else if ((e.key === '+' || e.key === '=') && canZoom) zoomTo(view.scale * 1.5, stageWidth / 2, stageHeight / 2);
     else if (e.key === '-' && canZoom) zoomTo(view.scale / 1.5, stageWidth / 2, stageHeight / 2);
     else if (e.key === '0' && zoomed) view = RESET;
@@ -391,7 +391,7 @@
       <span class="spacer"></span>
       {#if busy}<span class="spinner" title="Wird gespeichert"></span>{/if}
       {#if trash}
-        {#if allowed}<button class="round" onclick={() => onrestore(itemId)} title="Wiederherstellen"><Icon name="restore" /></button>{/if}
+        {#if canDelete}<button class="round" onclick={() => onrestore(itemId)} title="Wiederherstellen"><Icon name="restore" /></button>{/if}
         {#if canPurge}<button class="round" onclick={() => onpurge(itemId)} title="Endgültig löschen"><Icon name="deleteForever" /></button>{/if}
       {:else}
         {#if detail?.rotatable && allowed}
@@ -402,7 +402,7 @@
           <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title="Gesichter zeigen (f)"><Icon name="face" /></button>
         {/if}
         <a class="round" href={originalUrl(item, true)} title="Original herunterladen"><Icon name="download" /></a>
-        {#if allowed}<button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>{/if}
+        {#if canDelete}<button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>{/if}
       {/if}
       <button class="round" class:on={showInfo} onclick={toggleInfo} title="Informationen (i)"><Icon name="info" /></button>
     </div>

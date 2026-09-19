@@ -22,6 +22,7 @@ from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
 
+COUNTER = re.compile(r"_\d+(\.[^.]*)?$")  # "_2" vor der Endung, von unique_path angehängt
 UPLOAD_ID = re.compile(r"[A-Za-z0-9_-]{16,64}")
 UPLOAD_MAX = 50 * 1024**3  # 50 GB je Datei
 CHUNK_MAX = 96 * 1024**2  # knapp unter Cloudflares 100 MB je Anfrage
@@ -60,8 +61,23 @@ def placeholder() -> Response:
 
 
 def role_of(request: Request) -> str:
-    """Vom Zugang gesetzt: admin (Home Assistant), editor oder viewer (Internet)."""
+    """Vom Zugang gesetzt: admin (Home Assistant), editor, uploader oder viewer (Internet)."""
     return getattr(request.state, "role", "viewer")
+
+
+class KnownFile(BaseModel):
+    name: str = Field(max_length=255)
+    size: int = Field(ge=0)
+
+
+class KnownRequest(BaseModel):
+    files: list[KnownFile] = Field(max_length=5000)
+
+
+def _name_forms(filename: str) -> set[str]:
+    """Dateiname im Archiv, auch ohne den Zähler, den unique_path bei Namensgleichheit anhängt (_1, _2 …)."""
+    name = filename.lower()
+    return {name, COUNTER.sub(r"\1", name)}
 
 
 class ImportRequest(BaseModel):
@@ -346,6 +362,8 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             raise HTTPException(403, "Endgültig löschen ist nur über Home Assistant möglich")
         if body.action == "convert" and role_of(request) != "admin":
             raise HTTPException(403, "Umwandeln ist nur über Home Assistant möglich")
+        if body.action in ("delete", "restore") and role_of(request) == "uploader":
+            raise HTTPException(403, "Löschen ist mit diesem Konto nicht möglich")
         count = len(set(body.ids))
         kind, params = body.action, {}
         if body.action in ("tags", "persons"):
@@ -456,6 +474,20 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         ctx.duplicates.wake()
         status = 500 if result.status == "error" else 422 if result.status == "damaged" else 200
         return JSONResponse(result.__dict__, status_code=status)
+
+    @app.post("/api/upload/known")
+    def upload_known(body: KnownRequest):
+        """Vorab fragen, bevor ein Handy stundenlang schon Vorhandenes hochlädt: gleicher Name und gleiche
+        Größe wie eine Datei im Archiv oder Papierkorb gilt als bekannt und wird gar nicht erst gesendet.
+        Die MD5-Prüfung beim Import bleibt die eigentliche Sicherung gegen Duplikate."""
+        sizes = sorted({f.size for f in body.files})
+        known: dict[int, set[str]] = {}
+        for start in range(0, len(sizes), 500):
+            part = sizes[start:start + 500]
+            rows = db.query(f"SELECT path, size FROM assets WHERE size IN ({','.join('?' * len(part))})", part)
+            for row in rows:
+                known.setdefault(row["size"], set()).update(_name_forms(Path(row["path"]).name))
+        return {"known": [safe_name(f.name).lower() in known.get(f.size, ()) for f in body.files]}
 
     @app.put("/api/upload/chunk")
     async def upload_chunk(request: Request, upload_id: str, name: str, offset: int, total: int,
