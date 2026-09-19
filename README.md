@@ -19,6 +19,7 @@
   <img src="https://img.shields.io/badge/Home%20Assistant-add--on-41BDF5?logo=homeassistant&amp;logoColor=white" alt="Home Assistant add-on">
   <img src="https://img.shields.io/badge/arch-aarch64%20%7C%20amd64-green" alt="Architectures">
   <img src="https://img.shields.io/badge/Raspberry%20Pi%205-tested-C51A4A?logo=raspberrypi&amp;logoColor=white" alt="Raspberry Pi 5">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
   <a href="https://buymeacoffee.com/gregorwolf1973"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&amp;logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
@@ -64,6 +65,11 @@ If Fotoarchiv saves your family photos, a coffee keeps the development going ☕
 
 Found a bug or have an idea? Please open an [issue](https://github.com/gregorwolf1973/fotoarchiv-addon/issues). A ⭐ helps others find the project.
 
+## License
+
+The code is released under the [MIT License](LICENSE).
+Face recognition uses the InsightFace model pack `buffalo_l`, which is **not** part of this repository: the add-on downloads it on first start from the official InsightFace release. Those models are licensed for **non-commercial use only**. If you don't want that, switch off `face_recognition` – everything else works without it.
+
 ---
 
 ## 🇩🇪 Deutsch
@@ -83,5 +89,7 @@ Found a bug or have an idea? Please open an [issue](https://github.com/gregorwol
 - **Keine Abhängigkeit:** Die Bilder bleiben normale Dateien in `JJJJ/MM`, die Datenbank ist nur ein Index
 
 **Installation:** Oben auf **Add repository** klicken oder unter **Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories** die Adresse `https://github.com/gregorwolf1973/fotoarchiv-addon` hinzufügen, dann **Fotoarchiv** installieren. Alle Details in der **[Dokumentation](fotoarchiv/DOCS.md)**.
+
+**Lizenz:** Der Code steht unter der [MIT-Lizenz](LICENSE). Die Modelle der Gesichtserkennung (InsightFace `buffalo_l`) gehören nicht dazu: Das Add-on lädt sie beim ersten Start von InsightFace, und sie dürfen nur nicht-kommerziell genutzt werden. Ohne Gesichtserkennung (`face_recognition` aus) läuft alles andere genauso.
 
 <sub>Keywords: Home Assistant photo gallery, Home Assistant add-on photos, self-hosted photo library, Google Photos alternative, Immich alternative, PhotoPrism alternative, family photo sharing, Raspberry Pi photo server, face recognition, EXIF XMP editor, duplicate photo finder, photo map, Fotoverwaltung, Fotogalerie, Bilderverwaltung</sub>
