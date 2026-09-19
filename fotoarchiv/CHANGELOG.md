@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.22
+
+- Port 8301 für den Internetzugang ist ab Werk am Host freigegeben und unter *Konfiguration → Netzwerk* einstellbar – vorher war er leer, und ein Proxy, der auf die IP von Home Assistant zeigt, meldete 502 Bad Gateway
+- Doku: Abschnitt „Port ändern“
+
 ## 0.21
 
 - Karte: Fotos werden jetzt bis zur höchsten Zoomstufe gebündelt und überlappen sich nicht mehr – vorher lagen sie ab Zoom 18 als Haufen übereinander

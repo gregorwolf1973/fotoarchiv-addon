@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
 description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Gesichtserkennung, Suche, Bearbeiten direkt in der Datei"
-version: "0.21"
+version: "0.22"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:
@@ -14,9 +14,9 @@ ingress_stream: true
 panel_icon: "mdi:image-multiple"
 panel_title: "Fotoarchiv"
 ports:
-  8301/tcp: null
+  8301/tcp: 8301
 ports_description:
-  8301/tcp: "Internetzugang (public_enabled) – nicht direkt freigeben, nur über Reverse Proxy mit TLS"
+  8301/tcp: "Internetzugang (public_enabled) – Host-Port frei wählbar; im Router nicht freigeben, nur über Reverse Proxy mit TLS"
 map:
   - type: share
     read_only: false

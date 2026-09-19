@@ -252,9 +252,15 @@ Das Add-on NPM liegt im internen Home-Assistant-Netz `172.30.32.0/23` und ist da
 
 Als Dienst `http://a1b2c3d4-fotoarchiv:8301` angeben, mit dem Hostnamen wie oben. Die Besucheradresse übernimmt das Add-on aus `CF-Connecting-IP`. Cloudflare begrenzt Uploads im kostenlosen Tarif auf 100 MB pro Datei.
 
+### Port ändern
+
+Der Internetzugang ist im Heimnetz unter `http://<Home-Assistant-IP>:8301` erreichbar. Den Port stellst du unter *Einstellungen → Add-ons → Fotoarchiv → Konfiguration → Netzwerk* ein. Ein leeres Feld schaltet die Freigabe ab; dann erreicht ihn nur noch ein Proxy im Home-Assistant-Netz über den Add-on-Hostnamen, z. B. `http://a1b2c3d4-fotoarchiv:8301`. Zeigt dein Proxy auf die IP von Home Assistant, muss dort derselbe Port eingetragen sein, sonst meldet er 502 Bad Gateway.
+
+Anmelden lässt sich nur über HTTPS, solange `public_cookie_secure` an ist. Über `http://…:8301` im Heimnetz klappt die Anmeldung also nicht, dafür ist der Weg über den Proxy da.
+
 ### Proxy auf einem anderen Gerät
 
-Unter *Einstellungen → Add-ons → Fotoarchiv → Konfiguration → Netzwerk* einen Host-Port für 8301 eintragen. Dann die Adresse des Proxy-Geräts unter `public_trusted_proxies` ergänzen.
+Den Host-Port wie oben eintragen und die Adresse des Proxy-Geräts unter `public_trusted_proxies` ergänzen.
 
 ### Schutz
 
