@@ -205,8 +205,8 @@
 
       <h3>Sperren</h3>
       <p class="muted hint">
-        Nach 10 Fehlversuchen in 15 Minuten wird die Adresse bzw. das Konto gesperrt: zuerst 15 Minuten, bei Wiederholung
-        doppelt so lange, höchstens 24 Stunden. Wer ohne Anmeldung wiederholt die API abtastet, wird ebenfalls gesperrt.
+        Nach 10 Fehlversuchen in 15 Minuten wird das Konto gesperrt, nach 30 die Adresse (zu Hause teilt sich die Familie
+        eine): zuerst 15 Minuten, bei Wiederholung doppelt so lange, höchstens 24 Stunden. Wer ohne Anmeldung wiederholt die API abtastet, wird ebenfalls gesperrt.
       </p>
       <table>
         <thead><tr><th>Art</th><th>Ziel</th><th>Noch</th><th>Sperren</th><th></th></tr></thead>

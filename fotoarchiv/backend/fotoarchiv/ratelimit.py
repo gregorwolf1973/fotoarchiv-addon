@@ -142,7 +142,9 @@ REQ_ANON_PER_IP = (120, 60)          # ohne Anmeldung: Anmeldeseite, Skripte, St
 # Angemeldet: je Konto statt je IP – eine Familie teilt sich zu Hause eine Adresse. Vorschaubilder
 # zählen nicht mit, beim schnellen Scrollen lädt die Galerie davon Tausende in der Minute.
 REQ_AUTH_PER_USER = (3000, 60)
-AUTHFAIL_IP = (10, 15 * 60)
+# Je Adresse großzügiger als je Konto: Zu Hause teilt sich die Familie eine IP, und deren Tippfehler
+# addieren sich. Das einzelne Passwort schützt die Kontosperre (AUTHFAIL_USER).
+AUTHFAIL_IP = (30, 15 * 60)
 AUTHFAIL_USER = (10, 15 * 60)
 SCAN_PER_IP = (30, 10 * 60)          # API-Aufrufe ohne Anmeldung / unbekannte Pfade -> Scanner
 LOCK_BASE = 15 * 60                  # erste Sperre

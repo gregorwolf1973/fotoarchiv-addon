@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.35
+
+- Anmeldung: Die Sperre einer **Adresse** greift erst nach 30 statt 10 Fehlversuchen in 15 Minuten. Zu Hause teilt sich die Familie eine IP; die Tippfehler mehrerer Leute sperrten sonst alle aus. Die Sperre des einzelnen **Kontos** bleibt bei 10 Fehlversuchen
+
 ## 0.34
 
 - **Löschen vorschlagen:** Konten ohne Löschrecht („Ansehen“ und „Hochladen + Bearbeiten“) schlagen Fotos zum Löschen vor, einzeln oder in der Auswahl, auf Wunsch mit Grund

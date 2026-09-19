@@ -306,7 +306,7 @@ Den Host-Port wie oben eintragen und die Adresse des Proxy-Geräts unter `public
 
 ### Schutz
 
-- **Fehlversuche:** Nach 10 Fehlversuchen innerhalb von 15 Minuten wird die **Adresse** gesperrt. Unabhängig davon wird auch das **Konto** gesperrt, selbst wenn die Versuche von verschiedenen Adressen kommen. Die erste Sperre dauert 15 Minuten, jede weitere doppelt so lange, höchstens 24 Stunden.
+- **Fehlversuche:** Nach 10 Fehlversuchen innerhalb von 15 Minuten wird das **Konto** gesperrt, auch wenn die Versuche von verschiedenen Adressen kommen. Die **Adresse** wird erst nach 30 Fehlversuchen gesperrt: Zu Hause teilt sich die ganze Familie eine IP, und eine Adresssperre trifft alle. Eine Sperre lässt sich unter *Zugang übers Internet → Sitzungen & Sperren* sofort aufheben. Die erste Sperre dauert 15 Minuten, jede weitere doppelt so lange, höchstens 24 Stunden.
 - **Scanner:** Wer ohne Anmeldung wiederholt die API oder unbekannte Pfade aufruft, wird ebenfalls gesperrt.
 - **Anfragen:** Pro Adresse ist die Zahl der Anfragen pro Minute begrenzt.
 - **Proxy-Angaben:** Die Besucheradresse aus `X-Forwarded-For` bzw. `CF-Connecting-IP` wird **nur** von Adressen aus `public_trusted_proxies` übernommen. Gefälschte Angaben bei direktem Zugriff bleiben wirkungslos.

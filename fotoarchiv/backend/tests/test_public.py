@@ -170,13 +170,15 @@ def test_upload_precheck_skips_known_files(admin, public, make_jpeg, tmp_path):
 
 
 def test_escalating_lockout_per_ip(admin, ctx, public):
+    from fotoarchiv.ratelimit import AUTHFAIL_IP
+
     clock = Clock()
     ctx.limiter._clock = clock
     make_user(admin, "anna")
     browser = visitor(public, ip="192.0.2.10")
 
-    for _ in range(10):
-        assert login(browser, "anna", "falsch-falsch").status_code == 401
+    for n in range(AUTHFAIL_IP[0]):  # wechselnde Namen: es greift die Sperre der Adresse, nicht die des Kontos
+        assert login(browser, f"niemand{n}", "falsch-falsch").status_code == 401
     locked = login(browser, "anna")  # selbst das richtige Passwort hilft jetzt nicht
     assert locked.status_code == 429 and locked.json()["retry_after"] == 15 * 60
 
@@ -184,8 +186,8 @@ def test_escalating_lockout_per_ip(admin, ctx, public):
     assert login(browser, "anna").status_code == 200
 
     other = visitor(public, ip="192.0.2.10")
-    for _ in range(10):
-        login(other, "niemand", "falsch-falsch")
+    for n in range(AUTHFAIL_IP[0]):
+        login(other, f"keiner{n}", "falsch-falsch")
     assert login(other, "anna").json()["retry_after"] == 30 * 60  # zweite Sperre: doppelt so lang
 
     snapshot = admin.get("/api/admin/locks").json()
@@ -193,6 +195,17 @@ def test_escalating_lockout_per_ip(admin, ctx, public):
     assert admin.post("/api/admin/locks/unlock", json={"key": "authfail:ip:192.0.2.10"}).json() == {"ok": True}
     assert admin.post("/api/admin/locks/unlock", json={"key": "irgendwas"}).status_code == 400
     assert login(other, "anna").status_code == 200
+
+
+def test_household_typos_do_not_lock_out_the_family(admin, public):
+    """Mehrere Leute hinter derselben IP vertippen sich: das sperrt weder die IP noch die anderen Konten."""
+    make_user(admin, "manuela")
+    make_user(admin, "levin")
+    home = "192.0.2.50"
+    for name in ("vorname", "manuela", "ela", "manuela", "Manu", "Manu", "manu", "manu", "manuela", "manuela"):
+        assert login(visitor(public, ip=home), name, "falsch-falsch").status_code == 401
+    assert login(visitor(public, ip=home), "levin").status_code == 200
+    assert login(visitor(public, ip=home), "manuela").status_code == 200  # 5 Fehlversuche: Konto noch offen
 
 
 def test_lockout_per_user_across_addresses(admin, public):
