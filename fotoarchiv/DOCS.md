@@ -73,6 +73,8 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 
 Jede Änderung wird **zuerst mit exiftool in die Datei geschrieben**. Danach liest das Add-on die Datei neu ein und übernimmt den Stand in die Datenbank. So stimmen Datei und Datenbank immer überein, und andere Programme wie digiKam, Lightroom oder die Fotos-App am Handy sehen dieselben Angaben.
 
+In der Einzelansicht sammelt der Infobereich Änderungen an **Personen, Schlagworten und Ort** zuerst nur vor. Unten erscheint dann eine Leiste mit **Speichern** und **Verwerfen**. Erst *Speichern* schreibt alles zusammen in die Datei. Ein Name, der noch ohne Enter im Feld steht, wird dabei mitgenommen. Wer mit ungespeicherten Änderungen blättert oder die Ansicht schließt, wird vorher gefragt. Datum und Drehen wirken weiterhin sofort.
+
 | Angabe | Wird geschrieben in |
 |---|---|
 | Aufnahmedatum (Fotos) | EXIF `DateTimeOriginal`, `CreateDate`, `ModifyDate` |

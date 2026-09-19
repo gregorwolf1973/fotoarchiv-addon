@@ -2,10 +2,15 @@
   import Icon from './Icon.svelte';
 
   // values: Liste von Namen; Enter fügt hinzu (Komma nicht, Namen wie "Müller, Hans" sind erlaubt)
-  let { values = [], suggestions = [], placeholder = '', icon = 'tag', disabled = false, onchange } = $props();
+  // text: bindbar, damit ein Formular weiß, dass noch ein Name im Feld steht
+  let { values = [], suggestions = [], placeholder = '', icon = 'tag', disabled = false, text = $bindable(''), onchange } = $props();
 
   const listId = `chips-${Math.random().toString(36).slice(2)}`;
-  let text = $state('');
+
+  /** Noch nicht mit Enter bestätigten Namen übernehmen, z. B. beim Speichern. */
+  export function commit() {
+    if (text.trim()) add();
+  }
 
   const available = $derived(
     suggestions.filter((name) => !values.some((v) => v.toLocaleLowerCase() === name.toLocaleLowerCase())),

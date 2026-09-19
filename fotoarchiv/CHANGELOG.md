@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.24
+
+- Einzelansicht: Personen, Schlagworte und Ort werden erst mit **Speichern** in die Datei geschrieben, nicht mehr bei jeder einzelnen Eingabe. Solange etwas offen ist, zeigt der Infobereich unten *Speichern* und *Verwerfen*
+- Ein Name, der noch ohne Enter im Feld steht, wird beim Speichern mitgenommen
+- Blättern oder Schließen mit ungespeicherten Änderungen fragt vorher nach
+- Der Ortsdialog der Einzelansicht heißt dafür jetzt *Übernehmen*
+
 ## 0.23
 
 - Fängt Cloudflare eine Anfrage mit einer Sicherheitsabfrage ab (etwa eine WAF-Regel auf `/login`), nennt die Oberfläche das jetzt klar statt nur „Forbidden“

@@ -4,6 +4,7 @@
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import { clampView, RESET, zoomAt } from '../lib/zoom.js';
   import ChipInput from './ChipInput.svelte';
+  import Confirm from './Confirm.svelte';
   import DateDialog from './DateDialog.svelte';
   import FaceBoxes from './FaceBoxes.svelte';
   import LocationDialog from './LocationDialog.svelte';
@@ -28,6 +29,14 @@
   let view = $state(RESET); // Zoom: { scale, x, y }
   let hiresFor = $state(null); // Original nachladen, sobald gezoomt wird (einmal je Bild)
   let hiresReady = $state(null);
+  // Personen, Schlagworte und Ort erst mit "Speichern" in die Datei schreiben.
+  // draft enthält nur geänderte Felder; location: null = Ort entfernen
+  let draft = $state({});
+  let personText = $state('');
+  let tagText = $state('');
+  let personInput = $state();
+  let tagInput = $state();
+  let leaving = $state(null); // Aktion, die auf "Änderungen verwerfen?" wartet
 
   // Ein .mp4 sagt nichts über den Codec darin. Kann der Browser ihn nicht dekodieren,
   // bleibt sonst nur das Vorschaubild stehen, ohne jeden Hinweis.
@@ -55,6 +64,43 @@
   const key = $derived(`${item[0]}-${item[5]}`); // neue Revision (z. B. gedreht) lädt neu
   const isVideo = $derived(item?.[4] === 1);
   const canEdit = $derived(allowed && !trash && detail?.editable);
+
+  // ── Entwurf ────────────────────────────────────────────────────
+  const sameList = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  const savedLocation = $derived(detail && detail.lat !== null ? { lat: detail.lat, lon: detail.lon } : null);
+  const persons = $derived(draft.persons ?? detail?.persons ?? []);
+  const tags = $derived(draft.tags ?? detail?.tags ?? []);
+  const location = $derived('location' in draft ? draft.location : savedLocation);
+  const changes = $derived.by(() => {
+    if (!detail) return {};
+    const result = {};
+    if (!sameList(persons, detail.persons)) result.persons = persons;
+    if (!sameList(tags, detail.tags)) result.tags = tags;
+    if (location?.lat !== savedLocation?.lat || location?.lon !== savedLocation?.lon) result.location = location;
+    return result;
+  });
+  const dirty = $derived(Object.keys(changes).length > 0 || !!personText.trim() || !!tagText.trim());
+
+  function discard() {
+    draft = {};
+    personText = '';
+    tagText = '';
+  }
+
+  async function saveDraft() {
+    // Namen, die noch ohne Enter im Feld stehen, gehören dazu
+    personInput?.commit();
+    tagInput?.commit();
+    const body = changes;
+    if (!Object.keys(body).length) return discard();
+    if (await save(() => api.update(itemId, body), 'Gespeichert')) discard();
+  }
+
+  /** Blättern oder Schließen: bei ungespeicherten Änderungen erst nachfragen. */
+  function leave(action) {
+    if (dirty) leaving = action;
+    else action();
+  }
 
   // ── Zoom ───────────────────────────────────────────────────────
   // Browser zeigen HEIC/TIFF nicht an; sehr große Originale lohnen das Nachladen nicht
@@ -119,6 +165,7 @@
     detail = null;
     error = '';
     videoError = '';
+    discard();
     if (id === undefined) return;
     let cancelled = false;
     api.asset(id).then(
@@ -151,34 +198,26 @@
   }
 
   const rotate = (degrees) => save(() => api.rotate(itemId, degrees));
-  const setLabels = (kind, values) => save(() => api.update(itemId, { [kind]: values }));
+  const setLabels = (kind, values) => (draft[kind] = values);
   function setDate(value) {
     editDate = false;
     save(() => api.update(itemId, { taken_at: value }), 'Datum gespeichert');
   }
-  function setLocation(location) {
+  function setLocation(position) {
     editLocation = false;
-    save(() => api.update(itemId, { location }), 'Ort gespeichert');
+    draft.location = position;
   }
-  async function removeLocation() {
-    const { lat, lon } = detail;
-    const id = itemId;
-    if (await save(() => api.update(id, { location: null }))) {
-      notify('Ort entfernt', {
-        actionLabel: 'Rückgängig',
-        action: () => api.update(id, { location: { lat, lon } }).then(onchanged, notifyError),
-      });
-    }
-  }
+  const removeLocation = () => (draft.location = null);
 
   const go = (step) => {
     const next = index + step;
-    if (next >= 0 && next < items.length) onnavigate(next);
+    if (next >= 0 && next < items.length) leave(() => onnavigate(next));
   };
+  const close = () => leave(onclose);
 
   function keydown(e) {
-    if (editDate || editLocation || e.target.closest?.('input, textarea, .modal')) return;
-    if (e.key === 'Escape') onclose();
+    if (editDate || editLocation || leaving || e.target.closest?.('input, textarea, .modal')) return;
+    if (e.key === 'Escape') close();
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'i') toggleInfo();
@@ -348,7 +387,7 @@
     {/if}
 
     <div class="toolbar">
-      <button class="round" onclick={onclose} title="Schließen (Esc)"><Icon name="close" /></button>
+      <button class="round" onclick={close} title="Schließen (Esc)"><Icon name="close" /></button>
       <span class="spacer"></span>
       {#if busy}<span class="spinner" title="Wird gespeichert"></span>{/if}
       {#if trash}
@@ -405,17 +444,17 @@
 
           <dt>Ort</dt>
           <dd class="row">
-            {#if detail.lat !== null}
-              <a href={mapLink(detail)} target="_blank" rel="noopener">{detail.lat.toFixed(5)}, {detail.lon.toFixed(5)}</a>
+            {#if location}
+              <a href={mapLink(location)} target="_blank" rel="noopener">{location.lat.toFixed(5)}, {location.lon.toFixed(5)}</a>
             {:else}
               <span class="muted">Kein Aufnahmeort</span>
             {/if}
             {#if canEdit}
               <span class="buttons">
-                <button class="icon small" disabled={busy} onclick={() => (editLocation = true)} title={detail.lat !== null ? 'Ort ändern' : 'Ort setzen'}>
+                <button class="icon small" disabled={busy} onclick={() => (editLocation = true)} title={location ? 'Ort ändern' : 'Ort setzen'}>
                   <Icon name="pencil" size={18} />
                 </button>
-                {#if detail.lat !== null}
+                {#if location}
                   <button class="icon small" disabled={busy} onclick={removeLocation} title="Ort entfernen"><Icon name="close" size={18} /></button>
                 {/if}
               </span>
@@ -424,9 +463,11 @@
 
           <dt>Personen</dt>
           <dd>
-            {#if canEdit || detail.persons.length}
+            {#if canEdit || persons.length}
               <ChipInput
-                values={detail.persons}
+                bind:this={personInput}
+                bind:text={personText}
+                values={persons}
                 suggestions={labels.persons.map((p) => p.name)}
                 icon="person"
                 placeholder="Person hinzufügen"
@@ -440,9 +481,11 @@
 
           <dt>Schlagworte</dt>
           <dd>
-            {#if canEdit || detail.tags.length}
+            {#if canEdit || tags.length}
               <ChipInput
-                values={detail.tags}
+                bind:this={tagInput}
+                bind:text={tagText}
+                values={tags}
                 suggestions={labels.tags.map((t) => t.name)}
                 icon="tag"
                 placeholder="Schlagwort hinzufügen"
@@ -469,13 +512,37 @@
             </div>
           </dd>
         </dl>
+        {#if canEdit && dirty}
+          <div class="draft-bar">
+            <span class="muted">Nicht gespeichert</span>
+            <button disabled={busy} onclick={discard}>Verwerfen</button>
+            <button class="primary" disabled={busy} onclick={saveDraft}>Speichern</button>
+          </div>
+        {/if}
       {/if}
     </aside>
   {/if}
 </div>
 
 {#if editLocation && detail}
-  <LocationDialog lat={detail.lat} lon={detail.lon} onsave={setLocation} oncancel={() => (editLocation = false)} />
+  <LocationDialog lat={location?.lat ?? null} lon={location?.lon ?? null} saveLabel="Übernehmen" onsave={setLocation}
+    oncancel={() => (editLocation = false)} />
+{/if}
+
+{#if leaving}
+  <Confirm
+    title="Änderungen verwerfen?"
+    text="Personen, Schlagworte oder Ort sind geändert, aber noch nicht gespeichert."
+    confirmLabel="Verwerfen"
+    danger
+    onconfirm={() => {
+      const action = leaving;
+      leaving = null;
+      discard();
+      action();
+    }}
+    oncancel={() => (leaving = null)}
+  />
 {/if}
 
 {#if editDate && detail}
@@ -685,6 +752,21 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
+  }
+  .draft-bar {
+    position: sticky;
+    bottom: -20px; /* bündig mit dem Innenabstand von .info */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 20px -20px -20px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .draft-bar span {
+    flex: 1;
+    font-size: 0.85rem;
   }
   .hint {
     display: flex;

@@ -6,7 +6,8 @@
 
   // lat/lon: bisheriger Ort oder null. onsave({ lat, lon })
   // count > 1: der Ort gilt für eine Mehrfachauswahl
-  let { lat = null, lon = null, count = 1, onsave, oncancel } = $props();
+  // saveLabel: in der Einzelansicht "Übernehmen", gespeichert wird dort erst mit dem Speichern-Button
+  let { lat = null, lon = null, count = 1, saveLabel = 'Speichern', onsave, oncancel } = $props();
 
   let container = $state();
   // svelte-ignore state_referenced_locally
@@ -62,7 +63,7 @@
     </div>
     <footer>
       <button onclick={oncancel}>Abbrechen</button>
-      <button class="primary" disabled={!position} onclick={() => onsave(position)}>Speichern</button>
+      <button class="primary" disabled={!position} onclick={() => onsave(position)}>{saveLabel}</button>
     </footer>
   </div>
 </div>
