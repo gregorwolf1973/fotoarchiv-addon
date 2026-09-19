@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.33
+
+- Behoben: Im Internetzugang kam beim Scrollen durch die Galerie „Zu viele Anfragen“ (429), und Manifest und App-Symbole ließen sich dann gar nicht laden. Angemeldete haben jetzt einen eigenen Zähler je Konto statt je IP (eine Familie teilt sich zu Hause eine Adresse), Vorschaubilder zählen nicht mehr mit, und Anfragen ohne Anmeldung haben ihren eigenen Zähler
+- Lizenz: MIT (die Modelle der Gesichtserkennung lädt das Add-on von InsightFace nach, sie sind nur nicht-kommerziell nutzbar)
+
 ## 0.32
 
 - Karte: **Zeitregler** – nur Fotos aus einem Zeitraum zeigen (1 Jahr, einstellbar bis 10 Jahre), per Regler oder ◀ ▶ vom ältesten Foto bis heute verschieben, mit Anzahl der Fotos im Zeitraum

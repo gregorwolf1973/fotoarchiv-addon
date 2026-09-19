@@ -22,7 +22,7 @@ from starlette.routing import Match
 from . import api
 from .auth import AuthError, LoginFailed, LoginLocked
 from .context import Context
-from .ratelimit import LOCK_BASE, LOCK_CAP, REQ_ANON_PER_IP, REQ_AUTH_PER_IP, SCAN_PER_IP
+from .ratelimit import LOCK_BASE, LOCK_CAP, REQ_ANON_PER_IP, REQ_AUTH_PER_USER, SCAN_PER_IP
 
 log = logging.getLogger(__name__)
 
@@ -137,14 +137,20 @@ def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
         session = auth.session(request.cookies.get(COOKIE))
         request.state.session = session
         request.state.role = session["role"] if session else None
-        allowed, retry = limiter.hit(f"ip:{ip}", *(REQ_AUTH_PER_IP if session else REQ_ANON_PER_IP))
+        name = endpoint_name(request)
+        # Getrennte Zähler: Manifest und Symbole lädt der Browser ohne Cookie; sie dürfen nicht an den
+        # Vorschaubildern scheitern, die jemand anderes im selben Haushalt gerade lädt
+        if session:
+            allowed, retry = (True, 0) if name in IMAGES else limiter.hit(f"user:{session['user_id']}", *REQ_AUTH_PER_USER)
+        else:
+            allowed, retry = limiter.hit(f"ip:{ip}", *REQ_ANON_PER_IP)
         if not allowed:
-            access.log("rate_limited", ip=ip, path=request.url.path, detail="requests per minute")
+            access.log("rate_limited", ip=ip, user=session["username"] if session else None,
+                       path=request.url.path, detail="requests per minute")
             response = reply(429, "Zu viele Anfragen. Bitte kurz warten.")
             response.headers["Retry-After"] = str(retry)
             return secure(request, response)
 
-        name = endpoint_name(request)
         if request.url.path.startswith("/api/"):
             if name in OPEN:
                 pass

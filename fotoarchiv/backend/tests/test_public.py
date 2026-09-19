@@ -332,3 +332,22 @@ def test_uploader_may_upload_in_chunks(admin, public, make_jpeg, tmp_path):
     assert uploader.put("/api/upload/chunk", params=params | {"offset": 0}, content=body[:10]).status_code == 202
     done = uploader.put("/api/upload/chunk", params=params | {"offset": 10}, content=body[10:])
     assert done.json()["status"] == "imported"
+
+
+def test_household_shares_ip_without_blocking_each_other(admin, public, make_jpeg, tmp_path):
+    """Viele Vorschaubilder eines Kontos sperren weder das Manifest noch andere Konten hinter derselben IP."""
+    from fotoarchiv.ratelimit import REQ_ANON_PER_IP
+
+    photo = make_jpeg(tmp_path / "IMG_20200303_120000.jpg")
+    asset_id = admin.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes()).json()["asset_id"]
+    make_user(admin, "mama")
+    make_user(admin, "kind")
+    mama = visitor(public, ip="203.0.113.7")
+    kind = visitor(public, ip="203.0.113.7")
+    login(mama, "mama")
+    login(kind, "kind")
+    for _ in range(REQ_ANON_PER_IP[0] + 50):  # mehr als das Limit ohne Anmeldung
+        assert mama.get(f"/api/assets/{asset_id}/thumb").status_code == 200
+    assert kind.get("/api/state").status_code == 200
+    stranger = visitor(public, ip="203.0.113.7")  # z. B. der Browser, der das Manifest ohne Cookie lädt
+    assert stranger.get("/api/auth/session").status_code == 200

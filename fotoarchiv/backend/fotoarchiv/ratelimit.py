@@ -138,8 +138,10 @@ class Limiter:
 
 
 # Grenzen für den Internetzugang: (Anzahl, Zeitfenster in Sekunden)
-REQ_ANON_PER_IP = (120, 60)          # ohne Anmeldung: Anmeldeseite, Skripte, Stile
-REQ_AUTH_PER_IP = (3000, 60)         # angemeldet: die Galerie lädt viele Vorschaubilder auf einmal
+REQ_ANON_PER_IP = (120, 60)          # ohne Anmeldung: Anmeldeseite, Skripte, Stile, Manifest, Symbole
+# Angemeldet: je Konto statt je IP – eine Familie teilt sich zu Hause eine Adresse. Vorschaubilder
+# zählen nicht mit, beim schnellen Scrollen lädt die Galerie davon Tausende in der Minute.
+REQ_AUTH_PER_USER = (3000, 60)
 AUTHFAIL_IP = (10, 15 * 60)
 AUTHFAIL_USER = (10, 15 * 60)
 SCAN_PER_IP = (30, 10 * 60)          # API-Aufrufe ohne Anmeldung / unbekannte Pfade -> Scanner
