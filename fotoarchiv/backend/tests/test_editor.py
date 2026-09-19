@@ -188,3 +188,13 @@ def test_purge_expired_only_old_items(settings, importer, editor, make_jpeg):
 
     assert editor.purge_expired(30) == 1
     assert row(importer, old) is None and row(importer, new) is not None
+
+
+def test_ids_are_never_reused_after_purge(settings, importer, editor, make_jpeg, tmp_path):
+    """Bild-URLs enthalten die ID und werden lange gecacht: ein neues Foto darf nie die ID eines gelöschten erben."""
+    first = importer.import_file(make_jpeg(tmp_path / "a.jpg")).asset_id
+    doomed = importer.import_file(make_jpeg(tmp_path / "b.jpg")).asset_id
+    editor.delete(doomed)
+    editor.purge(doomed)  # war die höchste ID
+    fresh = importer.import_file(make_jpeg(tmp_path / "c.jpg")).asset_id
+    assert fresh > doomed > first

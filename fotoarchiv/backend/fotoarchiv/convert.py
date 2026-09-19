@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import labels, media
 from .config import Settings
-from .db import Database
+from .db import NEXT_ASSET_ID, Database
 from .editor import TRASH_DIR, Editor, EditError
 from .importer import Importer, move_file, unique_path
 
@@ -277,7 +277,8 @@ class ConvertService:
                               deleted_at=datetime.now().isoformat(timespec="seconds"),
                               phash="", faces_scanned=1, persons_dirty=0, convert=0, convert_error=None)
                 cur = conn.execute(
-                    f"INSERT INTO assets ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})",
+                    f"INSERT INTO assets (id, {', '.join(columns)}) "
+                    f"VALUES (({NEXT_ASSET_ID}), {', '.join('?' * len(columns))})",
                     [values[c] for c in columns])
                 for kind in ("tags", "persons"):
                     _, link, column = labels.TABLES[kind]

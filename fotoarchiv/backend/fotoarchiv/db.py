@@ -159,7 +159,39 @@ MIGRATIONS = [
     -- Befund der gründlichen Prüfung: Grund, warum die Datei beschädigt ist (NULL = in Ordnung oder ungeprüft)
     ALTER TABLE assets ADD COLUMN damaged TEXT;
     """,
+    """
+    -- IDs nie wiederverwenden. SQLite vergibt nach dem Löschen der höchsten ID dieselbe erneut; Bild-URLs
+    -- enthalten die ID und werden lange gecacht, ein neues Foto zeigte dann die Vorschau des gelöschten.
+    -- Die höchste je vergebene ID steht in meta, neue Einträge bekommen NEXT_ASSET_ID.
+    INSERT OR REPLACE INTO meta (key, value) VALUES ('asset_id_high', (SELECT COALESCE(MAX(id), 0) FROM assets));
+    CREATE TRIGGER assets_id_high AFTER DELETE ON assets
+    WHEN OLD.id > CAST((SELECT value FROM meta WHERE key = 'asset_id_high') AS INTEGER)
+    BEGIN
+        UPDATE meta SET value = OLD.id WHERE key = 'asset_id_high';
+    END;
+    -- Einmal neue Kennung für alle Bild-URLs: räumt Vorschauen auf, die schon falsch im Browser-Cache liegen
+    DELETE FROM meta WHERE key = 'instance';
+    """,
 ]
+
+# Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID
+NEXT_ASSET_ID = """SELECT MAX(COALESCE((SELECT MAX(id) FROM assets), 0),
+                  COALESCE((SELECT CAST(value AS INTEGER) FROM meta WHERE key = 'asset_id_high'), 0)) + 1"""
+
+
+def _statements(script: str):
+    """SQL-Skript in einzelne Anweisungen teilen; Trigger enthalten selbst Semikolons."""
+    buffer = ""
+    for line in script.splitlines(keepends=True):
+        if not buffer and line.strip().startswith("--"):
+            continue
+        buffer += line
+        if sqlite3.complete_statement(buffer):
+            if buffer.strip():
+                yield buffer
+            buffer = ""
+    if buffer.strip() and buffer.strip() != ";":
+        yield buffer
 
 
 class Database:
@@ -183,9 +215,8 @@ class Database:
         version = self._conn.execute("PRAGMA user_version").fetchone()[0]
         for number, script in enumerate(MIGRATIONS[version:], start=version + 1):
             with self.transaction():
-                for statement in script.split(";"):
-                    if statement.strip():
-                        self._conn.execute(statement)
+                for statement in _statements(script):
+                    self._conn.execute(statement)
                 self._conn.execute(f"PRAGMA user_version = {number}")
 
     def bump(self):

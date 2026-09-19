@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.31
+
+- Behoben: Ein neu hochgeladenes Foto konnte die Vorschau eines endgültig gelöschten zeigen. SQLite vergab dessen ID erneut, und der Browser hatte die Vorschau unter derselben Adresse im Cache. IDs werden jetzt nie wiederverwendet
+- Einmalig bekommen alle Bild-Adressen eine neue Kennung, damit schon falsch gecachte Vorschauen auf allen Geräten verschwinden (die Vorschaubilder werden dafür einmal neu geladen)
+
 ## 0.30
 
 - Rolle **Hochladen + Bearbeiten (ohne Löschen)** (vorher „Ansehen + Hochladen“): darf jetzt auch Schlagworte, Personen, Orte und Datum ändern, drehen und Gesichter benennen – nur keine Bilder löschen (kein Papierkorb, kein Wiederherstellen, keine Duplikat-Bereinigung)

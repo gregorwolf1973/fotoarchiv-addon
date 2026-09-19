@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import labels, media, metadata
 from .config import Settings
-from .db import Database
+from .db import NEXT_ASSET_ID, Database
 from .exiftool import ExifTool
 
 log = logging.getLogger(__name__)
@@ -234,9 +234,9 @@ class Importer:
     def _insert(self, rel: str, kind: str, size: int, checksum: str, meta: metadata.Metadata) -> int:
         with self.db.transaction() as conn:
             cur = conn.execute(
-                """INSERT INTO assets (path, kind, mime, size, md5, md5_import, taken_at, taken_ts,
+f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, taken_ts,
                        date_source, tz_offset, width, height, duration, lat, lon, camera, imported_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (({NEXT_ASSET_ID}), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (rel, kind, meta.mime or media.mime_of(Path(rel)), size, checksum, checksum,
                  meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
                  meta.width, meta.height, meta.duration, meta.lat, meta.lon, meta.camera,
