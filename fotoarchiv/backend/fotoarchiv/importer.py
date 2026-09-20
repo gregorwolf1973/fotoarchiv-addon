@@ -270,8 +270,8 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
         if row is None:
             return None
         target = self.cache_file(asset_id, "thumb")
-        if row["thumb_ok"] and target.exists():
-            return target
+        if row["thumb_ok"] == 1 and target.exists():
+            return target  # -1 (schon einmal fehlgeschlagen) heißt: noch einmal versuchen
         if self._recently_failed("thumb", asset_id, row["rev"]):
             return None
         try:
@@ -279,8 +279,13 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
         except Exception as exc:
             log.warning("Vorschaubild für %s fehlgeschlagen: %s", row["path"], exc)
             self._set_failed("thumb", asset_id, row["rev"], True)
-            self.db.execute("UPDATE assets SET thumb_ok = -1 WHERE id = ?", (asset_id,))
-            return None
+            if not target.exists():
+                # Bei parallelen Anfragen kann ein anderer Versuch die Datei schon geschrieben haben;
+                # dann ist die Datei in Ordnung und der Eintrag gehört nicht unter "Beschädigt"
+                self.db.execute("UPDATE assets SET thumb_ok = -1 WHERE id = ?", (asset_id,))
+                return None
+            self.db.execute("UPDATE assets SET thumb_ok = 1 WHERE id = ?", (asset_id,))
+            return target
         self._set_failed("thumb", asset_id, row["rev"], False)
         # Die Ausrichtung des Vorschaubilds ist maßgeblich, auch wenn die Metadaten etwas anderes sagen
         w, h = row["width"] or tw, row["height"] or th

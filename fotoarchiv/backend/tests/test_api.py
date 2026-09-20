@@ -315,3 +315,32 @@ def test_name_forms_ignore_counter():
     from fotoarchiv.api import _name_forms
     assert _name_forms("IMG_1234_2.JPG") == {"img_1234_2.jpg", "img_1234.jpg"}
     assert _name_forms("clip.mp4") == {"clip.mp4"}
+
+
+
+def test_failed_thumbnail_is_retried_and_leaves_the_damaged_list(client, settings, make_jpeg, tmp_path, monkeypatch):
+    """Ein misslungener Versuch darf ein Foto nicht dauerhaft als beschädigt führen."""
+    from fotoarchiv import media
+
+    photo = make_jpeg(tmp_path / "IMG_20260101_120000.jpg")
+    asset_id = client.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes()).json()["asset_id"]
+    importer = client.app.state.importer
+    thumb = importer.cache_file(asset_id, "thumb")
+    assert thumb.exists()
+
+    # Zustand wie im Betrieb beobachtet: Versuch fehlgeschlagen, Datei aber vorhanden
+    importer.db.execute("UPDATE assets SET thumb_ok = -1 WHERE id = ?", (asset_id,))
+    importer._failed.clear()
+    assert [item[0] for item in client.get("/api/largest", params={"kind": "damaged", "min_mb": 0, "order": "desc"}).json()["items"]] == [asset_id]
+
+    assert client.get(f"/api/assets/{asset_id}/thumb").status_code == 200
+    assert importer.db.one("SELECT thumb_ok FROM assets WHERE id = ?", (asset_id,))["thumb_ok"] == 1
+    assert client.get("/api/largest", params={"kind": "damaged", "min_mb": 0, "order": "desc"}).json()["items"] == []
+
+    # Fehlschlag ohne Datei: bleibt beschädigt
+    thumb.unlink()
+    importer.db.execute("UPDATE assets SET thumb_ok = 0 WHERE id = ?", (asset_id,))
+    importer._failed.clear()
+    monkeypatch.setattr(media, "thumbnail", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("kaputt")))
+    assert client.get(f"/api/assets/{asset_id}/thumb").headers.get("X-Fotoarchiv-Placeholder") == "1"
+    assert importer.db.one("SELECT thumb_ok FROM assets WHERE id = ?", (asset_id,))["thumb_ok"] == -1

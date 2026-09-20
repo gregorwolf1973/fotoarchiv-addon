@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41
+
+- Behoben: Fotos standen dauerhaft unter **Speicherplatz → Beschädigt**, obwohl ihr Vorschaubild längst da war. Ein einmal fehlgeschlagener Versuch (etwa wenn beim Hochladen viele Vorschaubilder gleichzeitig entstehen) wurde nie wiederholt und nie zurückgesetzt. Jetzt wird erneut versucht, und wenn die Datei in Ordnung ist, verschwindet der Eintrag aus der Liste
+
 ## 0.40
 
 - **Keine doppelten Umwandlungen mehr:** Wer ein Original aus dem Papierkorb wiederherstellt und noch einmal „Umwandeln“ wählt, bekam bisher eine zweite Fassung mit `_1` im Namen. Jetzt meldet das Add-on, wo die fertige Datei liegt, und lässt das Original in Ruhe
