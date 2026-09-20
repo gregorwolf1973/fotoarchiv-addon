@@ -231,6 +231,18 @@
   };
   const close = () => leave(onclose);
 
+  // Safari (iOS) zoomt sonst die ganze Seite statt des Fotos – dann liegt das Schließen-X
+  // außerhalb des Bildschirms und die Ansicht lässt sich nicht mehr verlassen
+  $effect(() => {
+    const blockPageZoom = (e) => e.preventDefault();
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend'])
+      document.addEventListener(type, blockPageZoom);
+    return () => {
+      for (const type of ['gesturestart', 'gesturechange', 'gestureend'])
+        document.removeEventListener(type, blockPageZoom);
+    };
+  });
+
   function keydown(e) {
     if (editDate || editLocation || leaving || e.target.closest?.('input, textarea, .modal')) return;
     if (e.key === 'Escape') close();
@@ -304,6 +316,10 @@
     if (!done || done.type === 'pinch' || e.type === 'pointercancel') return;
     const dx = x - done.sx;
     const dy = y - done.sy;
+    if (done.type === 'swipe' && dy > 80 && Math.abs(dy) > Math.abs(dx)) {
+      close();
+      return;
+    }
     if (done.type === 'swipe' && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
       go(dx < 0 ? 1 : -1);
       return;
@@ -675,7 +691,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 12px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 12px
+      calc(12px + env(safe-area-inset-left, 0px));
     background: linear-gradient(rgb(0 0 0 / 0.55), transparent);
     z-index: 2;
   }

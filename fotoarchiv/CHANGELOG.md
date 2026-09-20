@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.39
+
+- **iPhone: Einzelansicht ließ sich nicht mehr schließen**, wenn Safari statt des Fotos die ganze Seite zoomte und das X aus dem Bild schob. Der Seitenzoom ist in der Einzelansicht jetzt gesperrt (gezoomt wird das Foto selbst), das X weicht Notch/Dynamic Island aus (Safe-Area), und **Wischen nach unten schließt** die Ansicht zusätzlich
+
 ## 0.38
 
 - **Ordner hochladen** (nur am PC/Mac): neuer Knopf neben „Hochladen“ wählt einen ganzen Ordner samt Unterordnern; versteckte Dateien (.DS_Store u. Ä.) werden übersprungen. Wie bisher gilt: schon vorhandene Dateien werden nicht erneut gesendet, große Uploads laufen in 32-MB-Stücken mit Fortsetzen. Auf iPhone/iPad und Android gibt es keinen Ordner-Dialog – dort erscheint der Knopf nicht
