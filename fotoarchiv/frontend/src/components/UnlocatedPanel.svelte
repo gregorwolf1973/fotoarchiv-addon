@@ -34,6 +34,7 @@
   // ── Ziehen: Maus sofort, Touch nach langem Drücken ──────────────
   let press = null;
   let suppressClick = false;
+  let lastClicked = null; // Index des zuletzt angeklickten Bildes, Anker für Shift+Klick
 
   function pointerdown(e, item) {
     if (e.button !== 0) return;
@@ -85,13 +86,22 @@
     press = null;
   }
 
-  function click(item) {
+  function click(e, item, index) {
     if (suppressClick) {
       suppressClick = false;
       return;
     }
-    if (selected.has(item[0])) selected.delete(item[0]);
-    else selected.add(item[0]);
+    if (e.shiftKey && lastClicked !== null) {
+      // Bereich vom letzten Klick bis hier, wie in der Galerie
+      const [from, to] = lastClicked < index ? [lastClicked, index] : [index, lastClicked];
+      for (let i = from; i <= to; i++) selected.add(items[i][0]);
+      window.getSelection?.()?.removeAllRanges(); // Shift+Klick markiert sonst Text
+    } else if (selected.has(item[0])) {
+      selected.delete(item[0]);
+    } else {
+      selected.add(item[0]);
+    }
+    lastClicked = index;
   }
 
   // Während des Ziehens darf die Liste nicht scrollen (touchmove muss dafür nicht-passiv sein)
@@ -122,7 +132,7 @@
           <span>{formatNumber(selected.size)} ausgewählt</span>
           <button class="link" onclick={() => selected.clear()}>Aufheben</button>
         {:else}
-          <span class="muted">Fotos auf die Karte ziehen. Antippen wählt mehrere aus.</span>
+          <span class="muted">Fotos auf die Karte ziehen. Klick wählt aus, Shift+Klick einen Bereich.</span>
         {/if}
         <span class="grow"></span>
         {#if selected.size < items.length}
@@ -142,7 +152,7 @@
               style:top="{Math.floor(index / columns) * (tile + GAP)}px"
               title={dateFormat.format(item[1] * 1000)}
               onpointerdown={(e) => pointerdown(e, item)}
-              onclick={() => click(item)}
+              onclick={(e) => click(e, item, index)}
               ondblclick={() => onopen(items.map((i) => i[0]), item[0])}
               oncontextmenu={(e) => e.preventDefault()}
             >

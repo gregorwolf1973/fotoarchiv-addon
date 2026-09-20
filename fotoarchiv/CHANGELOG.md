@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.43
+
+- Karte: Im Fenster „Ohne Ort“ wählt **Shift+Klick** einen ganzen Bereich aus, wie in der Galerie
+
 ## 0.42
 
 - **Umwandeln: Halbbilder werden aufgelöst.** DV-, DVD- und Camcorder-Aufnahmen (interlaced) bekamen bisher Kammartefakte bei Bewegung; jetzt rechnet yadif Vollbilder daraus. Auch abspielbare H.264-Videos mit Halbbildern werden dafür umgewandelt
