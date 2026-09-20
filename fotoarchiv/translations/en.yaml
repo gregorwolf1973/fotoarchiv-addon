@@ -37,6 +37,11 @@ configuration:
       Check the import folder every minute and import new, completely copied files on its own – e.g. for a phone
       uploading to the Samba share via FolderSync or PhotoSync over Wi-Fi. One way only: nothing is ever written
       back to the phone. Files already in the archive or trash are deleted instead of moved to _duplikate.
+  map_language:
+    name: Map labels
+    description: >-
+      de: German map style (openstreetmap.de) – countries and places in German, local names in brackets.
+      local: openstreetmap.org – every country in its own language and script. Takes effect after reloading the page.
   public_enabled:
     name: Internet access
     description: >-

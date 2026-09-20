@@ -249,6 +249,7 @@ def test_security_headers(public):
     assert headers["X-Frame-Options"] == "DENY" and headers["X-Content-Type-Options"] == "nosniff"
     assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
     assert "https://tile.openstreetmap.de" in headers["Content-Security-Policy"]
+    assert "https://server.arcgisonline.com" in headers["Content-Security-Policy"]  # Satellitenbild
     assert headers["Strict-Transport-Security"].startswith("max-age=")
     assert headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
 

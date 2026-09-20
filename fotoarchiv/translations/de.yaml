@@ -40,6 +40,11 @@ configuration:
       das per FolderSync oder PhotoSync im WLAN in den Samba-Ordner hochlädt. Nur in eine Richtung: aufs Handy
       wird nie geschrieben. Dateien, die schon im Archiv oder im Papierkorb liegen, werden gelöscht statt in
       _duplikate verschoben.
+  map_language:
+    name: Kartenbeschriftung
+    description: >-
+      de: deutscher Kartenstil (openstreetmap.de) – Länder und Orte auf Deutsch, die Landessprache in Klammern.
+      local: openstreetmap.org – jedes Land in seiner eigenen Sprache und Schrift. Wirkt nach dem Neuladen der Seite.
   public_enabled:
     name: Internetzugang
     description: >-

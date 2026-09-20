@@ -210,6 +210,20 @@ label.field {
   filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.4));
 }
 
+.layer-toggle button {
+  min-height: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  font: 600 13px/30px Roboto, 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+.layer-toggle button:hover {
+  background: #f4f4f4;
+}
 .leaflet-container {
   font: inherit;
 }

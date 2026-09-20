@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.45
+
+- Karte: Knopf **Satellit** oben rechts (Esri World Imagery mit Grenzen und Ortsnamen), auch im Ortsdialog; die Wahl bleibt auf dem Gerät gespeichert
+- Neue Option **`map_language`**: `de` = deutscher Kartenstil, `local` = jedes Land in seiner eigenen Sprache
+
 ## 0.44
 
 - Karte im **deutschen Kartenstil** (openstreetmap.de): Länder und Orte heißen jetzt auf Deutsch, die Landessprache steht in Klammern – bisher standen z. B. arabische oder griechische Schriftzeichen auf der Karte

@@ -210,6 +210,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             "instance": db.instance,
             "counts": dict(counts),
             "library": None if public else str(settings.library),
+            "map_language": settings.map_language,
             "import_dir": None if public else str(settings.import_dir),
             "trash_days": settings.trash_days,
             "importing": importer.job.running,

@@ -47,6 +47,7 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
 | `convert_on_import` | `false` | HEIC und nicht abspielbare Videos beim Import umwandeln, siehe [Umwandeln](#umwandeln) |
 | `auto_import` | `false` | Import-Ordner jede Minute prüfen und neue Dateien selbst einlesen, siehe [Handy automatisch sichern](#handy-automatisch-sichern) |
+| `map_language` | `de` | Kartenbeschriftung: `de` = deutscher Kartenstil, `local` = jedes Land in seiner Sprache |
 | `public_enabled` | `false` | Internetzugang auf Port 8301 starten |
 | `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
 | `public_cookie_secure` | `true` | Sitzungs-Cookie nur über HTTPS (nur zum Testen ausschalten) |
@@ -209,7 +210,7 @@ Mit `duplicate_detection: false` wird die Suche abgeschaltet.
 - In der **Einzelansicht** lässt sich der Ort über das Stift-Symbol setzen oder korrigieren: in die Karte tippen oder die Stecknadel verschieben.
 - **Zeitraum:** Unten auf der Karte schaltet *Zeitraum* einen Zeitregler ein. Dann zeigt die Karte nur Fotos aus diesem Zeitraum, standardmäßig ein Jahr; die Länge lässt sich auf 2, 3, 5 oder 10 Jahre stellen. Mit dem Regler oder den Pfeilen ◀ ▶ wandert der Zeitraum vom ältesten Foto bis zum aktuellen Jahr. Die Zahl daneben sagt, wie viele Fotos hineinfallen. Ein Klick auf das Jahr schaltet zurück auf alle Jahre.
 
-Die Kartenkacheln kommen von **OpenStreetMap** im deutschen Kartenstil (`tile.openstreetmap.de`, Namen auf Deutsch), die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
+Die Kartenkacheln kommen von **OpenStreetMap**, wahlweise im deutschen Kartenstil (`tile.openstreetmap.de`, Namen auf Deutsch) oder von `openstreetmap.org` in der Landessprache (Option `map_language`). Der Knopf **Satellit** oben rechts schaltet auf Satellitenbilder von **Esri** um, mit Grenzen und Ortsnamen auf Englisch; die Wahl bleibt auf dem Gerät gespeichert. Die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
 
 ## Umwandeln
 

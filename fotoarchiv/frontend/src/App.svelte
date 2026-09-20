@@ -6,6 +6,7 @@
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
   import { isIos, openedFromShare, registerServiceWorker, standalone, takeShared } from './lib/pwa.js';
+  import { mapSettings } from './lib/map.js';
   import AccessPanel from './components/AccessPanel.svelte';
   import PasswordDialog from './components/PasswordDialog.svelte';
   import ProposeDeleteDialog from './components/ProposeDeleteDialog.svelte';
@@ -119,6 +120,7 @@
       }
       if (next.tasks_running || pending.size) await checkTasks();
       info = next;
+      mapSettings.language = next.map_language ?? 'de';
       failure = '';
     } catch (e) {
       failure = e.message;
