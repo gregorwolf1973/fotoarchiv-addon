@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.40
+
+- **Keine doppelten Umwandlungen mehr:** Wer ein Original aus dem Papierkorb wiederherstellt und noch einmal „Umwandeln“ wählt, bekam bisher eine zweite Fassung mit `_1` im Namen. Jetzt meldet das Add-on, wo die fertige Datei liegt, und lässt das Original in Ruhe
+
 ## 0.39
 
 - **iPhone: Einzelansicht ließ sich nicht mehr schließen**, wenn Safari statt des Fotos die ganze Seite zoomte und das X aus dem Bild schob. Der Seitenzoom ist in der Einzelansicht jetzt gesperrt (gezoomt wird das Foto selbst), das X weicht Notch/Dynamic Island aus (Safe-Area), und **Wischen nach unten schließt** die Ansicht zusätzlich

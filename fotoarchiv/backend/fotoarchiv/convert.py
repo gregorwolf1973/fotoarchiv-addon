@@ -203,6 +203,11 @@ class ConvertService:
         source = self.settings.library / row["path"]
         if not source.is_file():
             raise EditError("Datei fehlt auf dem Datenträger")
+        twin = self.converted_twin(row)
+        if twin:
+            # Wer ein Original aus dem Papierkorb holt und erneut umwandelt, bekäme sonst eine zweite
+            # Fassung mit _1 im Namen – die fertige Datei liegt längst im Archiv
+            raise EditError(f"Es gibt schon eine umgewandelte Fassung: {twin}")
         info = media.probe(self.ffprobe, source) if row["kind"] == "video" else None
         plan = decide(source.suffix, row["kind"], info)
         if plan is None:
@@ -220,6 +225,17 @@ class ConvertService:
             return self._replace(row, source, temp, plan)
         finally:
             temp.unlink(missing_ok=True)
+
+    def converted_twin(self, row) -> str | None:
+        """Pfad einer schon vorhandenen Umwandlung derselben Quelldatei, sonst None.
+        Erkannt an md5_import (Prüfsumme beim Import) und einer anderen Dateiendung."""
+        suffix = Path(row["path"]).suffix.lower()
+        for other in self.db.query(
+                """SELECT path FROM assets WHERE md5_import = ? AND id != ? AND deleted_at IS NULL
+                   ORDER BY id""", (row["md5_import"], row["id"])):
+            if Path(other["path"]).suffix.lower() != suffix:
+                return other["path"]
+        return None
 
     def _heic_to_jpeg(self, source: Path, temp: Path):
         pyvips = media.pyvips

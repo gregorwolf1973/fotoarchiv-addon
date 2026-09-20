@@ -170,3 +170,27 @@ def test_request_restores_trashed_files_before_converting(settings, importer, ed
 
     service.request(asset_id)  # erneuter Aufruf (etwa nach unterbrochener Aufgabe) bleibt harmlos
     assert importer.db.one("SELECT convert FROM assets WHERE id = ?", (asset_id,))["convert"] == 1
+
+
+
+def test_no_second_conversion_after_restoring_the_original(settings, importer, editor, make_video):
+    """Original aus dem Papierkorb geholt und erneut umgewandelt: das Archiv hat die Fassung schon."""
+    from fotoarchiv.convert import ConvertService
+
+    source = make_video(settings.import_dir / "clip.mov")  # MOV mit H.264: wird verlustfrei zu MP4 umgepackt
+    asset_id = importer.import_file(source).asset_id
+    service = ConvertService(settings, importer.db, importer, editor)
+    service.request(asset_id)
+    assert service.work_once()
+    converted = importer.db.one("SELECT path FROM assets WHERE id = ?", (asset_id,))["path"]
+    assert converted.endswith(".mp4")
+
+    trashed = importer.db.one("SELECT id FROM assets WHERE deleted_at IS NOT NULL")["id"]
+    editor.restore(trashed)
+    service.request(trashed)
+    assert service.work_once()
+
+    row = importer.db.one("SELECT path, convert, convert_error FROM assets WHERE id = ?", (trashed,))
+    assert row["path"].endswith(".mov")  # unverändert, keine zweite MP4-Fassung
+    assert row["convert"] == -1 and converted in row["convert_error"]
+    assert not list((settings.library / converted).parent.glob("*_1.mp4"))
