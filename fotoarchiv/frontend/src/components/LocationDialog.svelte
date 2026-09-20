@@ -7,7 +7,8 @@
   // lat/lon: bisheriger Ort oder null. onsave({ lat, lon })
   // count > 1: der Ort gilt für eine Mehrfachauswahl
   // saveLabel: in der Einzelansicht "Übernehmen", gespeichert wird dort erst mit dem Speichern-Button
-  let { lat = null, lon = null, count = 1, saveLabel = 'Speichern', onsave, oncancel } = $props();
+  // hint: eigener Erklärtext (z. B. Gruppe verschieben) statt des Standards
+  let { lat = null, lon = null, count = 1, saveLabel = 'Speichern', hint = '', onsave, oncancel } = $props();
 
   let container = $state();
   // svelte-ignore state_referenced_locally
@@ -49,7 +50,9 @@
       <h2 id="location-title">Aufnahmeort</h2>
       <button class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
     </header>
-    {#if count > 1}
+    {#if hint}
+      <p>{hint}</p>
+    {:else if count > 1}
       <p>Alle <strong>{count}</strong> ausgewählten Dateien bekommen genau diesen Ort. In die Karte tippen oder die Stecknadel verschieben.</p>
     {:else}
       <p>In die Karte tippen oder die Stecknadel verschieben. Mit der Suche springst du schnell zu einem Ort.</p>

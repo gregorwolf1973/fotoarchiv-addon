@@ -29,9 +29,7 @@
   let unlocated = $state.raw([]);
   let dropActive = $state(false);
   let menu = $state(null); // Rechtsklick-Menü: { x, y, ids, lat, lon, feature, item }
-  let editing = $state(null); // Ortsdialog für eine Gruppe: { ids, lat, lon }
-  // Ziehen nur mit der Maus: am Touchscreen wäre jeder Wischversuch ein Verschieben; dort gibt es das Menü (lange drücken)
-  const touch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  let editing = $state(null); // Ortsdialog aus dem Menü: { ids, lat, lon, mode: 'shift' | 'place' }
   let collapsed = $state(readCollapsed());
 
   function readCollapsed() {
@@ -182,20 +180,13 @@
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
       });
-      const marker = L.marker([lat, lon], { icon, keyboard: false, draggable: canEdit && !touch });
+      const marker = L.marker([lat, lon], { icon, keyboard: false });
       marker.on('click', () => (props.cluster ? openCluster(feature, lat, lon) : openInView(item[0])));
       marker.on('contextmenu', (e) => {
         L.DomEvent.stop(e.originalEvent);
         const rect = container.getBoundingClientRect();
         menu = { x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, ids: groupIds(feature, item), lat, lon, feature, item };
       });
-      if (canEdit && !touch) {
-        // Gruppe verschieben: alle Fotos darin um denselben Versatz, ihre Anordnung bleibt
-        marker.on('dragend', () => {
-          const to = marker.getLatLng().wrap();
-          shiftGroup(groupIds(feature, item), to.lat - lat, to.lng - lon);
-        });
-      }
       marker.addTo(layer);
     }
   }
@@ -205,7 +196,8 @@
     return clusters.getLeaves(feature.properties.cluster_id, Infinity).map((l) => shown[l.properties.index][0]);
   }
 
-  // ── Verschieben ────────────────────────────────────────────────
+  // ── Verschieben (Rechtsklick-Menü) ─────────────────────────────
+  // Eine Gruppe wandert als Ganzes: alle Fotos darin um denselben Versatz, ihre Anordnung bleibt
   function shiftGroup(ids, dlat, dlon) {
     dlat = Number(dlat.toFixed(6));
     dlon = Number(dlon.toFixed(6));
@@ -300,9 +292,11 @@
   <LocationDialog
     lat={editing.lat}
     lon={editing.lon}
-    count={editing.ids.length}
+    count={editing.mode === 'place' ? editing.ids.length : 1}
+    hint={editing.mode === 'shift' ? `Die Stecknadel steht in der Mitte der Gruppe (${formatNumber(editing.ids.length)} Fotos). Verschiebe sie an die richtige Stelle – alle Fotos wandern mit, ihre Anordnung bleibt.` : ''}
     onsave={(location) => {
-      placeGroup(editing.ids, location);
+      if (editing.mode === 'shift') shiftGroup(editing.ids, location.lat - editing.lat, location.lon - editing.lon);
+      else placeGroup(editing.ids, location);
       editing = null;
     }}
     oncancel={() => (editing = null)}
@@ -321,7 +315,12 @@
       <div class="menu" style:left="{menu.x}px" style:top="{menu.y}px" role="menu">
         <div class="menu-title">{menu.ids.length === 1 ? '1 Foto' : `${formatNumber(menu.ids.length)} Fotos`}</div>
         {#if canEdit}
-          <button role="menuitem" onclick={() => (editing = { ids: menu.ids, lat: menu.lat, lon: menu.lon })}>Ort ändern …</button>
+          {#if menu.ids.length > 1}
+            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'shift' })}>Gruppe verschieben …</button>
+            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'place' })}>Alle auf einen Punkt …</button>
+          {:else}
+            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'place' })}>Ort ändern …</button>
+          {/if}
           <button role="menuitem" onclick={() => removeLocation(menu.ids)}>Ort entfernen</button>
         {/if}
         <button role="menuitem" onclick={() => showGroup(menu)}>Ansehen</button>
@@ -417,9 +416,6 @@
   }
   .menu button:hover {
     background: var(--chip);
-  }
-  .map-view :global(.leaflet-marker-draggable) {
-    cursor: grab;
   }
   .drop-hint {
     position: absolute;

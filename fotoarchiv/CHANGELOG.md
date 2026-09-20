@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.47
+
+- Karte: Das Ziehen von Fotos mit der Maus ist wieder weg, es war zu fehleranfällig. Verschoben wird nur noch über das Rechtsklick-Menü, das jetzt für Gruppen zwei Wege bietet: *Gruppe verschieben …* (Anordnung bleibt) und *Alle auf einen Punkt …*
+
 ## 0.46
 
 - Karte: Fotos und ganze Gruppen lassen sich **mit der Maus verschieben**; eine Gruppe wandert als Ganzes, die Anordnung bleibt. Mit „Rückgängig“
