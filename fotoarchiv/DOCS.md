@@ -209,7 +209,7 @@ Mit `duplicate_detection: false` wird die Suche abgeschaltet.
 - In der **Einzelansicht** lässt sich der Ort über das Stift-Symbol setzen oder korrigieren: in die Karte tippen oder die Stecknadel verschieben.
 - **Zeitraum:** Unten auf der Karte schaltet *Zeitraum* einen Zeitregler ein. Dann zeigt die Karte nur Fotos aus diesem Zeitraum, standardmäßig ein Jahr; die Länge lässt sich auf 2, 3, 5 oder 10 Jahre stellen. Mit dem Regler oder den Pfeilen ◀ ▶ wandert der Zeitraum vom ältesten Foto bis zum aktuellen Jahr. Die Zahl daneben sagt, wie viele Fotos hineinfallen. Ein Klick auf das Jahr schaltet zurück auf alle Jahre.
 
-Die Kartenkacheln kommen von **OpenStreetMap**, die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
+Die Kartenkacheln kommen von **OpenStreetMap** im deutschen Kartenstil (`tile.openstreetmap.de`, Namen auf Deutsch), die Ortssuche nutzt **OpenStreetMap Nominatim**. Dafür lädt dein Browser Daten von diesen Diensten. Die Suchbegriffe gehen dabei an Nominatim, deine Fotos verlassen Home Assistant nicht.
 
 ## Umwandeln
 

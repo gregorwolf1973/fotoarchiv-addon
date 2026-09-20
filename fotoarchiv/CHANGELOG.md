@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.44
+
+- Karte im **deutschen Kartenstil** (openstreetmap.de): Länder und Orte heißen jetzt auf Deutsch, die Landessprache steht in Klammern – bisher standen z. B. arabische oder griechische Schriftzeichen auf der Karte
+
 ## 0.43
 
 - Karte: Im Fenster „Ohne Ort“ wählt **Shift+Klick** einen ganzen Bereich aus, wie in der Galerie

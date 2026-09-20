@@ -50,7 +50,7 @@ ALLOWED = {"viewer": set(), "uploader": EDIT - DELETING, "editor": EDIT}
 IMAGES = {"asset_thumb", "asset_preview", "asset_original", "face_crop"}
 
 CSP = (
-    "default-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; "
+    "default-src 'self'; img-src 'self' data: https://tile.openstreetmap.de; "
     "connect-src 'self' https://nominatim.openstreetmap.org; style-src 'self' 'unsafe-inline'; "
     "script-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
     "frame-ancestors 'none'"

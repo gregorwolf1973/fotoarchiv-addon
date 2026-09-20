@@ -3,8 +3,10 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+// Deutscher Kartenstil: Länder- und Ortsnamen auf Deutsch, die Landessprache in Klammern –
+// die Kacheln von openstreetmap.org beschriften in der jeweiligen Landessprache (arabisch, griechisch …)
+const TILES = 'https://tile.openstreetmap.de/{z}/{x}/{y}.png';
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://www.openstreetmap.de" target="_blank" rel="noopener">openstreetmap.de</a>';
 // Home Assistant sendet "Referrer-Policy: no-referrer". OpenStreetMap blockiert Anfragen ohne Referer,
 // daher hier ausdrücklich nur den Ursprung (z. B. https://ha.example.org/) mitschicken – nie Pfad oder Ingress-Token.
 const REFERRER_POLICY = 'strict-origin-when-cross-origin';
