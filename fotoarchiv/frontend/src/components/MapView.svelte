@@ -7,8 +7,10 @@
   import { onMount, untrack } from 'svelte';
   import Supercluster from 'supercluster';
   import { api, thumbUrl } from '../lib/api.js';
+  import { formatNumber } from '../lib/format.js';
   import { createMap, L } from '../lib/map.js';
   import { notifyError } from '../lib/notices.svelte.js';
+  import LocationDialog from './LocationDialog.svelte';
   import MapTimeline from './MapTimeline.svelte';
   import PlaceSearch from './PlaceSearch.svelte';
   import UnlocatedPanel from './UnlocatedPanel.svelte';
@@ -26,6 +28,10 @@
   let points = $state.raw([]); // [id, ts, w, h, video, rev, lat, lon]
   let unlocated = $state.raw([]);
   let dropActive = $state(false);
+  let menu = $state(null); // Rechtsklick-Menü: { x, y, ids, lat, lon, feature, item }
+  let editing = $state(null); // Ortsdialog für eine Gruppe: { ids, lat, lon }
+  // Ziehen nur mit der Maus: am Touchscreen wäre jeder Wischversuch ein Verschieben; dort gibt es das Menü (lange drücken)
+  const touch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   let collapsed = $state(readCollapsed());
 
   function readCollapsed() {
@@ -129,6 +135,8 @@
     layer = L.layerGroup().addTo(map);
     if (saved.center) map.setView(saved.center, saved.zoom);
     else map.setView([30, 10], 2);
+    map.on('contextmenu', () => (menu = null)); // Rechtsklick auf die Karte selbst: nichts
+    map.on('movestart', () => (menu = null));
     map.on('moveend', () => {
       saved.center = map.getCenter();
       saved.zoom = map.getZoom();
@@ -174,9 +182,71 @@
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
       });
-      L.marker([lat, lon], { icon, keyboard: false })
-        .on('click', () => (props.cluster ? openCluster(feature, lat, lon) : openInView(item[0])))
-        .addTo(layer);
+      const marker = L.marker([lat, lon], { icon, keyboard: false, draggable: canEdit && !touch });
+      marker.on('click', () => (props.cluster ? openCluster(feature, lat, lon) : openInView(item[0])));
+      marker.on('contextmenu', (e) => {
+        L.DomEvent.stop(e.originalEvent);
+        const rect = container.getBoundingClientRect();
+        menu = { x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, ids: groupIds(feature, item), lat, lon, feature, item };
+      });
+      if (canEdit && !touch) {
+        // Gruppe verschieben: alle Fotos darin um denselben Versatz, ihre Anordnung bleibt
+        marker.on('dragend', () => {
+          const to = marker.getLatLng().wrap();
+          shiftGroup(groupIds(feature, item), to.lat - lat, to.lng - lon);
+        });
+      }
+      marker.addTo(layer);
+    }
+  }
+
+  function groupIds(feature, item) {
+    if (!feature.properties.cluster) return [item[0]];
+    return clusters.getLeaves(feature.properties.cluster_id, Infinity).map((l) => shown[l.properties.index][0]);
+  }
+
+  // ── Verschieben ────────────────────────────────────────────────
+  function shiftGroup(ids, dlat, dlon) {
+    dlat = Number(dlat.toFixed(6));
+    dlon = Number(dlon.toFixed(6));
+    if (!dlat && !dlon) return;
+    const moving = new Set(ids);
+    // Sofort anzeigen, der Server schreibt im Hintergrund in die Dateien
+    points = points.map((p) => (moving.has(p[0]) ? [...p.slice(0, 6), Math.max(-90, Math.min(90, p[6] + dlat)), ((p[7] + dlon + 540) % 360) - 180] : p));
+    onbatch({ ids, action: 'shift', dlat, dlon }, () => shiftGroup(ids, -dlat, -dlon));
+  }
+
+  function placeGroup(ids, location) {
+    // Alle auf genau diesen Punkt (Ortsdialog); Rückgängig stellt jeden alten Ort einzeln wieder her
+    const moving = new Set(ids);
+    const before = points.filter((p) => moving.has(p[0])).map((p) => [p[0], p[6], p[7]]);
+    points = points.map((p) => (moving.has(p[0]) ? [...p.slice(0, 6), location.lat, location.lon] : p));
+    onbatch({ ids, action: 'location', location }, () => restore(before));
+  }
+
+  function removeLocation(ids) {
+    const moving = new Set(ids);
+    const before = points.filter((p) => moving.has(p[0])).map((p) => [p[0], p[6], p[7]]);
+    points = points.filter((p) => !moving.has(p[0]));
+    onbatch({ ids, action: 'location', location: null }, () => restore(before));
+  }
+
+  async function restore(before) {
+    try {
+      await Promise.all(before.map(([id, lat, lon]) => api.update(id, { location: { lat, lon } })));
+    } catch (e) {
+      notifyError(e);
+    }
+    load(filters);
+  }
+
+  function showGroup(m) {
+    if (m.feature.properties.cluster) {
+      const leaves = clusters.getLeaves(m.feature.properties.cluster_id, Infinity).map((l) => shown[l.properties.index]);
+      leaves.sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+      onopen(leaves.map((i) => i[0]), leaves[0][0]);
+    } else {
+      openInView(m.item[0]);
     }
   }
 
@@ -224,6 +294,21 @@
   }
 </script>
 
+<svelte:window onclick={() => (menu = null)} onkeydown={(e) => e.key === 'Escape' && (menu = null)} />
+
+{#if editing}
+  <LocationDialog
+    lat={editing.lat}
+    lon={editing.lon}
+    count={editing.ids.length}
+    onsave={(location) => {
+      placeGroup(editing.ids, location);
+      editing = null;
+    }}
+    oncancel={() => (editing = null)}
+  />
+{/if}
+
 <div class="map-view">
   <div class="map-wrap" class:drop={dropActive}>
     <div class="map" bind:this={container}></div>
@@ -232,6 +317,16 @@
       <MapTimeline {period} minYear={years.min} maxYear={years.max} count={shown.length} onchange={changePeriod} />
     </div>
     {#if dropActive}<div class="drop-hint">Hier loslassen, um den Ort zu setzen</div>{/if}
+    {#if menu}
+      <div class="menu" style:left="{menu.x}px" style:top="{menu.y}px" role="menu">
+        <div class="menu-title">{menu.ids.length === 1 ? '1 Foto' : `${formatNumber(menu.ids.length)} Fotos`}</div>
+        {#if canEdit}
+          <button role="menuitem" onclick={() => (editing = { ids: menu.ids, lat: menu.lat, lon: menu.lon })}>Ort ändern …</button>
+          <button role="menuitem" onclick={() => removeLocation(menu.ids)}>Ort entfernen</button>
+        {/if}
+        <button role="menuitem" onclick={() => showGroup(menu)}>Ansehen</button>
+      </div>
+    {/if}
   </div>
   {#if canEdit}
   <UnlocatedPanel
@@ -289,6 +384,42 @@
     transform: translateX(-50%);
     max-width: calc(100% - 24px);
     pointer-events: none;
+  }
+  .menu {
+    position: absolute;
+    z-index: 700;
+    min-width: 180px;
+    padding: 4px 0;
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 8px 30px rgb(0 0 0 / 0.3);
+    pointer-events: auto;
+  }
+  .menu-title {
+    padding: 6px 14px 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .menu button {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-weight: 400;
+    text-align: left;
+  }
+  .menu button:hover {
+    background: var(--chip);
+  }
+  .map-view :global(.leaflet-marker-draggable) {
+    cursor: grab;
   }
   .drop-hint {
     position: absolute;

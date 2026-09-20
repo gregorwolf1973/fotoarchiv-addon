@@ -100,6 +100,7 @@ def register_task_actions(tasks: TaskRunner, editor: Editor, faces: FaceService,
     tasks.register("labels", lambda p: lambda i: editor.change_labels(i, p["kind"], p["add"], p["remove"]))
     tasks.register("date", lambda p: lambda i: editor.set_date(i, datetime.fromisoformat(p["taken_at"])))
     tasks.register("location", lambda p: lambda i: editor.set_location(i, p["lat"], p["lon"]))
+    tasks.register("shift", lambda p: lambda i: editor.shift_location(i, p["dlat"], p["dlon"]))
     tasks.register("rotate", lambda p: lambda i: editor.rotate(i, p["degrees"]), repeatable=False)
     # Beim Wiederholen nach Neustart ist das Foto womöglich schon gelöscht/wiederhergestellt – kein Fehler
     tasks.register("delete", lambda p: editor.delete, tolerate_on_resume=True)

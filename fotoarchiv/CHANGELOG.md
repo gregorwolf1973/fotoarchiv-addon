@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.46
+
+- Karte: Fotos und ganze Gruppen lassen sich **mit der Maus verschieben**; eine Gruppe wandert als Ganzes, die Anordnung bleibt. Mit „Rückgängig“
+- Karte: **Rechtsklick-Menü** (am Handy lange drücken) mit *Ort ändern …* (Ortsdialog mit Suche, alle auf einen Punkt), *Ort entfernen* und *Ansehen*
+
 ## 0.45
 
 - Karte: Knopf **Satellit** oben rechts (Esri World Imagery mit Grenzen und Ortsnamen), auch im Ortsdialog; die Wahl bleibt auf dem Gerät gespeichert

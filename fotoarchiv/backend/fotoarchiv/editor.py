@@ -178,6 +178,16 @@ class Editor:
         _prune_empty_dirs(source.parent, self.settings.library)
 
     # ── Ort ────────────────────────────────────────────────────────
+    def shift_location(self, asset_id: int, dlat: float, dlon: float):
+        """Ort um einen Versatz verschieben – eine Gruppe wird auf der Karte gezogen, die Anordnung bleibt.
+        Fotos ohne Ort bleiben unberührt."""
+        row = self.db.one("SELECT lat, lon FROM assets WHERE id = ?", (asset_id,))
+        if row is None or row["lat"] is None:
+            raise EditError("Kein Aufnahmeort")
+        lat = max(-90.0, min(90.0, row["lat"] + dlat))
+        lon = ((row["lon"] + dlon + 180.0) % 360.0) - 180.0  # über die Datumsgrenze hinaus
+        self.set_location(asset_id, round(lat, 6), round(lon, 6))
+
     def set_location(self, asset_id: int, lat: float | None, lon: float | None):
         with self._lock:
             row = self._asset(asset_id)

@@ -112,12 +112,14 @@ class RotateRequest(BaseModel):
 
 class BatchRequest(BaseModel):
     ids: list[int] = Field(min_length=1)
-    action: Literal["tags", "persons", "date", "location", "rotate", "delete", "restore", "purge", "convert"]
+    action: Literal["tags", "persons", "date", "location", "shift", "rotate", "delete", "restore", "purge", "convert"]
     add: list[str] = []
     remove: list[str] = []
     taken_at: datetime | None = None
     degrees: Literal[90, 180, 270] | None = None
     location: Location | None = None  # bei action=location: null entfernt den Ort
+    dlat: float | None = Field(None, ge=-180, le=180)  # bei action=shift: Versatz in Grad
+    dlon: float | None = Field(None, ge=-360, le=360)
 
 
 def day_start(day: date) -> int:
@@ -422,6 +424,10 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             loc = body.location
             label = f"Ort bei {count} Dateien {'setzen' if loc else 'entfernen'}"
             params = {"lat": loc.lat if loc else None, "lon": loc.lon if loc else None}
+        elif body.action == "shift":
+            if body.dlat is None or body.dlon is None:
+                raise HTTPException(400, "Versatz fehlt")
+            label, params = f"{count} Dateien auf der Karte verschieben", {"dlat": body.dlat, "dlon": body.dlon}
         elif body.action == "rotate":
             if body.degrees is None:
                 raise HTTPException(400, "Drehung fehlt")

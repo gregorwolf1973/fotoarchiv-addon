@@ -344,3 +344,17 @@ def test_failed_thumbnail_is_retried_and_leaves_the_damaged_list(client, setting
     monkeypatch.setattr(media, "thumbnail", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("kaputt")))
     assert client.get(f"/api/assets/{asset_id}/thumb").headers.get("X-Fotoarchiv-Placeholder") == "1"
     assert importer.db.one("SELECT thumb_ok FROM assets WHERE id = ?", (asset_id,))["thumb_ok"] == -1
+
+
+
+def test_batch_shift_moves_a_group_and_keeps_its_arrangement(client, make_jpeg, tmp_path):
+    a = upload(client, make_jpeg, tmp_path, "IMG_20240601_100000.jpg", GPSLatitude=48.0, GPSLongitude=11.0, GPSLatitudeRef="N", GPSLongitudeRef="E")
+    b = upload(client, make_jpeg, tmp_path, "IMG_20240601_100100.jpg", GPSLatitude=48.001, GPSLongitude=11.002, GPSLatitudeRef="N", GPSLongitudeRef="E")
+    without = upload(client, make_jpeg, tmp_path, "IMG_20240601_100200.jpg")
+    assert client.post("/api/batch", json={"ids": [a, b], "action": "shift"}).status_code == 400
+    client.post("/api/batch", json={"ids": [a, b, without], "action": "shift", "dlat": 0.5, "dlon": -0.25})
+    task = wait_for_tasks(client)
+    assert len(task["failed"]) == 1 and str(without) in str(task["failed"][0])  # ohne Ort: bleibt unberührt
+    moved = {i: client.get(f"/api/assets/{i}").json() for i in (a, b)}
+    assert (round(moved[a]["lat"], 4), round(moved[a]["lon"], 4)) == (48.5, 10.75)
+    assert (round(moved[b]["lat"], 4), round(moved[b]["lon"], 4)) == (48.501, 10.752)
