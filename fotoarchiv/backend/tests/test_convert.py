@@ -151,3 +151,22 @@ def test_import_and_convert_mpg_wmv(settings, importer, editor, suffix, codecs):
     row = importer.db.one("SELECT path, mime, convert, convert_error FROM assets WHERE id = ?", (result.asset_id,))
     assert row["convert"] == 0, row["convert_error"]
     assert row["path"].endswith(".mp4") and row["mime"] == "video/mp4"
+
+
+def test_request_restores_trashed_files_before_converting(settings, importer, editor, make_video):
+    """Videos im Papierkorb: „Umwandeln“ holt sie zurück und merkt sie vor."""
+    from fotoarchiv.convert import ConvertService
+
+    asset_id = importer.import_file(make_video(settings.import_dir / "alt.avi")).asset_id
+    editor.delete(asset_id)
+    assert importer.db.one("SELECT deleted_at FROM assets WHERE id = ?", (asset_id,))["deleted_at"]
+
+    service = ConvertService(settings, importer.db, importer, editor)
+    service.request(asset_id)
+
+    row = importer.db.one("SELECT path, deleted_at, convert FROM assets WHERE id = ?", (asset_id,))
+    assert row["deleted_at"] is None and row["convert"] == 1
+    assert (settings.library / row["path"]).is_file()
+
+    service.request(asset_id)  # erneuter Aufruf (etwa nach unterbrochener Aufgabe) bleibt harmlos
+    assert importer.db.one("SELECT convert FROM assets WHERE id = ?", (asset_id,))["convert"] == 1

@@ -124,10 +124,14 @@ class ConvertService:
         return suffix in HEIF_SUFFIXES if kind == "image" else suffix not in SKIP_SUFFIXES
 
     def request(self, asset_id: int):
-        """Für die Mehrfachaktion: vormerken, der Hintergrund-Thread erledigt den Rest."""
-        row = self.db.one("SELECT path, kind FROM assets WHERE id = ? AND deleted_at IS NULL", (asset_id,))
+        """Für die Mehrfachaktion: vormerken, der Hintergrund-Thread erledigt den Rest.
+        Einträge im Papierkorb werden zuerst wiederhergestellt und dann vorgemerkt."""
+        row = self.db.one("SELECT path, kind, deleted_at FROM assets WHERE id = ?", (asset_id,))
         if row is None:
             raise EditError("Bild nicht gefunden")
+        if row["deleted_at"]:
+            self.editor.restore(asset_id)
+            row = self.db.one("SELECT path, kind FROM assets WHERE id = ?", (asset_id,))
         if self.candidate(row["path"], row["kind"]):
             self.db.execute("UPDATE assets SET convert = 1, convert_error = NULL WHERE id = ?", (asset_id,))
             self.wake()

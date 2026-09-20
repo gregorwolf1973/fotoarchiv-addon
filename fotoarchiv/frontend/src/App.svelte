@@ -413,6 +413,7 @@
       type: 'confirm',
       title: 'Umwandeln?',
       text:
+        (trash ? 'Die Dateien werden zuerst aus dem Papierkorb wiederhergestellt. ' : '') +
         `HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann, zu MP4 (H.264). ` +
         `Andere Dateien bleiben, wie sie sind. Die neue Datei ersetzt das Original; das Original kommt für ` +
         `${info?.trash_days ?? 30} Tage in den Papierkorb. Ein Video braucht auf dem Pi etwa so lange, wie es dauert.`,
@@ -475,6 +476,9 @@
           <Icon name="restore" size={20} /><span class="label">Wiederherstellen</span>
         </button>
         {#if isAdmin}
+          <button onclick={() => confirmConvert([...selected])} title="Wiederherstellen und umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4">
+            <Icon name="convert" size={20} /><span class="label">Umwandeln</span>
+          </button>
           <button class="danger" onclick={() => confirmPurge([...selected])} title="Endgültig löschen">
             <Icon name="deleteForever" size={20} /><span class="label">Endgültig löschen</span>
           </button>

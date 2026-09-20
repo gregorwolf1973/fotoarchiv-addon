@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.37
+
+- **Umwandeln aus dem Papierkorb:** Die Auswahl im Papierkorb bietet jetzt „Umwandeln“ an (nur über Home Assistant). Die Dateien werden zuerst wiederhergestellt und dann wie gewohnt umgewandelt – für Videos, die im Papierkorb gelandet sind, weil sie sich nicht abspielen ließen
+
 ## 0.36
 
 - Neue Videoformate: **MPG/MPEG** (ältere Kameras, DVD-Rekorder) und **WMV** (Windows). Browser spielen sie nicht ab; mit „Beim Import umwandeln“ werden sie gleich zu H.264-MP4, sonst über „Umwandeln“ in der Auswahl
