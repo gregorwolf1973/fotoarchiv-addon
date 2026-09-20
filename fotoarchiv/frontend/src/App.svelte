@@ -627,7 +627,7 @@
     <div class="banner error"><Icon name="alert" size={18} /> Server nicht erreichbar: {failure}</div>
   {/if}
   {#if info?.converting?.pending}
-    <div class="banner"><span class="busy"></span> {`Umwandeln läuft: noch ${formatNumber(info.converting.pending)}${info.converting.current ? ` · gerade ${info.converting.current}` : ''}`}</div>
+    <div class="banner"><span class="busy"></span> {`Umwandeln läuft: noch ${formatNumber(info.converting.pending)}${info.converting.current ? ` · gerade ${info.converting.current}` : ''}${info.converting.progress != null ? ` · ${info.converting.progress} %` : ''}`}</div>
   {:else if info?.converting?.failed && isAdmin}
     <div class="banner error">
       <Icon name="alert" size={18} />

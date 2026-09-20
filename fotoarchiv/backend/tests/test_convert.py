@@ -6,10 +6,11 @@ import pytest
 from fotoarchiv.convert import decide, video_command
 
 
-def streams(video=None, pix="yuv420p", audio="aac", cover=False):
+def streams(video=None, pix="yuv420p", audio="aac", cover=False, field_order="progressive", width=1920, height=1080):
     result = []
     if video:
-        result.append({"codec_type": "video", "codec_name": video, "pix_fmt": pix})
+        result.append({"codec_type": "video", "codec_name": video, "pix_fmt": pix, "field_order": field_order,
+                       "width": width, "height": height})
     if cover:
         result.insert(0, {"codec_type": "video", "codec_name": "mjpeg", "disposition": {"attached_pic": 1}})
     if audio:
@@ -88,7 +89,7 @@ def test_convert_hevc_video_replaces_file_and_trashes_original(settings, importe
     trashed = importer.db.one("SELECT * FROM assets WHERE id != ? AND deleted_at IS NOT NULL", (asset_id,))
     assert trashed["path"].startswith(f"{TRASH_DIR}/") and trashed["orig_path"].endswith("clip.mov")
     assert (settings.library / trashed["path"]).is_file()
-    assert service.status() == {"pending": 0, "failed": 0, "errors": [], "current": None}
+    assert service.status() == {"pending": 0, "failed": 0, "errors": [], "current": None, "progress": None}
 
     service.request(asset_id)  # schon abspielbar: nichts mehr zu tun
     assert service.work_once() and importer.db.one("SELECT path FROM assets WHERE id = ?", (asset_id,))["path"] == row["path"]
@@ -194,3 +195,53 @@ def test_no_second_conversion_after_restoring_the_original(settings, importer, e
     assert row["path"].endswith(".mov")  # unverändert, keine zweite MP4-Fassung
     assert row["convert"] == -1 and converted in row["convert_error"]
     assert not list((settings.library / converted).parent.glob("*_1.mp4"))
+
+
+
+def test_interlaced_sources_get_deinterlaced_even_when_h264():
+    dvd = decide(".mpg", "video", streams("mpeg2video", audio="mp2", field_order="tt", width=720, height=576))
+    assert dvd.deinterlace and dvd.preset == "medium" and "Halbbilder" in dvd.reason
+    hdv = decide(".mp4", "video", streams("h264", field_order="bb"))  # abspielbar, aber Halbbilder
+    assert hdv.action == "transcode" and hdv.deinterlace and hdv.preset == "veryfast"
+    hd = decide(".mp4", "video", streams("hevc", width=1280, height=720))
+    assert not hd.deinterlace and hd.preset == "faster"
+    assert decide(".mp4", "video", streams("h264")) is None  # progressiv: nichts zu tun
+    command = video_command("ffmpeg", Path("a.mpg"), Path("b.mp4"), dvd)
+    assert "yadif=mode=send_frame:parity=auto:deint=all" in command[command.index("-vf") + 1]
+    assert command[command.index("-preset") + 1] == "medium"
+    assert "-vf" not in video_command("ffmpeg", Path("a.mp4"), Path("b.mp4"), hd)
+
+
+def test_progress_percent():
+    from fotoarchiv.convert import progress_percent
+    assert progress_percent("out_time_us=30000000\n", 120.0) == 25
+    assert progress_percent("out_time_ms=120000000", 120.0) == 100
+    assert progress_percent("frame=12", 120.0) is None
+    assert progress_percent("out_time_us=N/A", 120.0) is None
+    assert progress_percent("out_time_us=5000000", 0) is None
+
+
+def test_truncated_original_is_rescued_with_a_note(settings, importer, editor):
+    """AVI, dessen zweite Hälfte nur Nullen enthält (abgebrochene Kopie): der lesbare Teil wird gerettet."""
+    from conftest import FFMPEG
+    from fotoarchiv.convert import ConvertService
+
+    if not FFMPEG:
+        pytest.skip("ffmpeg nicht vorhanden")
+    source = settings.library / "2008" / "05" / "MVI_20080502_112009.avi"  # liegt schon in der Bibliothek
+    source.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                    "-i", "testsrc=size=320x240:rate=25", "-t", "8", "-c:v", "mjpeg", "-q:v", "5", str(source)], check=True)
+    data = bytearray(source.read_bytes())
+    half = len(data) // 2
+    data[half:] = bytes(len(data) - half)  # ab der Mitte nur noch Nullen, Kopf verspricht weiter 8 s
+    source.write_bytes(data)
+
+    asset_id = importer.import_file(source, move=False).asset_id  # move=False: die Schadensprüfung des Imports umgehen
+    service = ConvertService(settings, importer.db, importer, editor)
+    service.request(asset_id)
+    assert service.work_once()
+    row = importer.db.one("SELECT path, convert, convert_error, damaged FROM assets WHERE id = ?", (asset_id,))
+    assert row["convert"] == 0, row["convert_error"]
+    assert row["path"].endswith(".mp4") and row["damaged"] and "unvollständig" in row["damaged"]
+    assert "von 8 s" in row["damaged"]

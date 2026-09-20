@@ -12,6 +12,7 @@ Umwandeln eines Videos auf dem Pi so lange dauert wie das Video selbst.
 import logging
 import os
 import subprocess
+import tempfile
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -39,12 +40,27 @@ class Changed(Exception):
     """Der Eintrag hat sich während des Umwandelns geändert; später erneut versuchen."""
 
 
+INTERLACED = {"tt", "bb", "tb", "bt"}  # field_order von ffprobe: Halbbilder (DV, DVD, Camcorder, 1080i)
+
+
 @dataclass
 class Plan:
     action: str        # heic | remux | transcode
     suffix: str        # Endung der neuen Datei
     copy_audio: bool   # Tonspur übernehmen statt nach AAC umwandeln
     reason: str
+    deinterlace: bool = False   # Halbbilder zu Vollbildern zusammenrechnen (yadif)
+    preset: str = "veryfast"    # x264: SD darf sich Zeit lassen, 4K muss auf dem Pi schnell sein
+
+
+def x264_preset(width: int, height: int) -> str:
+    """Pi 5: SD in medium (~100 fps), HD in faster, ab 1080p veryfast – sonst dauert 4K Tage."""
+    pixels = (width or 0) * (height or 0)
+    if pixels <= 720 * 576:
+        return "medium"
+    if pixels <= 1280 * 720:
+        return "faster"
+    return "veryfast"
 
 
 def decide(suffix: str, kind: str, info: dict | None) -> Plan | None:
@@ -59,7 +75,9 @@ def decide(suffix: str, kind: str, info: dict | None) -> Plan | None:
     audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
     if video is None:
         return None
-    playable = video.get("codec_name") in PLAYABLE_CODECS and video.get("pix_fmt") in PLAYABLE_PIXELS
+    interlaced = video.get("field_order") in INTERLACED
+    playable = (video.get("codec_name") in PLAYABLE_CODECS and video.get("pix_fmt") in PLAYABLE_PIXELS
+                and not interlaced)  # Browser rechnen keine Halbbilder zusammen: Kammartefakte bei Bewegung
     audio_ok = audio is None or audio.get("codec_name") in MP4_AUDIO
     if playable and audio_ok and suffix in MP4_SUFFIXES:
         return None
@@ -67,8 +85,11 @@ def decide(suffix: str, kind: str, info: dict | None) -> Plan | None:
         return Plan("remux", ".mp4", audio_ok, f"{suffix.lstrip('.').upper()} → MP4 (verlustfrei umgepackt)")
     codec = video.get("codec_name") or "?"
     pixels = video.get("pix_fmt") or ""
-    detail = f"{codec}, {pixels}" if codec in PLAYABLE_CODECS else codec
-    return Plan("transcode", ".mp4", audio_ok, f"{detail} → H.264")
+    detail = f"{codec}, {pixels}" if codec in PLAYABLE_CODECS and not interlaced else codec
+    if interlaced:
+        detail += ", Halbbilder"
+    return Plan("transcode", ".mp4", audio_ok, f"{detail} → H.264", deinterlace=interlaced,
+                preset=x264_preset(int(video.get("width") or 0), int(video.get("height") or 0)))
 
 
 def _is_cover(stream: dict) -> bool:
@@ -85,9 +106,42 @@ def video_command(ffmpeg: str, source: Path, target: Path, plan: Plan) -> list[s
         command += ["-c:v", "copy", "-tag:v", "avc1"]
     else:
         # Drehung wird beim Umwandeln in die Bilder übernommen (autorotate), die neue Datei ist aufrecht
-        command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p"]
+        if plan.deinterlace:
+            # Ein Vollbild je Halbbildpaar: Bildrate bleibt (25i → 25p), keine Kammartefakte mehr
+            command += ["-vf", "yadif=mode=send_frame:parity=auto:deint=all"]
+        command += ["-c:v", "libx264", "-preset", plan.preset, "-crf", "21", "-pix_fmt", "yuv420p"]
     command += ["-c:a", "copy"] if plan.copy_audio else ["-c:a", "aac", "-b:a", "160k"]
     return command + [str(target)]
+
+
+def progress_percent(line: str, duration: float) -> int | None:
+    """Zeile aus ffmpeg -progress (out_time_us=…) in Prozent der Gesamtdauer."""
+    if not duration:
+        return None
+    key, _, value = line.strip().partition("=")
+    if key not in ("out_time_us", "out_time_ms"):
+        return None
+    try:
+        seconds = int(value) / 1_000_000
+    except ValueError:
+        return None
+    return max(0, min(100, int(seconds / duration * 100)))
+
+
+def readable_duration(ffprobe: str, source: Path) -> float:
+    """Bis wohin die Videospur wirklich Daten enthält – über die Zeitstempel der Pakete, ohne Dekodieren.
+    Nach dem Ende der Nutzdaten (etwa Nullbytes einer abgebrochenen Kopie) findet der Demuxer nichts mehr."""
+    result = subprocess.run(
+        [ffprobe, "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,dts_time",
+         "-of", "csv=p=0", str(source)], capture_output=True, text=True, timeout=1800)
+    last = 0.0
+    for line in result.stdout.splitlines():
+        for field in line.split(","):
+            try:
+                last = max(last, float(field))
+            except ValueError:
+                pass
+    return last
 
 
 def _lower_priority():
@@ -103,6 +157,7 @@ class ConvertService:
         self.on_import = on_import
         self.ffprobe = media.ffprobe_for(settings.ffmpeg)
         self.current: str | None = None
+        self.progress: int | None = None  # Prozent der laufenden Umwandlung, None ohne Angabe
         self._wake = threading.Event()
         self._stop = threading.Event()
         importer.hooks["imported"].append(self._on_imported)
@@ -145,7 +200,8 @@ class ConvertService:
                   for r in self.db.query(
                       """SELECT id, path, convert_error FROM assets WHERE convert = -1 AND deleted_at IS NULL
                          ORDER BY id DESC LIMIT 3""")] if row["failed"] else []
-        return {"pending": row["pending"], "failed": row["failed"], "errors": errors, "current": self.current}
+        return {"pending": row["pending"], "failed": row["failed"], "errors": errors, "current": self.current,
+                "progress": self.progress}
 
     def dismiss_failed(self) -> int:
         """Fehlschläge zur Kenntnis genommen: Hinweis ausblenden. Der Grund bleibt in convert_error,
@@ -191,6 +247,7 @@ class ConvertService:
             self.db.execute("UPDATE assets SET convert = -1, convert_error = ? WHERE id = ?", (str(exc)[:500], row["id"]))
         finally:
             self.current = None
+            self.progress = None
             self.db.bump()
         return True
 
@@ -215,14 +272,21 @@ class ConvertService:
         log.info("Konvertiere %s: %s", row["path"], plan.reason)
         temp = source.with_name(f".konvert-{asset_id}{plan.suffix}")  # Punkt: beim Einlesen unsichtbar
         try:
+            note = None
             if plan.action == "heic":
                 self._heic_to_jpeg(source, temp)
             else:
-                self._video(source, temp, plan)
-                self._check_video(source, temp)
+                duration = float((info.get("format") or {}).get("duration") or 0)
+                self._video(source, temp, plan, duration)
+                note = self._check_video(source, temp, duration)
             stat = source.stat()
             os.utime(temp, (stat.st_atime, stat.st_mtime))  # Dateidatum bleibt, wie beim Bearbeiten
-            return self._replace(row, source, temp, plan)
+            new_rel = self._replace(row, source, temp, plan)
+            if note:
+                # Unter "Beschädigt" sichtbar, mit Grund; das unvollständige Original liegt im Papierkorb
+                log.warning("%s: %s", row["path"], note)
+                self.db.execute("UPDATE assets SET damaged = ? WHERE id = ?", (note, row["id"]))
+            return new_rel
         finally:
             temp.unlink(missing_ok=True)
 
@@ -252,26 +316,45 @@ class ConvertService:
         self.editor.exiftool.write(temp, "-tagsFromFile", str(source), "-all:all", "--ICC_Profile:all")
         self.editor.exiftool.write(temp, "-IFD0:Orientation#=1", "-XMP-tiff:Orientation=")
 
-    def _video(self, source: Path, temp: Path, plan: Plan):
+    def _video(self, source: Path, temp: Path, plan: Plan, duration: float = 0):
         command = video_command(self.settings.ffmpeg, source, temp, plan)
-        result = subprocess.run(command, capture_output=True, text=True,
-                                preexec_fn=_lower_priority if hasattr(os, "nice") else None)
-        if result.returncode or not temp.is_file():
-            raise RuntimeError(f"ffmpeg: {result.stderr.strip()[-300:] or 'keine Ausgabe'}")
+        # Fortschritt über stdout (-progress), Fehler in eine Datei: eine volle Pipe würde ffmpeg anhalten
+        command[1:1] = ["-nostats", "-progress", "pipe:1"]
+        self.progress = 0 if duration else None
+        with tempfile.TemporaryFile("w+") as errors:
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors, text=True,
+                                       preexec_fn=_lower_priority if hasattr(os, "nice") else None)
+            for line in process.stdout:
+                percent = progress_percent(line, duration)
+                if percent is not None and percent != self.progress:
+                    self.progress = percent
+                    self.db.bump()
+            returncode = process.wait()
+            errors.seek(0)
+            stderr = errors.read()
+        if returncode or not temp.is_file():
+            raise RuntimeError(f"ffmpeg: {stderr.strip()[-300:] or 'keine Ausgabe'}")
         # Was ffmpeg nicht mitnimmt: Personen, Schlagworte (XMP), Apple-Angaben (Keys), Ort, Aufnahmezeit
         self.editor.exiftool.write(
             temp, "-tagsFromFile", str(source), "-XMP:all", "-Keys:all", "-ItemList:all",
             "-UserData:GPSCoordinates", "-QuickTime:CreateDate", "-QuickTime:ModifyDate")
 
-    def _check_video(self, source: Path, temp: Path):
-        """Neue Datei muss ein Video in voller Länge sein, bevor das Original weicht."""
+    def _check_video(self, source: Path, temp: Path, before: float = 0) -> str | None:
+        """Neue Datei muss ein Video in voller Länge sein, bevor das Original weicht.
+        Ist das Original selbst abgeschnitten (Dateiende voller Nullen, Kopf verspricht mehr), wird der
+        lesbare Teil gerettet; zurück kommt dann ein Hinweis dazu."""
         new = media.probe(self.ffprobe, temp)
         if not any(s.get("codec_type") == "video" for s in new.get("streams") or []):
             raise RuntimeError("Ergebnis enthält kein Video")
-        before = float((media.probe(self.ffprobe, source).get("format") or {}).get("duration") or 0)
+        if not before:
+            before = float((media.probe(self.ffprobe, source).get("format") or {}).get("duration") or 0)
         after = float((new.get("format") or {}).get("duration") or 0)
-        if before and abs(before - after) > max(1.0, before * 0.02):
-            raise RuntimeError(f"Länge passt nicht ({after:.1f} s statt {before:.1f} s)")
+        if not before or abs(before - after) <= max(1.0, before * 0.02):
+            return None
+        readable = readable_duration(self.ffprobe, source)
+        if readable and after < before and abs(readable - after) <= max(1.0, readable * 0.02):
+            return f"Original war unvollständig: nur {after:.0f} s von {before:.0f} s ließen sich retten"
+        raise RuntimeError(f"Länge passt nicht ({after:.1f} s statt {before:.1f} s)")
 
     def _replace(self, row, source: Path, temp: Path, plan: Plan) -> str:
         library = self.settings.library

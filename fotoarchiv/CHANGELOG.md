@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.42
+
+- **Umwandeln: Halbbilder werden aufgelöst.** DV-, DVD- und Camcorder-Aufnahmen (interlaced) bekamen bisher Kammartefakte bei Bewegung; jetzt rechnet yadif Vollbilder daraus. Auch abspielbare H.264-Videos mit Halbbildern werden dafür umgewandelt
+- **Fortschritt in Prozent** im Hinweis „Umwandeln läuft“, bei stundenlangen DVD-Videos endlich sichtbar
+- **Abgeschnittene Originale werden gerettet:** Verspricht der Dateikopf mehr, als die Datei enthält (Nullbytes am Ende einer abgebrochenen Kopie), wird der lesbare Teil umgewandelt und unter *Speicherplatz → Beschädigt* mit Grund vermerkt, statt die Umwandlung abzulehnen
+- **Bessere Qualität bei SD und HD:** x264-Preset nach Auflösung (SD `medium`, HD `faster`, ab 1080p weiter `veryfast`)
+
 ## 0.41
 
 - Behoben: Fotos standen dauerhaft unter **Speicherplatz → Beschädigt**, obwohl ihr Vorschaubild längst da war. Ein einmal fehlgeschlagener Versuch (etwa wenn beim Hochladen viele Vorschaubilder gleichzeitig entstehen) wurde nie wiederholt und nie zurückgesetzt. Jetzt wird erneut versucht, und wenn die Datei in Ordnung ist, verschwindet der Eintrag aus der Liste
