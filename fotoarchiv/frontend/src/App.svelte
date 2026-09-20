@@ -53,6 +53,12 @@
   const IOS_HINT_KEY = 'fotoarchiv.iosHint';
   let uploader = $state();
   let fileInput = $state();
+  let folderInput = $state();
+  // Ordner-Auswahl: nur Desktop-Browser; iOS/iPadOS und Android haben keinen Ordner-Dialog
+  const canPickFolder =
+    'webkitdirectory' in document.createElement('input') &&
+    !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) &&
+    !(navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
 
   const selected = new SvelteSet();
   let lastToggled = null;
@@ -458,6 +464,13 @@
     uploader.add([...e.currentTarget.files]);
     e.currentTarget.value = '';
   }
+
+  function pickFolder(e) {
+    // Versteckte Dateien und Ordner (.DS_Store, .thumbnails …) nicht in die Warteschlange legen
+    const files = [...e.currentTarget.files].filter((f) => !`/${f.webkitRelativePath || f.name}`.includes('/.'));
+    uploader.add(files);
+    e.currentTarget.value = '';
+  }
 </script>
 
 <svelte:window onkeydown={keydown} />
@@ -566,6 +579,9 @@
           <button onclick={() => fileInput.click()} title="Dateien hochladen">
             <Icon name="upload" size={20} /><span class="label">Hochladen</span>
           </button>
+          {#if canPickFolder}
+            <button class="icon" onclick={() => folderInput.click()} title="Ordner hochladen (mit Unterordnern; Vorhandenes wird übersprungen)"><Icon name="folderUpload" /></button>
+          {/if}
         {/if}
         {#if isAdmin}
           <button onclick={() => (showImport = true)} title="Aus Ordner importieren">
@@ -599,6 +615,7 @@
           <button class="icon" onclick={logout} title="Abmelden ({session.user?.display_name || session.user?.username})"><Icon name="logout" /></button>
         {/if}
         <input bind:this={fileInput} type="file" multiple accept="image/*,video/*,.heic,.heif" hidden onchange={pickFiles} />
+        <input bind:this={folderInput} type="file" webkitdirectory hidden onchange={pickFolder} />
       </div>
     </header>
     {#if searchOpen}

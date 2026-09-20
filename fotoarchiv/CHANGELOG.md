@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.38
+
+- **Ordner hochladen** (nur am PC/Mac): neuer Knopf neben „Hochladen“ wählt einen ganzen Ordner samt Unterordnern; versteckte Dateien (.DS_Store u. Ä.) werden übersprungen. Wie bisher gilt: schon vorhandene Dateien werden nicht erneut gesendet, große Uploads laufen in 32-MB-Stücken mit Fortsetzen. Auf iPhone/iPad und Android gibt es keinen Ordner-Dialog – dort erscheint der Knopf nicht
+
 ## 0.37
 
 - **Umwandeln aus dem Papierkorb:** Die Auswahl im Papierkorb bietet jetzt „Umwandeln“ an (nur über Home Assistant). Die Dateien werden zuerst wiederhergestellt und dann wie gewohnt umgewandelt – für Videos, die im Papierkorb gelandet sind, weil sie sich nicht abspielen ließen
