@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from . import labels, media
+from . import labels, media, metadata
 from .config import Settings
 from .db import NEXT_ASSET_ID, Database
 from .editor import TRASH_DIR, Editor, EditError
@@ -313,8 +313,20 @@ class ConvertService:
             image = image.cast("uchar")
         image.jpegsave(str(temp), Q=JPEG_QUALITY, keep="none")
         # Metadaten übernehmen; die Pixel sind schon aufrecht, also Orientierung zurücksetzen
+        self._from_sidecar(source, temp)
         self.editor.exiftool.write(temp, "-tagsFromFile", str(source), "-all:all", "--ICC_Profile:all")
         self.editor.exiftool.write(temp, "-IFD0:Orientation#=1", "-XMP-tiff:Orientation=")
+
+    def _from_sidecar(self, source: Path, temp: Path):
+        """AVI, MPG und WMV speichern selbst nichts – ihre Metadaten stehen in der Begleitdatei. Die kommt
+        zuerst in die neue Datei, damit die Quelldatei sie überschreiben kann, wo sie selbst etwas weiß."""
+        sidecar = metadata.sidecar_for(source)
+        if sidecar is None:
+            return
+        try:
+            self.editor.exiftool.write(temp, "-tagsFromFile", str(sidecar), "-XMP:all")
+        except Exception as exc:  # daran darf das Umwandeln nicht scheitern
+            log.warning("Begleitdatei %s nicht übernommen: %s", sidecar.name, exc)
 
     def _video(self, source: Path, temp: Path, plan: Plan, duration: float = 0):
         command = video_command(self.settings.ffmpeg, source, temp, plan)
@@ -335,6 +347,7 @@ class ConvertService:
         if returncode or not temp.is_file():
             raise RuntimeError(f"ffmpeg: {stderr.strip()[-300:] or 'keine Ausgabe'}")
         # Was ffmpeg nicht mitnimmt: Personen, Schlagworte (XMP), Apple-Angaben (Keys), Ort, Aufnahmezeit
+        self._from_sidecar(source, temp)
         self.editor.exiftool.write(
             temp, "-tagsFromFile", str(source), "-XMP:all", "-Keys:all", "-ItemList:all",
             "-UserData:GPSCoordinates", "-QuickTime:CreateDate", "-QuickTime:ModifyDate")

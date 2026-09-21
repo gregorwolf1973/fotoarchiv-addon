@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.49
+
+- **XMP-Begleitdateien** werden ausgewertet: Liegt neben `video.avi` eine `video.avi.xmp`, kommen Aufnahmedatum, Ort, Schlagworte, Personen und Kamera daraus in den Eintrag. AVI, MPG und WMV können selbst nichts speichern – dort ist das die einzige Quelle. Was in der Datei selbst steht, hat weiterhin Vorrang
+- Die Begleitdatei wandert mit: ins Archiv, in den Papierkorb, zurück beim Wiederherstellen, und beim endgültigen Löschen geht sie mit. Beim Umwandeln nach MP4 werden ihre Angaben in die neue Datei geschrieben
+- Begleitdateien werden im Import-Bericht nicht mehr als *Dateityp wird nicht unterstützt* gezählt
+
 ## 0.48
 
 - Doppelte Fotos: Die Strenge des Vergleichs ist jetzt einstellbar – `duplicate_bits` (Standard 6, Bereich 1–7) für die Liste *Doppelt* und `series_bits` (Standard 12, Bereich 1–24) für *Serien*. Landet zu viel bloß Ähnliches unter *Doppelt*, sorgt 4 oder 5 für eine strengere Liste. Wirkt nach einem Neustart des Add-ons, die Fingerabdrücke bleiben erhalten

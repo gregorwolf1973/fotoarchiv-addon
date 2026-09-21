@@ -306,7 +306,10 @@ class Editor:
         with self._lock:
             row = self._asset(asset_id, deleted=True)
             path = self.settings.library / row["path"]
+            sidecar = metadata.sidecar_for(path)
             path.unlink(missing_ok=True)
+            if sidecar is not None:
+                sidecar.unlink(missing_ok=True)
             _prune_empty_dirs(path.parent, self.settings.library / TRASH_DIR)
             self._emit("purge", asset_id)
             self.importer.drop_cache(asset_id)

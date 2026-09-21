@@ -81,6 +81,24 @@ def unique_path(path: Path) -> Path:
 
 
 def move_file(source: Path, target: Path):
+    """Datei verschieben; eine XMP-Begleitdatei wandert unter dem neuen Namen mit."""
+    sidecar = metadata.sidecar_for(source)  # vor dem Verschieben suchen, danach ist die Quelle weg
+    _move_one(source, target)
+    if sidecar is None:
+        return
+    companion = target.with_name(metadata.sidecar_name(target.name))
+    if companion.exists():
+        # Gehört zu einer anderen Datei (der Zielname wurde eindeutig gemacht): nicht überschreiben
+        companion = unique_path(companion)
+        log.warning("Begleitdatei zu %s war am Ziel schon belegt, abgelegt als %s", target.name, companion.name)
+    try:
+        _move_one(sidecar, companion)
+    except OSError as exc:
+        # Die Datei selbst liegt schon am Ziel – daran darf die Begleitdatei den Vorgang nicht scheitern lassen
+        log.warning("Begleitdatei %s nicht verschoben: %s", sidecar.name, exc)
+
+
+def _move_one(source: Path, target: Path):
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.replace(source, target)
@@ -169,6 +187,13 @@ class Importer:
             except Exception as exc:  # Metadaten sind nicht zwingend
                 log.warning("Metadaten von %s nicht lesbar: %s", name, exc)
                 raw = {}
+            sidecar = metadata.sidecar_for(source)
+            if sidecar is not None:
+                # AVI, MPG und WMV können selbst nichts speichern – dort steht alles in der Begleitdatei
+                try:
+                    raw = metadata.merge_sidecar(raw, self.exiftool.read(sidecar))
+                except Exception as exc:
+                    log.warning("Begleitdatei %s nicht lesbar: %s", sidecar.name, exc)
             meta = metadata.extract(raw, Path(name), self.settings.timezone, mtime or stat.st_mtime)
 
             if move:
@@ -390,6 +415,8 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
                         stack.append(Path(entry.path))
                 elif entry.is_file():  # nutzt den Dateityp aus dem Verzeichnis, kein eigener stat
                     path = Path(entry.path)
+                    if metadata.is_sidecar(path):
+                        continue  # wird zusammen mit ihrer Mediendatei gelesen und verschoben
                     if path.relative_to(root).as_posix() not in known:
                         files.append(path)
             if progress and len(files) - reported >= 1000:
@@ -490,7 +517,10 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
                     if result.status == "duplicate" and mode == "import" and auto:
                         # Byte-gleiche Kopie (MD5) von etwas, das schon im Archiv oder im Papierkorb liegt.
                         # Beim Handy-Sync kommt das ständig vor; in _duplikate würde es sich nur sammeln.
+                        sidecar = metadata.sidecar_for(path)
                         path.unlink()
+                        if sidecar is not None:
+                            sidecar.unlink(missing_ok=True)  # sonst bliebe sie für immer im Eingang liegen
                         result.message += " – Kopie gelöscht"
                     elif result.status == "duplicate" and mode == "import":
                         move_file(path, unique_path(root / DUPLICATE_DIR / rel))

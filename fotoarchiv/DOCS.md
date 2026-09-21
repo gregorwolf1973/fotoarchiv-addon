@@ -24,7 +24,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort, mit Zeitregler für ein Jahr oder mehrere. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
-- **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI, MTS, MPG und WMV.
+- **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI, MTS, MPG und WMV. Dazu **XMP-Begleitdateien**, siehe [Begleitdateien](#begleitdateien).
 
 Alle ursprünglich geplanten Funktionen sind umgesetzt.
 
@@ -125,9 +125,29 @@ In der Einzelansicht sammelt der Infobereich Änderungen an **Personen, Schlagwo
 
 - Nach einer Datumsänderung wird die Datei in den passenden `JJJJ/MM`-Ordner verschoben.
 - Das Dateidatum (Änderungszeit) bleibt beim Schreiben erhalten.
-- **Bearbeitbar** sind JPEG, PNG, WebP, TIFF, HEIC/HEIF, AVIF, MP4, MOV, M4V und 3GP. GIF, MKV, WebM, AVI und MTS können keine Metadaten speichern und werden nur angezeigt.
+- **Bearbeitbar** sind JPEG, PNG, WebP, TIFF, HEIC/HEIF, AVIF, MP4, MOV, M4V und 3GP. GIF, MKV, WebM, AVI und MTS können keine Metadaten speichern und werden nur angezeigt. Vorhandene Angaben aus einer [Begleitdatei](#begleitdateien) zeigt das Archiv trotzdem an.
 - **HEIC/AVIF lassen sich nicht drehen.** Die Drehung steckt dort in einem Container-Feld, das exiftool nicht schreiben kann, und die EXIF-Orientierung wird von HEIC-Programmen ignoriert. Handyfotos sind in der Regel schon richtig gedreht.
 - Personen, die ein anderes Programm über **Gesichtsmarkierungen** zugeordnet hat (Picasa, Google Fotos, Lightroom, Windows-Fotogalerie), lassen sich umbenennen und entfernen. Dabei werden die fremden Markierungen dieser Datei entfernt. Alle übrigen Namen bleiben erhalten und stehen danach in `PersonInImage`, nur die Gesichtsrahmen des anderen Programms gehen verloren.
+
+## Begleitdateien
+
+AVI, MPG und WMV können selbst keine Metadaten aufnehmen. Programme wie digiKam, darktable, Lightroom oder Adobe Bridge legen sie darum in einer **XMP-Begleitdatei** daneben ab, benannt nach der ganzen Datei:
+
+```
+20130401_141515.avi
+20130401_141515.avi.xmp
+```
+
+Das Add-on behandelt beide als eine Einheit:
+
+- **Beim Import wird die Begleitdatei mitgelesen.** Aufnahmedatum, Ort, Schlagworte, Personen und Kamera daraus landen im Eintrag. Bei einem AVI ist das oft die einzige Quelle – ohne sie bliebe nur der Dateiname oder die Dateizeit.
+- **Was in der Datei selbst steht, hat Vorrang.** Die Begleitdatei füllt nur Lücken.
+- **Sie wandert mit.** Ins Archiv, in den Papierkorb, zurück beim Wiederherstellen, und beim endgültigen Löschen verschwindet sie mit. Beim Umwandeln nach MP4 werden ihre Angaben in die neue Datei geschrieben, die sie dann selbst speichern kann.
+- **Im Bericht taucht sie nicht auf.** Früher wurde sie als *Dateityp wird nicht unterstützt* gezählt.
+
+Übernommen wird eine feste Liste von Feldern. Größe, Typ und Maße der XMP-Datei selbst bleiben außen vor, damit sie nie mit den Angaben zum Foto verwechselt werden.
+
+Nicht erkannt wird die zweite Schreibweise `20130401_141515.xmp` ohne die Original-Endung, die Lightroom für RAW-Dateien verwendet: Liegen `bild.jpg` und `bild.avi` im selben Ordner, wäre nicht zu entscheiden, wem sie gehört. Eine Begleitdatei ohne zugehörige Mediendatei bleibt einfach liegen.
 
 ## Dateien außerhalb des Fotoarchivs ändern
 

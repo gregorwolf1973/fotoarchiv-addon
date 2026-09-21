@@ -45,6 +45,7 @@
 | 🔐 **Internet access** | Own accounts with roles (view / upload & edit without deleting / edit), lockout after failed logins, CrowdSec integration, works behind Nginx Proxy Manager or Cloudflare Tunnel |
 | 📥 **Import** | Samba inbox folder, drag & drop in the browser, **automatic import** for phone sync apps (FolderSync, PhotoSync) |
 | 🎞️ **Formats** | JPEG, HEIC/HEIF, PNG, WebP, AVIF, TIFF, GIF, MP4, MOV, M4V, 3GP, MKV, WebM, AVI, MTS, MPG, WMV – HEIC and HEVC/H.265 can be converted automatically so every browser plays them |
+| 📄 **XMP sidecars** | `video.avi.xmp` next to a file is read on import (date, location, tags, people) and travels with the file – the only place AVI, MPG and WMV can carry metadata |
 | 🗑️ **Trash** | Deleted files can be restored and are removed after a configurable number of days |
 
 ## Installation

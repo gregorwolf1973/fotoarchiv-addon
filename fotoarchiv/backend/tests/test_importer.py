@@ -1,6 +1,26 @@
 import shutil
 
+from fotoarchiv.editor import TRASH_DIR
 from fotoarchiv.importer import DUPLICATE_DIR, safe_name
+
+# Begleitdatei, wie digiKam und darktable sie neben Videos legen, die selbst nichts speichern können
+SIDECAR = """<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:exif="http://ns.adobe.com/exif/1.0/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"
+    exif:DateTimeOriginal="2013-04-01T14:15:15"
+    exif:GPSLatitude="47,30.000000N"
+    exif:GPSLongitude="9,45.000000E">
+   <dc:subject><rdf:Bag><rdf:li>Urlaub</rdf:li><rdf:li>Strand</rdf:li></rdf:Bag></dc:subject>
+   <Iptc4xmpExt:PersonInImage><rdf:Bag><rdf:li>Anna</rdf:li></rdf:Bag></Iptc4xmpExt:PersonInImage>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+"""
 
 
 def test_import_folder_sorts_deduplicates_and_cleans_up(settings, importer, make_jpeg):
@@ -234,3 +254,54 @@ def test_deep_check_can_be_cancelled(settings, importer, make_jpeg):
     importer._cancel.set()
     importer._check_files()
     assert importer.job.cancelled and importer.job.counts["checked"] == 0
+
+
+def test_sidecar_is_read_and_travels_with_the_video(settings, importer, make_video):
+    """AVI kann selbst keine Metadaten aufnehmen – sie stehen in der Begleitdatei daneben."""
+    video = make_video(settings.import_dir / "urlaub.avi")  # Dateiname ohne Datum: alles kommt aus der XMP
+    (settings.import_dir / "urlaub.avi.xmp").write_text(SIDECAR, encoding="utf-8")
+
+    result = importer.import_file(video)
+    assert result.status == "imported"
+
+    row = importer.db.one("SELECT * FROM assets WHERE id = ?", (result.asset_id,))
+    assert (row["taken_at"], row["date_source"]) == ("2013-04-01T14:15:15", "exif")
+    assert (round(row["lat"], 4), round(row["lon"], 4)) == (47.5, 9.75)
+    tags = [r["name"] for r in importer.db.query(
+        "SELECT name FROM tags JOIN asset_tags ON tag_id = id WHERE asset_id = ? ORDER BY name", (row["id"],))]
+    assert tags == ["Strand", "Urlaub"]
+    assert importer.db.one("SELECT name FROM persons")["name"] == "Anna"
+
+    moved = settings.library / row["path"]
+    assert moved.parent == settings.library / "2013" / "04"       # nach dem Datum aus der Begleitdatei einsortiert
+    assert moved.with_name(moved.name + ".xmp").is_file()          # mitgewandert
+    assert not (settings.import_dir / "urlaub.avi.xmp").exists()
+
+
+def test_sidecar_is_not_reported_as_unsupported(settings, importer, make_jpeg):
+    make_jpeg(settings.import_dir / "a.jpg")
+    (settings.import_dir / "a.jpg.xmp").write_text(SIDECAR, encoding="utf-8")
+
+    importer._run("import")
+
+    assert (importer.job.counts["imported"], importer.job.counts["skipped"]) == (1, 0)
+    assert (settings.library / "2013" / "04" / "a.jpg.xmp").is_file()
+
+
+def test_sidecar_follows_the_file_into_the_trash_and_is_purged_with_it(settings, importer, editor, make_jpeg):
+    source = make_jpeg(settings.import_dir / "a.jpg")
+    (settings.import_dir / "a.jpg.xmp").write_text(SIDECAR, encoding="utf-8")
+    asset_id = importer.import_file(source).asset_id
+
+    def companion() -> bool:
+        path = settings.library / importer.db.one("SELECT path FROM assets WHERE id = ?", (asset_id,))["path"]
+        return path.with_name(path.name + ".xmp").is_file()
+
+    editor.delete(asset_id)
+    assert companion()
+    editor.restore(asset_id)
+    assert companion()
+
+    editor.delete(asset_id)
+    editor.purge(asset_id)
+    assert not list((settings.library / TRASH_DIR).rglob("*.xmp"))

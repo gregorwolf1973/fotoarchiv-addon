@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from fotoarchiv.metadata import date_from_filename, extract, parse_date
+from fotoarchiv.metadata import date_from_filename, extract, is_sidecar, merge_sidecar, parse_date, sidecar_for
 
 MTIME = datetime(2024, 1, 2, 3, 4, 5).timestamp()
 
@@ -92,3 +92,42 @@ def test_write_video_with_trailer_after_last_atom(exiftool, make_video, tmp_path
         f.write(b"SEFH" + bytes(60) + b"SEFT")
     exiftool.write(video, "-XMP-dc:Subject=Urlaub")
     assert exiftool.read(video).get("XMP-dc:Subject") == "Urlaub"
+
+
+def test_sidecar_is_found_next_to_its_file(tmp_path):
+    video = tmp_path / "20130401_141515.avi"
+    video.write_bytes(b"x")
+    assert sidecar_for(video) is None
+    companion = tmp_path / "20130401_141515.avi.xmp"
+    companion.write_text("<x/>")
+    assert sidecar_for(video) == companion
+    assert is_sidecar(companion) and not is_sidecar(video)
+
+
+def test_sidecar_fills_gaps_but_the_file_itself_wins():
+    raw = {"ExifIFD:DateTimeOriginal": "2018:07:01 10:00:00"}
+    companion = {
+        "XMP-exif:DateTimeOriginal": "1999:01:01 00:00:00",
+        "XMP-dc:Subject": ["Urlaub", "Strand"],
+        "XMP-iptcExt:PersonInImage": "Anna",
+        "XMP-exif:GPSLatitude": 47.5,
+        "XMP-exif:GPSLongitude": 9.75,
+    }
+    meta = extract(merge_sidecar(raw, companion), Path("20130401_141515.avi"), "Europe/Berlin", MTIME)
+    assert (meta.taken, meta.date_source) == (datetime(2018, 7, 1, 10), "exif")  # Datei schlägt Begleitdatei
+    assert meta.tags == ["Urlaub", "Strand"] and meta.persons == ["Anna"]
+    assert (meta.lat, meta.lon) == (47.5, 9.75)
+
+
+def test_sidecar_provides_the_date_when_the_file_has_none():
+    """Der eigentliche Zweck: AVI kann selbst kein Datum speichern."""
+    companion = {"XMP-photoshop:DateCreated": "2013:04:01 14:15:15"}
+    meta = extract(merge_sidecar({}, companion), Path("clip.avi"), "Europe/Berlin", MTIME)
+    assert (meta.taken, meta.date_source) == (datetime(2013, 4, 1, 14, 15, 15), "exif")
+
+
+def test_sidecar_never_contributes_its_own_file_properties():
+    """Größe, Typ und Maße der XMP-Datei dürfen nicht in den Eintrag geraten."""
+    companion = {"File:MIMEType": "application/rdf+xml", "File:FileSize": 1234,
+                 "Composite:ImageSize": "10 10", "File:FileName": "clip.avi.xmp"}
+    assert merge_sidecar({}, companion) == {}

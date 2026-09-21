@@ -23,6 +23,21 @@ UTC_DATE_TAGS = ["QuickTime:CreateDate", "Track1:MediaCreateDate"]
 
 OFFSET_TAGS = ["ExifIFD:OffsetTimeOriginal", "ExifIFD:OffsetTime"]
 
+TAG_TAGS = ["XMP-dc:Subject", "IPTC:Keywords"]
+PERSON_TAGS = ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP-mwg-rs:RegionName"]
+
+# ── Begleitdateien ────────────────────────────────────────────────
+# AVI, MPG und WMV können selbst keine Metadaten aufnehmen. Programme wie digiKam, darktable oder
+# Lightroom legen sie darum daneben ab: video.avi -> video.avi.xmp
+SIDECAR_SUFFIX = ".xmp"
+# Aus der Begleitdatei wird nur übernommen, was sie über die Aufnahme sagt. Größe, MIME-Typ und
+# Maße der XMP-Datei selbst dürfen nie in den Eintrag geraten – darum eine feste Liste.
+SIDECAR_TAGS = [
+    *LOCAL_DATE_TAGS, *UTC_DATE_TAGS, *MODIFY_DATE_TAGS, *OFFSET_TAGS, *TAG_TAGS, *PERSON_TAGS,
+    "Composite:GPSLatitude", "Composite:GPSLongitude", "XMP-exif:GPSLatitude", "XMP-exif:GPSLongitude",
+    "IFD0:Make", "IFD0:Model", "XMP-tiff:Make", "XMP-tiff:Model",
+]
+
 _DATE_RE = re.compile(
     r"(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?"
 )
@@ -83,6 +98,33 @@ def date_from_filename(name: str) -> datetime | None:
     return None
 
 
+def is_sidecar(path: Path) -> bool:
+    return path.suffix.lower() == SIDECAR_SUFFIX
+
+
+def sidecar_name(name: str) -> str:
+    """Wie die Begleitdatei zu dieser Datei heißen muss: video.avi -> video.avi.xmp"""
+    return name + SIDECAR_SUFFIX
+
+
+def sidecar_for(path: Path) -> Path | None:
+    """Vorhandene Begleitdatei zu path, sonst None. Auf Linux zählt auch die Endung in Großbuchstaben."""
+    for suffix in (SIDECAR_SUFFIX, SIDECAR_SUFFIX.upper()):
+        candidate = path.with_name(path.name + suffix)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def merge_sidecar(raw: dict, sidecar: dict) -> dict:
+    """Fehlende Angaben aus der Begleitdatei ergänzen – was in der Datei selbst steht, gewinnt."""
+    merged = dict(raw)
+    for tag in SIDECAR_TAGS:
+        if merged.get(tag) in (None, "") and sidecar.get(tag) not in (None, ""):
+            merged[tag] = sidecar[tag]
+    return merged
+
+
 def _first(raw: dict, keys: list[str]):
     for key in keys:
         value = raw.get(key)
@@ -117,6 +159,9 @@ def _unique(items: list[str]) -> list[str]:
 
 def _gps(raw: dict) -> tuple[float | None, float | None]:
     lat, lon = raw.get("Composite:GPSLatitude"), raw.get("Composite:GPSLongitude")
+    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        # Begleitdateien bringen oft nur die XMP-Felder mit, ohne dass exiftool daraus Composite bildet
+        lat, lon = _first_suffix(raw, ":GPSLatitude"), _first_suffix(raw, ":GPSLongitude")
     if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
         coords = _first_suffix(raw, ":GPSCoordinates")
         numbers = _NUMBER_RE.findall(str(coords)) if coords is not None else []
@@ -184,10 +229,6 @@ def extract(raw: dict, path: Path, tz: str, mtime: float) -> Metadata:
         lon=lon,
         camera=camera or None,
         mime=raw.get("File:MIMEType"),
-        tags=_unique(_as_list(raw.get("XMP-dc:Subject")) + _as_list(raw.get("IPTC:Keywords"))),
-        persons=_unique(
-            _as_list(raw.get("XMP-iptcExt:PersonInImage"))
-            + _as_list(raw.get("XMP-MP:RegionPersonDisplayName"))
-            + _as_list(raw.get("XMP-mwg-rs:RegionName"))
-        ),
+        tags=_unique([name for tag in TAG_TAGS for name in _as_list(raw.get(tag))]),
+        persons=_unique([name for tag in PERSON_TAGS for name in _as_list(raw.get(tag))]),
     )
