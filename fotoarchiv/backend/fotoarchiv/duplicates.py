@@ -2,9 +2,12 @@
 
 Jedes Foto bekommt einen 64-Bit-pHash aus seinem Vorschaubild: verkleinert, neu komprimiert, als
 anderes Format gespeichert oder anders beschriftet bleibt er (fast) gleich.
-- doppelt: Abstand ≤ 6 Bit, egal wann aufgenommen (gemessen: WhatsApp-Kopie 0, aufgehellt 2,
-  andere Fotos derselben Person ≥ 14, andere Motive 18–38)
-- Serie: Abstand ≤ 12 Bit und höchstens 30 Sekunden auseinander
+- doppelt: Abstand ≤ duplicate_bits (Standard 6), egal wann aufgenommen (gemessen: WhatsApp-Kopie 0,
+  aufgehellt 2, andere Fotos derselben Person ≥ 14, andere Motive 18–38)
+- Serie: Abstand ≤ series_bits (Standard 12) und höchstens 30 Sekunden auseinander
+
+Beide Schwellen stehen in den Add-on-Optionen. Sie gelten paarweise: sind A und B sowie B und C
+ähnlich genug, landen alle drei in einer Gruppe, auch wenn A und C weiter auseinanderliegen.
 """
 
 import logging
@@ -22,8 +25,6 @@ from .importer import Importer
 
 log = logging.getLogger(__name__)
 
-DUPLICATE_BITS = 6
-SERIES_BITS = 12
 SERIES_SECONDS = 30
 BATCH = 200
 IDLE_WAIT = 600
@@ -74,6 +75,8 @@ class DuplicateService:
         self.importer = importer
         self.editor = editor
         self.enabled = enabled
+        self.duplicate_bits = settings.duplicate_bits
+        self.series_bits = settings.series_bits
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._cache: tuple[tuple, dict] | None = None
@@ -150,7 +153,7 @@ class DuplicateService:
                     self._buckets[band].setdefault((value >> (8 * band)) & 0xFF, set()).add(asset_id)
 
     def similar_to(self, asset_id: int, value: int) -> int | None:
-        """Ein vorhandenes Foto mit Abstand ≤ 6 – geprüft werden nur Fotos mit einem gleichen Byte."""
+        """Ein vorhandenes Foto innerhalb der Schwelle – geprüft werden nur Fotos mit einem gleichen Byte."""
         with self._index_lock:
             if self._hashes is None:
                 self._hashes, self._buckets = {}, [{} for _ in range(8)]
@@ -164,7 +167,7 @@ class DuplicateService:
             for band in range(8):
                 candidates |= self._buckets[band].get((value >> (8 * band)) & 0xFF, set())
             matches = sorted(c for c in candidates
-                             if c != asset_id and (self._hashes[c] ^ value).bit_count() <= DUPLICATE_BITS)
+                             if c != asset_id and (self._hashes[c] ^ value).bit_count() <= self.duplicate_bits)
         for match in matches:
             if self.db.one("SELECT 1 FROM assets WHERE id = ? AND deleted_at IS NULL", (match,)):
                 return match
@@ -220,7 +223,8 @@ class DuplicateService:
         def allowed(a: int, b: int) -> bool:
             return (min(a, b), max(a, b)) not in ignored
 
-        # Doppelte: Abstand ≤ 6 heißt, mindestens eines der 8 Bytes ist identisch (Schubfachprinzip)
+        # Doppelte: bei Abstand ≤ 7 ist mindestens eines der 8 Bytes identisch (Schubfachprinzip),
+        # darum ist duplicate_bits auf 7 begrenzt – sonst würden Paare durch diese Vorauswahl fallen
         same = _UnionFind()
         for band in range(8):
             keys = ((hashes >> np.uint64(8 * band)) & np.uint64(0xFF)).astype(np.int64)
@@ -232,7 +236,7 @@ class DuplicateService:
                 for start in range(0, len(bucket), 512):
                     part = bucket[start:start + 512]
                     distance = np.bitwise_count(hashes[part][:, None] ^ hashes[bucket][None, :])
-                    for row, col in zip(*np.nonzero(distance <= DUPLICATE_BITS)):
+                    for row, col in zip(*np.nonzero(distance <= self.duplicate_bits)):
                         a, b = int(ids[part[row]]), int(ids[bucket[col]])
                         if a < b and allowed(a, b):
                             same.union(a, b)
@@ -243,7 +247,7 @@ class DuplicateService:
             j = i + 1
             while j < len(ids) and times[j] - times[i] <= SERIES_SECONDS:
                 a, b = int(ids[i]), int(ids[j])
-                if (int(hashes[i]) ^ int(hashes[j])).bit_count() <= SERIES_BITS and allowed(a, b) \
+                if (int(hashes[i]) ^ int(hashes[j])).bit_count() <= self.series_bits and allowed(a, b) \
                         and same.find(a) != same.find(b):
                     series.union(a, b)
                 j += 1

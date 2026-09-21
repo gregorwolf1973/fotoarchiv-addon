@@ -45,6 +45,8 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
 | `face_threads` | `2` | Prozessorkerne für die Gesichtserkennung (1–8). Auf dem Pi 5 sind 3 ein guter Wert, wenn Home Assistant flüssig bleiben soll. Wirkt nach einem Neustart des Add-ons. |
 | `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
+| `duplicate_bits` | `6` | Strenge der Liste **Doppelt** (1–7). Kleiner = strenger, siehe [Doppelte Fotos](#doppelte-fotos). Wirkt nach einem Neustart des Add-ons. |
+| `series_bits` | `12` | Strenge der Liste **Serien** (1–24). Wirkt nach einem Neustart des Add-ons. |
 | `convert_on_import` | `false` | HEIC und nicht abspielbare Videos beim Import umwandeln, siehe [Umwandeln](#umwandeln) |
 | `auto_import` | `false` | Import-Ordner jede Minute prüfen und neue Dateien selbst einlesen, siehe [Handy automatisch sichern](#handy-automatisch-sichern) |
 | `map_language` | `de` | Kartenbeschriftung: `de` = deutscher Kartenstil, `local` = jedes Land in seiner Sprache |
@@ -195,6 +197,24 @@ Bedienung:
 - **Keine Duplikate** merkt sich, dass diese Fotos zusammengehören dürfen. Sie werden nicht wieder vorgeschlagen.
 
 Beim Import und Upload weist das Add-on auf neue Fotos hin, die einem vorhandenen Foto sehr ähnlich sind. Sie werden trotzdem aufgenommen und erscheinen unter **Doppelte Fotos**.
+
+### Wie streng verglichen wird
+
+Der Fingerabdruck ist 64 Bit lang. Verglichen wird, **wie viele dieser Bits sich zwischen zwei Fotos unterscheiden**. Wie viele das sein dürfen, legen zwei Optionen fest:
+
+| Liste | Option | Standard | Zusätzlich |
+| --- | --- | --- | --- |
+| Doppelt | `duplicate_bits` | 6 von 64 | – |
+| Serien | `series_bits` | 12 von 64 | höchstens 30 Sekunden auseinander |
+
+Zur Einordnung, gemessen an echten Fotos: eine WhatsApp-Kopie weicht um 0 Bit ab, eine aufgehellte Fassung um 2, ein anderes Foto derselben Person um mindestens 14, ein fremdes Motiv um 18 bis 38.
+
+**Landet zu viel bloß Ähnliches unter „Doppelt“, setze `duplicate_bits` auf 4 oder 5.** Bei 4 bleiben fast nur noch echte Kopien übrig. 7 ist der höchste zulässige Wert; darüber würde die schnelle Vorauswahl im Hintergrund Paare übersehen.
+
+Zwei Dinge dazu:
+
+- Die Schwelle gilt **paarweise**. Sind A und B ähnlich genug und B und C ebenfalls, landen alle drei in einer Gruppe – auch wenn A und C weiter auseinanderliegen. Bei einer längeren Kette kann eine Gruppe also breiter werden, als die Schwelle vermuten lässt.
+- Die Änderung wirkt nach einem **Neustart des Add-ons**. Die Fingerabdrücke selbst bleiben gültig und werden nicht neu berechnet, nur die Gruppen entstehen neu.
 
 Grenzen: Der Vergleich erkennt dasselbe Bild, nicht dasselbe Motiv aus anderem Blickwinkel. Stark zugeschnittene oder gespiegelte Fassungen werden nicht erkannt. Sehr gleichförmige Bilder, etwa Schnee oder Himmel, können als ähnlich gelten, deshalb wird nie automatisch gelöscht. Videos werden nicht verglichen.
 

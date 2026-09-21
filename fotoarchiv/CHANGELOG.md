@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.48
+
+- Doppelte Fotos: Die Strenge des Vergleichs ist jetzt einstellbar – `duplicate_bits` (Standard 6, Bereich 1–7) für die Liste *Doppelt* und `series_bits` (Standard 12, Bereich 1–24) für *Serien*. Landet zu viel bloß Ähnliches unter *Doppelt*, sorgt 4 oder 5 für eine strengere Liste. Wirkt nach einem Neustart des Add-ons, die Fingerabdrücke bleiben erhalten
+
 ## 0.47
 
 - Karte: Das Ziehen von Fotos mit der Maus ist wieder weg, es war zu fehleranfällig. Verschoben wird nur noch über das Rechtsklick-Menü, das jetzt für Gruppen zwei Wege bietet: *Gruppe verschieben …* (Anordnung bleibt) und *Alle auf einen Punkt …*

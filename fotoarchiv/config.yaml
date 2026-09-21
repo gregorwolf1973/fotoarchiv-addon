@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
 description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Gesichtserkennung, Suche, Bearbeiten direkt in der Datei"
-version: "0.47"
+version: "0.48"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:
@@ -33,6 +33,8 @@ options:
   face_recognition: true
   face_threads: 2
   duplicate_detection: true
+  duplicate_bits: 6
+  series_bits: 12
   convert_on_import: false
   auto_import: false
   map_language: de
@@ -50,6 +52,8 @@ schema:
   face_recognition: bool
   face_threads: int(1,8)
   duplicate_detection: bool
+  duplicate_bits: int(1,7)
+  series_bits: int(1,24)
   convert_on_import: bool
   auto_import: bool
   map_language: list(de|local)

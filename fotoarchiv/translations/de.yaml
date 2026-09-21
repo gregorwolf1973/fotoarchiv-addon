@@ -27,6 +27,19 @@ configuration:
       Fotos im Hintergrund vergleichen und doppelte Fassungen (verkleinert, neu gespeichert, anderes Format) sowie
       Serien ähnlicher Aufnahmen finden. Beim Import wird auf sehr ähnliche vorhandene Fotos hingewiesen. Sehr schnell,
       einige Millisekunden pro Foto.
+  duplicate_bits:
+    name: Strenge bei doppelten Fotos
+    description: >-
+      Wie viele der 64 Bits des Bild-Fingerabdrucks abweichen dürfen, damit zwei Fotos als doppelt gelten.
+      Kleiner heißt strenger: 6 ist der Standard und findet auch aufgehellte oder nachbearbeitete Fassungen,
+      4 nimmt fast nur noch echte Kopien, 7 ist die großzügigste Einstellung. Landet zu viel bloß Ähnliches in
+      der Liste, stelle den Wert herunter. Die Änderung wirkt nach einem Neustart des Add-ons.
+  series_bits:
+    name: Strenge bei Serien
+    description: >-
+      Wie viele der 64 Bits abweichen dürfen, damit zwei Fotos, die höchstens 30 Sekunden auseinander
+      aufgenommen wurden, als Serie gelten. Standard 12. Kleiner heißt strenger, größer fasst auch Aufnahmen
+      mit mehr Bewegung zusammen. Die Änderung wirkt nach einem Neustart des Add-ons.
   convert_on_import:
     name: Beim Import umwandeln
     description: >-

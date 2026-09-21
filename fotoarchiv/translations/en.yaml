@@ -25,6 +25,19 @@ configuration:
     description: >-
       Compare photos in the background to find duplicate versions (resized, re-saved, other format) and bursts of
       similar shots. Imports point out very similar existing photos. Very fast, a few milliseconds per photo.
+  duplicate_bits:
+    name: Strictness for duplicates
+    description: >-
+      How many of the 64 bits of the image fingerprint may differ for two photos to count as duplicates.
+      Lower is stricter: 6 is the default and also catches brightened or edited versions, 4 keeps almost only
+      true copies, 7 is the most generous setting. If too many merely similar photos show up in the list, lower
+      the value. Takes effect after restarting the add-on.
+  series_bits:
+    name: Strictness for bursts
+    description: >-
+      How many of the 64 bits may differ for two photos taken at most 30 seconds apart to count as a burst.
+      Default 12. Lower is stricter, higher also groups shots with more movement. Takes effect after restarting
+      the add-on.
   convert_on_import:
     name: Convert on import
     description: >-

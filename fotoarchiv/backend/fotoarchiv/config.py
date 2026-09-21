@@ -22,6 +22,9 @@ class Settings:
     face_recognition: bool = True
     face_threads: int = 2  # Kerne für die Gesichtserkennung (1–8)
     duplicate_detection: bool = True
+    # Wie viele der 64 Hash-Bits abweichen dürfen; kleiner = strenger, siehe duplicates.py
+    duplicate_bits: int = 6   # „doppelt“ (1–7, höher bricht die Byte-Vorauswahl)
+    series_bits: int = 12     # „Serie“, zusätzlich höchstens 30 Sekunden auseinander (1–24)
     convert_on_import: bool = False  # HEIC und nicht abspielbare Videos beim Import umwandeln
     auto_import: bool = False  # Import-Ordner jede Minute prüfen und neue Dateien selbst einlesen (Handy-Sync)
     map_language: str = "de"  # Kartenbeschriftung: de (deutscher Stil) | local (Landessprache, openstreetmap.org)
@@ -78,6 +81,8 @@ def load() -> Settings:
         # 0 wäre bei pick() nicht unterscheidbar vom fehlenden Wert, darum erst ab 1
         face_threads=min(8, max(1, int(pick("FOTOARCHIV_FACE_THREADS", "face_threads", 2)))),
         duplicate_detection=_bool(os.environ.get("FOTOARCHIV_DUPLICATES", options.get("duplicate_detection")), True),
+        duplicate_bits=min(7, max(1, int(pick("FOTOARCHIV_DUPLICATE_BITS", "duplicate_bits", 6)))),
+        series_bits=min(24, max(1, int(pick("FOTOARCHIV_SERIES_BITS", "series_bits", 12)))),
         convert_on_import=_bool(os.environ.get("FOTOARCHIV_CONVERT", options.get("convert_on_import")), False),
         auto_import=_bool(os.environ.get("FOTOARCHIV_AUTO_IMPORT", options.get("auto_import")), False),
         map_language="local" if str(options.get("map_language") or "de") == "local" else "de",
