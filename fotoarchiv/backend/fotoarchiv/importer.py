@@ -81,12 +81,12 @@ def unique_path(path: Path) -> Path:
 
 
 def move_file(source: Path, target: Path):
-    """Datei verschieben; eine XMP-Begleitdatei wandert unter dem neuen Namen mit."""
+    """Datei verschieben; eine XMP- oder JSON-Begleitdatei wandert unter dem neuen Namen mit."""
     sidecar = metadata.sidecar_for(source)  # vor dem Verschieben suchen, danach ist die Quelle weg
     _move_one(source, target)
     if sidecar is None:
         return
-    companion = target.with_name(metadata.sidecar_name(target.name))
+    companion = target.with_name(metadata.sidecar_name(target.name, sidecar))
     if companion.exists():
         # Gehört zu einer anderen Datei (der Zielname wurde eindeutig gemacht): nicht überschreiben
         companion = unique_path(companion)
@@ -189,9 +189,10 @@ class Importer:
                 raw = {}
             sidecar = metadata.sidecar_for(source)
             if sidecar is not None:
-                # AVI, MPG und WMV können selbst nichts speichern – dort steht alles in der Begleitdatei
+                # XMP: AVI, MPG und WMV können selbst nichts speichern – dort steht alles in der Begleitdatei.
+                # JSON: Cloud-Exporte (Google Takeout u. a.) legen Datum, Ort und Personen daneben ab.
                 try:
-                    raw = metadata.merge_sidecar(raw, self.exiftool.read(sidecar))
+                    raw = metadata.merge_sidecar(raw, metadata.read_sidecar(sidecar, self.exiftool, self.settings.timezone))
                 except Exception as exc:
                     log.warning("Begleitdatei %s nicht lesbar: %s", sidecar.name, exc)
             meta = metadata.extract(raw, Path(name), self.settings.timezone, mtime or stat.st_mtime)

@@ -324,7 +324,13 @@ class ConvertService:
         if sidecar is None:
             return
         try:
-            self.editor.exiftool.write(temp, "-tagsFromFile", str(sidecar), "-XMP:all")
+            if sidecar.suffix.lower() == ".json":
+                tags = metadata.read_sidecar(sidecar, self.editor.exiftool, self.settings.timezone)
+                assignments = metadata.sidecar_assignments(tags)
+                if assignments:
+                    self.editor.exiftool.write(temp, *assignments)
+            else:
+                self.editor.exiftool.write(temp, "-tagsFromFile", str(sidecar), "-XMP:all")
         except Exception as exc:  # daran darf das Umwandeln nicht scheitern
             log.warning("Begleitdatei %s nicht übernommen: %s", sidecar.name, exc)
 

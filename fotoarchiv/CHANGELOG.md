@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50
+
+- **JSON-Begleitdateien aus Cloud-Exporten** werden beim Import gelesen: Google Takeout (`bild.jpg.json`, `bild.jpg.supplemental-metadata.json`, auch gekürzt), Mi Cloud, Samsung Cloud und andere (`bild.json`). Aufnahmezeitpunkt, Ort, Personen und Schlagworte daraus landen im Eintrag; das Datum zählt wie ein Kameradatum und schlägt damit den Dateinamen. Was in der Datei selbst steht, hat weiterhin Vorrang
+- Die JSON wandert wie eine XMP-Begleitdatei mit ins Archiv (dort einheitlich als `bild.jpg.json`), in den Papierkorb und zurück; beim Umwandeln werden ihre Angaben in die neue Datei geschrieben
+- Bisher blieben solche JSON-Dateien im Import-Ordner liegen und wurden als *Dateityp wird nicht unterstützt* gezählt
+
 ## 0.49
 
 - **XMP-Begleitdateien** werden ausgewertet: Liegt neben `video.avi` eine `video.avi.xmp`, kommen Aufnahmedatum, Ort, Schlagworte, Personen und Kamera daraus in den Eintrag. AVI, MPG und WMV können selbst nichts speichern – dort ist das die einzige Quelle. Was in der Datei selbst steht, hat weiterhin Vorrang

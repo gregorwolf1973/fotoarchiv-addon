@@ -278,6 +278,41 @@ def test_sidecar_is_read_and_travels_with_the_video(settings, importer, make_vid
     assert not (settings.import_dir / "urlaub.avi.xmp").exists()
 
 
+def test_json_sidecar_from_cloud_export_is_read_and_travels_with_the_photo(settings, importer, make_jpeg):
+    """Google Takeout, Mi Cloud & Co. legen Datum, Ort und Personen als JSON neben das Bild."""
+    import json
+    from datetime import datetime, timezone
+
+    inbox = settings.import_dir
+    make_jpeg(inbox / "20190713_173819_D65B5CBE.jpg")  # ohne EXIF: Datum käme sonst nur aus dem Dateinamen
+    taken = datetime(2019, 7, 13, 15, 38, 19, tzinfo=timezone.utc)
+    (inbox / "20190713_173819_D65B5CBE.json").write_text(json.dumps({
+        "title": "20190713_173819_D65B5CBE.jpg",
+        "photoTakenTime": {"timestamp": str(int(taken.timestamp()))},
+        "geoData": {"latitude": 48.137154, "longitude": 11.576124, "altitude": 520.0},
+        "people": [{"name": "Anna"}],
+    }), encoding="utf-8")
+    (inbox / "allein.json").write_text("{}", encoding="utf-8")  # ohne Bild: bleibt liegen, zählt nicht
+
+    importer._run("import")
+    job = importer.job
+    assert (job.counts["imported"], job.counts["skipped"], job.counts["error"]) == (1, 0, 0)
+
+    row = importer.db.one("SELECT * FROM assets")
+    assert (row["taken_at"], row["date_source"], row["tz_offset"]) == ("2019-07-13T17:38:19", "exif", "+02:00")
+    assert (round(row["lat"], 4), round(row["lon"], 4)) == (48.1372, 11.5761)
+    assert importer.db.one("SELECT name FROM persons")["name"] == "Anna"
+
+    moved = settings.library / row["path"]
+    assert moved.parent == settings.library / "2019" / "07"
+    assert moved.with_name("20190713_173819_D65B5CBE.jpg.json").is_file()  # mitgewandert, Name vereinheitlicht
+    assert not (inbox / "20190713_173819_D65B5CBE.json").exists()
+    assert (inbox / "allein.json").is_file()
+
+    importer._run("library")  # der Abgleich zählt die Begleitdatei nicht als unbekannten Dateityp
+    assert importer.job.total == 0
+
+
 def test_sidecar_is_not_reported_as_unsupported(settings, importer, make_jpeg):
     make_jpeg(settings.import_dir / "a.jpg")
     (settings.import_dir / "a.jpg.xmp").write_text(SIDECAR, encoding="utf-8")

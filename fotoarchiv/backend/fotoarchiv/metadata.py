@@ -1,6 +1,7 @@
 """Aus exiftool-Rohdaten die Felder machen, die das Archiv braucht."""
 
 import calendar
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -27,9 +28,19 @@ TAG_TAGS = ["XMP-dc:Subject", "IPTC:Keywords"]
 PERSON_TAGS = ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP-mwg-rs:RegionName"]
 
 # ── Begleitdateien ────────────────────────────────────────────────
-# AVI, MPG und WMV können selbst keine Metadaten aufnehmen. Programme wie digiKam, darktable oder
-# Lightroom legen sie darum daneben ab: video.avi -> video.avi.xmp
-SIDECAR_SUFFIX = ".xmp"
+# Zwei Arten:
+# - XMP: AVI, MPG und WMV können selbst keine Metadaten aufnehmen. Programme wie digiKam, darktable
+#   oder Lightroom legen sie darum daneben ab: video.avi -> video.avi.xmp
+# - JSON: Cloud-Exporte (Google Takeout, Mi Cloud, Samsung Cloud, Amazon Photos) liefern Datum, Ort
+#   und Personen als JSON neben dem Bild: bild.jpg.json, bild.jpg.supplemental-metadata.json oder
+#   bild.json. Die Angaben stehen dort, weil der Dienst sie nicht ins Bild selbst schreibt.
+SIDECAR_SUFFIXES = (".xmp", ".json")
+SIDECAR_SUFFIX = SIDECAR_SUFFIXES[0]
+# Google Takeout hängt ".supplemental-metadata" an und kürzt lange Namen (ohne .json) auf 46 Zeichen:
+# PXL_20230101_123456789.jpg.supplemental-metadata.json -> PXL_20230101_123456789.jpg.supplemental-metada.json
+GOOGLE_SUFFIX = ".supplemental-metadata"
+GOOGLE_NAME_LIMIT = 46
+_GOOGLE_COPY_RE = re.compile(r"^(.*)(\(\d+\))$")  # Google: bild(1).jpg -> bild.jpg(1).json
 # Aus der Begleitdatei wird nur übernommen, was sie über die Aufnahme sagt. Größe, MIME-Typ und
 # Maße der XMP-Datei selbst dürfen nie in den Eintrag geraten – darum eine feste Liste.
 SIDECAR_TAGS = [
@@ -37,6 +48,16 @@ SIDECAR_TAGS = [
     "Composite:GPSLatitude", "Composite:GPSLongitude", "XMP-exif:GPSLatitude", "XMP-exif:GPSLongitude",
     "IFD0:Make", "IFD0:Model", "XMP-tiff:Make", "XMP-tiff:Model",
 ]
+# JSON-Felder, in denen Exporte den Aufnahmezeitpunkt ablegen (Reihenfolge = Priorität).
+# Googles "creationTime" fehlt absichtlich: das ist der Zeitpunkt des Hochladens, nicht der Aufnahme.
+JSON_TIME_KEYS = [
+    "photoTakenTime", "takenTime", "dateTaken", "date_taken", "takenAt", "taken_at", "DateTimeOriginal",
+    "dateTimeOriginal", "captureTime", "capture_time", "creationDate", "creation_date", "createDate",
+]
+JSON_GEO_KEYS = ["geoData", "geoDataExif", "geo", "gps", "location", "coordinates"]
+JSON_PERSON_KEYS = ["people", "persons", "personInImage", "PersonInImage"]
+JSON_TAG_KEYS = ["tags", "keywords", "labels", "subject", "Subject"]
+JSON_CAMERA_KEYS = [("cameraMake", "cameraModel"), ("make", "model"), ("Make", "Model")]
 
 _DATE_RE = re.compile(
     r"(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?"
@@ -99,20 +120,43 @@ def date_from_filename(name: str) -> datetime | None:
 
 
 def is_sidecar(path: Path) -> bool:
-    return path.suffix.lower() == SIDECAR_SUFFIX
+    return path.suffix.lower() in SIDECAR_SUFFIXES
 
 
-def sidecar_name(name: str) -> str:
-    """Wie die Begleitdatei zu dieser Datei heißen muss: video.avi -> video.avi.xmp"""
-    return name + SIDECAR_SUFFIX
+def sidecar_name(name: str, sidecar: Path | None = None) -> str:
+    """Wie die Begleitdatei zu dieser Datei heißen muss: video.avi -> video.avi.xmp, bild.jpg -> bild.jpg.json.
+    Eine JSON-Datei mit anderem Namensmuster (bild.json, Google-Kürzung) wird dabei vereinheitlicht."""
+    suffix = sidecar.suffix.lower() if sidecar is not None else SIDECAR_SUFFIX
+    return name + suffix
+
+
+def sidecar_candidates(name: str) -> list[str]:
+    """Mögliche Namen der Begleitdatei zu name, in der Reihenfolge, in der sie zählen."""
+    stem = Path(name).stem
+    google = name + GOOGLE_SUFFIX
+    names = [
+        name + ".xmp", name + ".XMP",
+        name + ".json", name + ".JSON",                   # Google Takeout (alt), viele andere Exporte
+        google + ".json",                                 # Google Takeout (neu)
+        google[:GOOGLE_NAME_LIMIT] + ".json",             # … von Google gekürzt
+        google[:GOOGLE_NAME_LIMIT + 1] + ".json",
+    ]
+    copy = _GOOGLE_COPY_RE.match(stem)
+    if copy:  # Google: bild(1).jpg gehört zu bild.jpg(1).json
+        base = copy.group(1) + Path(name).suffix + copy.group(2)
+        names += [base + ".json", (base + GOOGLE_SUFFIX)[:GOOGLE_NAME_LIMIT] + ".json"]
+    if stem != name:
+        names += [stem + ".json", stem + ".JSON"]          # bild.json: Mi Cloud, Samsung Cloud u. a.
+    seen: set[str] = set()
+    return [n for n in names if not (n in seen or seen.add(n))]
 
 
 def sidecar_for(path: Path) -> Path | None:
     """Vorhandene Begleitdatei zu path, sonst None. Auf Linux zählt auch die Endung in Großbuchstaben."""
-    for suffix in (SIDECAR_SUFFIX, SIDECAR_SUFFIX.upper()):
-        candidate = path.with_name(path.name + suffix)
-        if candidate.is_file():
-            return candidate
+    for candidate in sidecar_candidates(path.name):
+        companion = path.with_name(candidate)
+        if companion.is_file():
+            return companion
     return None
 
 
@@ -123,6 +167,128 @@ def merge_sidecar(raw: dict, sidecar: dict) -> dict:
         if merged.get(tag) in (None, "") and sidecar.get(tag) not in (None, ""):
             merged[tag] = sidecar[tag]
     return merged
+
+
+def read_sidecar(path: Path, exiftool, tz: str) -> dict:
+    """Begleitdatei als exiftool-Rohdaten: XMP liest exiftool, JSON wird in dieselben Tags übersetzt."""
+    if path.suffix.lower() == ".json":
+        return json_sidecar_tags(json.loads(path.read_text(encoding="utf-8-sig")), tz)
+    return exiftool.read(path)
+
+
+def sidecar_assignments(tags: dict) -> list[str]:
+    """exiftool-Zuweisungen, um übersetzte JSON-Angaben in eine Datei zu schreiben."""
+    assignments = []
+    for tag, value in tags.items():
+        if tag.startswith("Composite:"):
+            continue  # nicht schreibbar; die XMP-Fassung der Koordinaten ist ebenfalls dabei
+        for item in value if isinstance(value, list) else [value]:
+            assignments.append(f"-{tag}={item}")
+    return assignments
+
+
+def _json_time(value, tz: str) -> str | None:
+    """Zeitangabe aus JSON -> exiftool-Schreibweise mit Offset. Sekunden seit 1970 (Google, als Zahl oder
+    Text, auch Millisekunden) werden in die Ortszeit umgerechnet; Textdaten bleiben, wie sie sind."""
+    if isinstance(value, dict):
+        value = value.get("timestamp") or value.get("epoch") or value.get("value") or value.get("formatted")
+    if isinstance(value, bool) or value in (None, ""):
+        return None
+    if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().lstrip("-").isdigit()):
+        seconds = float(value)
+        if seconds > 1e11:
+            seconds /= 1000
+        if seconds <= 0:
+            return None
+        return _local(datetime.fromtimestamp(seconds, timezone.utc), tz)
+    if not isinstance(value, str):
+        return None
+    parsed = parse_date(re.sub(r"^\s*(\d{4})-(\d{2})-(\d{2})", r"\1:\2:\3", value))
+    if not parsed:
+        return None
+    taken, offset = parsed
+    if offset == "Z":  # UTC -> Ortszeit, wie bei QuickTime
+        return _local(taken.replace(tzinfo=timezone.utc), tz)
+    return taken.strftime("%Y:%m:%d %H:%M:%S") + (offset or "")
+
+
+def _local(aware: datetime, tz: str) -> str:
+    local = aware.astimezone(ZoneInfo(tz))
+    offset = local.strftime("%z")
+    return local.strftime("%Y:%m:%d %H:%M:%S") + f"{offset[:3]}:{offset[3:]}"
+
+
+def _json_number(obj: dict, keys: tuple[str, ...]) -> float | None:
+    for key in keys:
+        value = obj.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                continue
+    return None
+
+
+def _json_coords(data: dict) -> tuple[float | None, float | None]:
+    """Erstes brauchbares Koordinatenpaar: Google geoData/geoDataExif, sonst lat/lon auf oberster Ebene.
+    0/0 heißt bei Google „kein Ort“."""
+    for obj in [data.get(key) for key in JSON_GEO_KEYS] + [data]:
+        if not isinstance(obj, dict):
+            continue
+        lat = _json_number(obj, ("latitude", "lat"))
+        lon = _json_number(obj, ("longitude", "lon", "lng", "long"))
+        if lat is None or lon is None or (lat == 0 and lon == 0):
+            continue
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return round(lat, 7), round(lon, 7)
+    return None, None
+
+
+def _json_names(value) -> list[str]:
+    """Liste von Namen: Strings oder Objekte mit "name" (Google: people: [{"name": "Anna"}])."""
+    items = value if isinstance(value, list) else [value]
+    names = []
+    for item in items:
+        if isinstance(item, dict):
+            item = item.get("name") or item.get("title") or item.get("label")
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+    return names
+
+
+def json_sidecar_tags(data, tz: str) -> dict:
+    """JSON-Begleitdatei -> exiftool-Tags (wie sie SIDECAR_TAGS erwartet). Unbekannte Felder bleiben außen vor."""
+    if not isinstance(data, dict):
+        return {}
+    tags: dict = {}
+    for key in JSON_TIME_KEYS:
+        taken = _json_time(data.get(key), tz)
+        if taken:
+            tags["XMP-exif:DateTimeOriginal"] = taken
+            break
+    lat, lon = _json_coords(data)
+    if lat is not None:
+        tags["Composite:GPSLatitude"], tags["Composite:GPSLongitude"] = lat, lon
+        tags["XMP-exif:GPSLatitude"], tags["XMP-exif:GPSLongitude"] = lat, lon
+    persons = _unique([name for key in JSON_PERSON_KEYS for name in _json_names(data.get(key))])
+    if persons:
+        tags["XMP-iptcExt:PersonInImage"] = persons
+    subjects = _unique([name for key in JSON_TAG_KEYS for name in _json_names(data.get(key))])
+    if subjects:
+        tags["XMP-dc:Subject"] = subjects
+    for make_key, model_key in JSON_CAMERA_KEYS:
+        make, model = data.get(make_key), data.get(model_key)
+        if isinstance(make, str) and make.strip():
+            tags["XMP-tiff:Make"] = make.strip()
+        if isinstance(model, str) and model.strip():
+            tags["XMP-tiff:Model"] = model.strip()
+        if "XMP-tiff:Make" in tags or "XMP-tiff:Model" in tags:
+            break
+    return tags
 
 
 def _first(raw: dict, keys: list[str]):

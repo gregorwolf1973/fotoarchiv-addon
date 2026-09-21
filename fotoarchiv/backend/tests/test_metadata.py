@@ -1,9 +1,26 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fotoarchiv.metadata import date_from_filename, extract, is_sidecar, merge_sidecar, parse_date, sidecar_for
+from fotoarchiv.metadata import (
+    date_from_filename, extract, is_sidecar, json_sidecar_tags, merge_sidecar, parse_date, sidecar_assignments,
+    sidecar_candidates, sidecar_for, sidecar_name,
+)
 
 MTIME = datetime(2024, 1, 2, 3, 4, 5).timestamp()
+# 13.07.2019 17:38:19 Berliner Sommerzeit, so wie Google Takeout es ablegt: Sekunden seit 1970 als Text
+TAKEN_UTC = datetime(2019, 7, 13, 15, 38, 19, tzinfo=timezone.utc)
+GOOGLE_JSON = {
+    "title": "20190713_173819_D65B5CBE.jpg",
+    "description": "",
+    "imageViews": "3",
+    "creationTime": {"timestamp": "1700000000", "formatted": "Nov 14, 2023, 10:13:20 PM UTC"},  # Hochladen
+    "photoTakenTime": {"timestamp": str(int(TAKEN_UTC.timestamp())), "formatted": "Jul 13, 2019, 3:38:19 PM UTC"},
+    "geoData": {"latitude": 48.137154, "longitude": 11.576124, "altitude": 520.0, "latitudeSpan": 0.0, "longitudeSpan": 0.0},
+    "geoDataExif": {"latitude": 0.0, "longitude": 0.0, "altitude": 0.0, "latitudeSpan": 0.0, "longitudeSpan": 0.0},
+    "people": [{"name": "Anna"}, {"name": "Müller, Hans"}],
+    "url": "https://photos.google.com/photo/x",
+    "googlePhotosOrigin": {"mobileUpload": {"deviceType": "ANDROID_PHONE"}},
+}
 
 
 def test_parse_date_variants():
@@ -102,6 +119,76 @@ def test_sidecar_is_found_next_to_its_file(tmp_path):
     companion.write_text("<x/>")
     assert sidecar_for(video) == companion
     assert is_sidecar(companion) and not is_sidecar(video)
+
+
+def test_json_sidecar_google_takeout():
+    tags = json_sidecar_tags(GOOGLE_JSON, "Europe/Berlin")
+    assert tags["XMP-exif:DateTimeOriginal"] == "2019:07:13 17:38:19+02:00"  # nicht creationTime (Upload)
+    assert (tags["Composite:GPSLatitude"], tags["Composite:GPSLongitude"]) == (48.137154, 11.576124)
+    assert tags["XMP-iptcExt:PersonInImage"] == ["Anna", "Müller, Hans"]
+    assert "XMP-dc:Subject" not in tags
+
+    meta = extract(merge_sidecar({}, tags), Path("20190713_173819_D65B5CBE.jpg"), "Europe/Berlin", MTIME)
+    assert (meta.taken, meta.date_source, meta.tz_offset) == (datetime(2019, 7, 13, 17, 38, 19), "exif", "+02:00")
+    assert (meta.lat, meta.lon) == (48.137154, 11.576124)
+    assert meta.persons == ["Anna", "Müller, Hans"]
+
+    # Datei schlägt Begleitdatei
+    raw = {"ExifIFD:DateTimeOriginal": "2019:07:13 17:38:20", "Composite:GPSLatitude": 1.0, "Composite:GPSLongitude": 2.0}
+    meta = extract(merge_sidecar(raw, tags), Path("x.jpg"), "Europe/Berlin", MTIME)
+    assert meta.taken == datetime(2019, 7, 13, 17, 38, 20) and (meta.lat, meta.lon) == (1.0, 2.0)
+
+
+def test_json_sidecar_other_shapes():
+    # Google ohne Ort: 0/0 heißt „kein Ort“; Ort dann aus geoDataExif
+    tags = json_sidecar_tags({"geoData": {"latitude": 0.0, "longitude": 0.0},
+                              "geoDataExif": {"latitude": 47.5, "longitude": 9.75}}, "Europe/Berlin")
+    assert (tags["Composite:GPSLatitude"], tags["Composite:GPSLongitude"]) == (47.5, 9.75)
+    assert "XMP-exif:DateTimeOriginal" not in tags
+
+    # Andere Exporte: ISO-Datum, Millisekunden, flache Koordinaten, Schlagworte und Personen als Text
+    tags = json_sidecar_tags({"dateTaken": "2019-07-13T17:38:19+02:00", "latitude": "48.1", "lng": 11.5,
+                              "tags": ["Urlaub", "Strand", "urlaub"], "persons": "Anna",
+                              "cameraMake": "Samsung", "cameraModel": "SM-G960F"}, "Europe/Berlin")
+    assert tags["XMP-exif:DateTimeOriginal"] == "2019:07:13 17:38:19+02:00"
+    assert (tags["Composite:GPSLatitude"], tags["Composite:GPSLongitude"]) == (48.1, 11.5)
+    assert tags["XMP-dc:Subject"] == ["Urlaub", "Strand"] and tags["XMP-iptcExt:PersonInImage"] == ["Anna"]
+    assert (tags["XMP-tiff:Make"], tags["XMP-tiff:Model"]) == ("Samsung", "SM-G960F")
+
+    ms = json_sidecar_tags({"takenAt": int(TAKEN_UTC.timestamp() * 1000)}, "Europe/Berlin")
+    assert ms["XMP-exif:DateTimeOriginal"] == "2019:07:13 17:38:19+02:00"
+    utc = json_sidecar_tags({"dateTaken": "2019-07-13T15:38:19Z"}, "Europe/Berlin")
+    assert utc["XMP-exif:DateTimeOriginal"] == "2019:07:13 17:38:19+02:00"
+
+    assert json_sidecar_tags([], "Europe/Berlin") == {}
+    assert json_sidecar_tags({"photoTakenTime": {"timestamp": "0"}, "people": None}, "Europe/Berlin") == {}
+
+    assignments = sidecar_assignments(json_sidecar_tags(GOOGLE_JSON, "Europe/Berlin"))
+    assert "-XMP-exif:DateTimeOriginal=2019:07:13 17:38:19+02:00" in assignments
+    assert "-XMP-iptcExt:PersonInImage=Anna" in assignments and "-XMP-exif:GPSLatitude=48.137154" in assignments
+    assert not any(a.startswith("-Composite:") for a in assignments)
+
+
+def test_json_sidecar_names(tmp_path):
+    names = sidecar_candidates("PXL_20230101_123456789.jpg")
+    assert names[:3] == ["PXL_20230101_123456789.jpg.xmp", "PXL_20230101_123456789.jpg.XMP", "PXL_20230101_123456789.jpg.json"]
+    assert "PXL_20230101_123456789.jpg.supplemental-metadata.json" in names
+    assert "PXL_20230101_123456789.jpg.supplemental-metada.json" in names   # von Google auf 46 Zeichen gekürzt
+    assert "PXL_20230101_123456789.json" in names
+    assert "bild.jpg(1).json" in sidecar_candidates("bild(1).jpg")
+
+    photo = tmp_path / "20190713_173819_D65B5CBE.jpg"
+    photo.write_bytes(b"x")
+    assert sidecar_for(photo) is None
+    companion = tmp_path / "20190713_173819_D65B5CBE.json"
+    companion.write_text("{}")
+    assert sidecar_for(photo) == companion and is_sidecar(companion)
+    assert sidecar_name("neu.jpg", companion) == "neu.jpg.json"  # beim Verschieben vereinheitlicht
+    assert sidecar_name("neu.jpg") == "neu.jpg.xmp"
+
+    google = tmp_path / "20190713_173819_D65B5CBE.jpg.supplemental-metadata.json"
+    google.write_text("{}")
+    assert sidecar_for(photo) == google  # Googles Schreibweise zählt vor dem bloßen Stamm
 
 
 def test_sidecar_fills_gaps_but_the_file_itself_wins():

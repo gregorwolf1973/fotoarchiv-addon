@@ -24,7 +24,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
 - **Gesichtserkennung:** Gesichter werden im Hintergrund gefunden und gruppiert. Benannte Personen stehen in den Dateien und sind durchsuchbar. Siehe [Gesichtserkennung](#gesichtserkennung).
 - **Weltkarte:** Fotos gruppiert nach Aufnahmeort, mit Zeitregler für ein Jahr oder mehrere. Fotos ohne Ort zieht man aus dem Fenster „Ohne Ort“ auf die Karte. Siehe [Karte](#karte).
-- **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI, MTS, MPG und WMV. Dazu **XMP-Begleitdateien**, siehe [Begleitdateien](#begleitdateien).
+- **Formate:** JPEG, PNG, GIF, WebP, TIFF, HEIC/HEIF, AVIF sowie MP4, MOV, M4V, 3GP, MKV, WebM, AVI, MTS, MPG und WMV. Dazu **XMP- und JSON-Begleitdateien**, siehe [Begleitdateien](#begleitdateien).
 
 Alle ursprünglich geplanten Funktionen sind umgesetzt.
 
@@ -148,6 +148,21 @@ Das Add-on behandelt beide als eine Einheit:
 Übernommen wird eine feste Liste von Feldern. Größe, Typ und Maße der XMP-Datei selbst bleiben außen vor, damit sie nie mit den Angaben zum Foto verwechselt werden.
 
 Nicht erkannt wird die zweite Schreibweise `20130401_141515.xmp` ohne die Original-Endung, die Lightroom für RAW-Dateien verwendet: Liegen `bild.jpg` und `bild.avi` im selben Ordner, wäre nicht zu entscheiden, wem sie gehört. Eine Begleitdatei ohne zugehörige Mediendatei bleibt einfach liegen.
+
+### JSON aus Cloud-Exporten
+
+Google Fotos (Takeout), Mi Cloud, Samsung Cloud, Amazon Photos und ähnliche Dienste schreiben Datum, Ort und Personen nicht ins Bild, sondern in eine **JSON-Datei daneben**. Erkannt werden diese Schreibweisen:
+
+```
+20190713_173819.jpg.json                          Google Takeout (älter), viele andere
+20190713_173819.jpg.supplemental-metadata.json    Google Takeout (neuer, lange Namen werden von Google gekürzt)
+20190713_173819.json                              gleicher Name ohne Endung, z. B. Mi Cloud oder Samsung Cloud
+bild.jpg(1).json                                  Google bei gleichnamigen Dateien, gehört zu bild(1).jpg
+```
+
+Aus der JSON kommen **Aufnahmezeitpunkt** (`photoTakenTime`, auch `dateTaken`, `takenAt` und ähnliche, als Sekunden seit 1970 oder als Datumstext), **Ort** (`geoData`, `geoDataExif` oder `latitude`/`longitude`), **Personen** (`people`) und **Schlagworte** (`tags`, `keywords`). Googles `creationTime` wird bewusst ignoriert, das ist der Zeitpunkt des Hochladens. Ein Aufnahmezeitpunkt aus der JSON gilt so viel wie ein Kameradatum, damit er das Datum aus dem Dateinamen schlägt; steht in der Datei selbst ein Datum, gewinnt das. Sekundenwerte werden in die Zeitzone des Add-ons umgerechnet.
+
+Die JSON wandert wie eine XMP-Datei mit ins Archiv und bekommt dort den einheitlichen Namen `bild.jpg.json`. Beschreibungstexte und Albumnamen aus der JSON werden nicht übernommen, das Archiv hat dafür kein Feld.
 
 ## Dateien außerhalb des Fotoarchivs ändern
 
