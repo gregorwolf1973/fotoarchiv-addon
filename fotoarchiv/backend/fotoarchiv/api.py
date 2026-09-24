@@ -2,6 +2,7 @@
 Internetzugang (angemeldet, Rechte je Rolle, ohne Verwaltungsfunktionen)."""
 
 import calendar
+import logging
 import mimetypes
 import re
 import shutil
@@ -21,6 +22,8 @@ from . import duplicates_api, faces_api, labels, media
 from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
+
+log = logging.getLogger(__name__)
 
 COUNTER = re.compile(r"_\d+(\.[^.]*)?$")  # "_2" vor der Endung, von unique_path angehängt
 UPLOAD_ID = re.compile(r"[A-Za-z0-9_-]{16,64}")
@@ -517,13 +520,19 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         expected = request.headers.get("content-length", "")
         if expected.isdigit() and received != int(expected):
             temp.unlink(missing_ok=True)
-            raise HTTPException(400, f"Upload unvollständig ({received} von {expected} Bytes) – bitte erneut hochladen")
+            log.warning("Upload %s unvollständig: %d von %s Bytes", safe_name(name), received, expected)
+            # retry: die Oberfläche schickt die Datei selbst noch einmal
+            return JSONResponse({"detail": f"Upload unvollständig ({received} von {expected} Bytes)", "retry": True},
+                                status_code=400)
         return await finish_upload(temp, name, mtime)
 
     async def finish_upload(temp: Path, name: str, mtime: float | None) -> JSONResponse:
         # Browser liefern lastModified in Millisekunden
         seconds = mtime / 1000 if mtime and mtime > 1e11 else mtime
         result = await run_in_threadpool(importer.import_upload, temp, name, seconds)
+        if result.status in ("error", "damaged", "skipped"):
+            # Das Ergebnis sieht sonst nur der Browser, der hochgeladen hat
+            log.warning("Upload %s nicht importiert (%s): %s", safe_name(name), result.status, result.message)
         faces.wake()
         ctx.duplicates.wake()
         status = 500 if result.status == "error" else 422 if result.status == "damaged" else 200

@@ -18,6 +18,7 @@
     error: 'Fehler',
   };
   const OPEN = ['checking', 'waiting', 'uploading'];
+  const FAILED = ['error', 'damaged', 'skipped'];
 
   let dragging = $state(false);
   let queue = $state([]);
@@ -29,6 +30,7 @@
   let depth = 0;
 
   const running = $derived(queue.some((e) => OPEN.includes(e.status)));
+  const retryable = $derived(queue.some((e) => e.status === 'error' && e.file));
   const done = $derived(queue.filter((e) => !OPEN.includes(e.status)).length);
   const summary = $derived.by(() => {
     const count = (s) => queue.filter((e) => e.status === s).length;
@@ -122,7 +124,8 @@
           result.status === 'duplicate' ? `schon vorhanden: ${result.existing}`
           : result.similar ? `sehr ähnlich zu: ${result.similar}`
           : result.message;
-        entry.file = null;
+        // Bei einem Fehler die Datei behalten: "Erneut versuchen" schickt sie noch einmal
+        if (result.status !== 'error') entry.file = null;
         entry.controller = null;
         active--;
         pump();
@@ -147,6 +150,17 @@
         entry.controller?.abort();
       }
     }
+  }
+
+  function retry() {
+    for (const entry of queue) {
+      if (entry.status === 'error' && entry.file) {
+        entry.status = 'waiting';
+        entry.message = '';
+        entry.progress = 0;
+      }
+    }
+    pump();
   }
 
   function clear() {
@@ -259,6 +273,9 @@
       {#if running}
         <button class="text" onclick={cancel}>Abbrechen</button>
       {:else}
+        {#if retryable}
+          <button class="text" onclick={retry} title="Fehlgeschlagene Dateien noch einmal hochladen">Erneut versuchen</button>
+        {/if}
         <button class="icon small" onclick={clear} title="Schließen"><Icon name="close" size={18} /></button>
       {/if}
     </header>
@@ -278,6 +295,10 @@
               <span class="bar"><span style:width="{Math.round(entry.progress * 100)}%"></span></span>
             {:else}
               <span class="state" title={entry.message}>{entry.similar ? 'ähnlich' : (LABELS[entry.status] ?? entry.status)}</span>
+            {/if}
+            {#if entry.message && FAILED.includes(entry.status)}
+              <!-- Am Handy gibt es keinen Tooltip: den Grund direkt zeigen -->
+              <small class="reason">{entry.message}</small>
             {/if}
           </li>
         {/each}
@@ -395,9 +416,16 @@
   }
   li {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 0 10px;
     padding: 3px 0;
+  }
+  .reason {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
   }
   .name {
     flex: 1;

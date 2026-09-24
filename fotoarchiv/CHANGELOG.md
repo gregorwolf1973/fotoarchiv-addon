@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.51
+
+- **Hochladen vom Handy robuster:** Fotos unter 32 MB wurden bisher in einem Rutsch und ohne zweiten Versuch hochgeladen – ein kurzer Verbindungsabbruch, eine Fehlerseite des Proxys oder eine halb angekommene Datei endete sofort als *Fehler*. Jetzt gibt es wie bei großen Dateien bis zu sechs weitere Versuche. War eine Datei doch schon angekommen, meldet der nächste Versuch sie als vorhanden; doppelt ins Archiv kommt nichts
+- Die Upload-Liste zeigt den **Grund** für *Fehler*, *beschädigt* und *übersprungen* direkt unter dem Dateinamen (am Handy gab es nur einen Tooltip, also gar nichts). Statt eines leeren Textes steht dort jetzt der Statuscode bzw. *Netzwerkfehler*
+- **Erneut versuchen:** Nach dem Hochladen schickt ein Knopf alle fehlgeschlagenen Dateien noch einmal, ohne sie neu auswählen zu müssen
+- Nicht importierte Uploads stehen jetzt mit Grund im Log des Add-ons – bisher sah das Ergebnis nur der Browser, der hochgeladen hat
+- **Log:** pyvips schrieb jede Info von libvips mit, rund ein Dutzend Zeilen je Vorschaubild. Dadurch verschwanden echte Fehlermeldungen nach wenigen Minuten aus dem Log. Warnungen und Fehler von libvips erscheinen weiterhin
+- Vorschaubilder: Erzeugten Import und Galerie dasselbe Vorschaubild gleichzeitig, scheiterte einer der beiden mit *No such file or directory* (gemeinsame Zwischendatei). Jeder Aufruf hat jetzt seine eigene
+
 ## 0.50
 
 - **JSON-Begleitdateien aus Cloud-Exporten** werden beim Import gelesen: Google Takeout (`bild.jpg.json`, `bild.jpg.supplemental-metadata.json`, auch gekürzt), Mi Cloud, Samsung Cloud und andere (`bild.json`). Aufnahmezeitpunkt, Ort, Personen und Schlagworte daraus landen im Eintrag; das Datum zählt wie ein Kameradatum und schlägt damit den Dateinamen. Was in der Datei selbst steht, hat weiterhin Vorrang

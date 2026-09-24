@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -141,9 +142,15 @@ def md5_file(path: Path) -> str:
 
 def _save_webp(image, target: Path, quality: int) -> tuple[int, int]:
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_name(f".{target.stem}.tmp.webp")
-    image.webpsave(str(tmp), Q=quality, keep="none")
-    os.replace(tmp, target)
+    # Eigene Zwischendatei je Aufruf: Import und Galerie erzeugen dasselbe Vorschaubild manchmal
+    # gleichzeitig. Mit einem gemeinsamen Namen benannte der erste die Datei um, der zweite fand seine
+    # nicht mehr (No such file or directory) – oder hätte in die schon fertige Datei hineingeschrieben.
+    tmp = target.with_name(f".{target.stem}.{uuid.uuid4().hex[:12]}.tmp.webp")
+    try:
+        image.webpsave(str(tmp), Q=quality, keep="none")
+        os.replace(tmp, target)
+    finally:
+        tmp.unlink(missing_ok=True)  # nur noch vorhanden, wenn etwas schiefging
     return image.width, image.height
 
 

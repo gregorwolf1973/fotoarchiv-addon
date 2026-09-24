@@ -158,16 +158,30 @@ function put(url, body, onprogress, signal) {
   });
 }
 
+// Über HTTP/2 (Cloudflare) ist statusText leer – dann wenigstens den Statuscode nennen
 const failed = (r) => ({
   status: 'error',
-  message: r.json?.detail || (r.status === 413 ? 'Datei zu groß für den Proxy' : r.text || 'Netzwerkfehler'),
+  message:
+    r.json?.detail ||
+    (r.status === 413 ? 'Datei zu groß für den Proxy'
+    : r.status === 403 ? 'Zugriff verweigert (403) – Sperre durch CrowdSec oder Cloudflare?'
+    : r.status > 0 ? `Fehler ${r.status}${r.text ? ` (${r.text})` : ''}`
+    : 'Netzwerkfehler – Verbindung abgebrochen'),
 });
 
 async function uploadWhole(file, onprogress, signal) {
   const query = new URLSearchParams({ name: file.name, mtime: String(file.lastModified || '') });
-  const r = await put(`api/upload?${query}`, file, (loaded) => onprogress(loaded / file.size), signal);
-  if (r.status === -1) return CANCELLED;
-  return r.json && !r.json.detail ? r.json : failed(r);
+  for (let failures = 0; ; ) {
+    const r = await put(`api/upload?${query}`, file, (loaded) => onprogress(loaded / file.size), signal);
+    if (r.status === -1 || signal?.aborted) return CANCELLED;
+    if (r.json && !r.json.detail) return r.json; // Ergebnis des Imports, auch ein Fehler beim Import selbst
+    // Funkloch, Proxy oder halb angekommen: noch einmal von vorn. War die Datei doch schon angekommen,
+    // meldet der nächste Versuch sie als vorhanden – doppelt ins Archiv kommt sie nicht.
+    const transient = r.json?.retry || (RETRY_STATUS.has(r.status) && !r.json?.status);
+    if (!transient || ++failures > RETRIES) return failed(r);
+    onprogress(0);
+    await new Promise((resolve) => setTimeout(resolve, 1500 * failures));
+  }
 }
 
 function uploadId() {

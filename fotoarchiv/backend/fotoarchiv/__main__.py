@@ -7,6 +7,9 @@ import uvicorn
 from . import main, public
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# pyvips reicht jede Info von libvips als INFO weiter – rund ein Dutzend Zeilen je Vorschaubild. Das
+# verdrängte Fehlermeldungen aus dem Log; Warnungen und Fehler von libvips kommen weiterhin durch.
+logging.getLogger("pyvips").setLevel(logging.WARNING)
 log = logging.getLogger("fotoarchiv")
 
 
