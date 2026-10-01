@@ -13,6 +13,8 @@
   import Confirm from './components/Confirm.svelte';
   import DateDialog from './components/DateDialog.svelte';
   import DuplicatesView from './components/DuplicatesView.svelte';
+  import FavoriteDialog from './components/FavoriteDialog.svelte';
+  import FavoriteFolders from './components/FavoriteFolders.svelte';
   import Gallery from './components/Gallery.svelte';
   import Icon from './components/Icon.svelte';
   import ImportPanel from './components/ImportPanel.svelte';
@@ -20,6 +22,7 @@
   import LocationDialog from './components/LocationDialog.svelte';
   import Login from './components/Login.svelte';
   import MapView from './components/MapView.svelte';
+  import NameDialog from './components/NameDialog.svelte';
   import PeopleView from './components/PeopleView.svelte';
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
@@ -29,14 +32,19 @@
 
   const NO_FILTERS = { tags: [], persons: [], start: '', end: '', q: '' };
   const ZOOM_KEY = 'fotoarchiv.zoom';
+  const FOLDERS_KEY = 'fotoarchiv.favoritesSide';
 
   let info = $state(null);
   let items = $state.raw([]); // groß und unveränderlich: kein tiefer Proxy
   let labels = $state.raw({ tags: [], persons: [] });
+  let folders = $state.raw([]); // Favoritenordner
+  let folderId = $state(null); // in der Ansicht favorites: null = Übersicht, sonst der geöffnete Ordner
+  let showFolders = $state(readFlag(FOLDERS_KEY, true)); // Seitenleiste mit den Ordnern
+  let wide = $state(window.innerWidth >= 900);
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | map | people | trash | duplicates | storage
+  let view = $state('photos'); // photos | map | people | favorites | trash | duplicates | storage
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
@@ -66,7 +74,10 @@
 
   const trash = $derived(view === 'trash');
   const proposals = $derived(view === 'proposals'); // Löschvorschläge (nur Admin)
-  const listExtra = $derived(proposals ? { proposed: true } : {});
+  const inFolder = $derived(view === 'favorites' && folderId !== null);
+  const folderOverview = $derived(view === 'favorites' && folderId === null);
+  const openFolder = $derived(inFolder ? folders.find((f) => f.id === folderId) : null);
+  const listExtra = $derived(proposals ? { proposed: true } : inFolder ? { folder: folderId } : {});
   // Rechte: admin = Home Assistant, editor/viewer = Konten des Internetzugangs
   // uploader: hochladen und bearbeiten, aber keine Bilder löschen
   const canEdit = $derived(['admin', 'editor', 'uploader'].includes(session?.role));
@@ -75,6 +86,10 @@
   const canUpload = $derived(canEdit);
   // Wer nicht löschen darf, kann es dem Admin vorschlagen
   const canPropose = $derived(!!session?.authenticated && !canDelete);
+  // Ordnerleiste neben der Galerie: nur auf breiten Bildschirmen, dort lassen sich Fotos hineinziehen
+  const sideFolders = $derived(
+    showFolders && wide && (view === 'photos' || inFolder) && (folders.length > 0 || canEdit),
+  );
   const filtered = $derived(
     !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
   );
@@ -115,8 +130,10 @@
         for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
       }
       if (next.revision !== labelsRevision) {
-        labels = await api.labels();
+        [labels, folders] = await Promise.all([api.labels(), api.favorites()]);
         labelsRevision = next.revision;
+        // Geöffneter Ordner wurde gelöscht (auch von jemand anderem): zurück zur Übersicht
+        if (folderId !== null && !folders.some((f) => f.id === folderId)) folderId = null;
       }
       if (next.tasks_running || pending.size) await checkTasks();
       info = next;
@@ -229,8 +246,10 @@
       installPrompt = e;
     };
     const installed = () => (installPrompt = null);
+    const resized = () => (wide = window.innerWidth >= 900);
     window.addEventListener('beforeinstallprompt', beforeInstall);
     window.addEventListener('appinstalled', installed);
+    window.addEventListener('resize', resized);
     api.session().then(
       (next) => {
         if (next.public) registerServiceWorker(); // auch vor der Anmeldung: installierbar ab der ersten Seite
@@ -243,8 +262,26 @@
       clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', beforeInstall);
       window.removeEventListener('appinstalled', installed);
+      window.removeEventListener('resize', resized);
     };
   });
+
+  function readFlag(key, fallback) {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored === null ? fallback : stored === '1';
+    } catch {
+      return fallback;
+    }
+  }
+  function toggleFolders(on) {
+    showFolders = on;
+    try {
+      localStorage.setItem(FOLDERS_KEY, on ? '1' : '0');
+    } catch {
+      /* gilt dann nur bis zum Neuladen */
+    }
+  }
 
   // Zoomstufe pro Gerät merken; Handys starten kleiner
   function readZoom() {
@@ -270,8 +307,9 @@
     selected.clear();
     kick();
   }
-  function setView(next) {
+  function setView(next, folder = null) {
     view = next;
+    folderId = folder;
     openId = null;
     viewerIds = viewerList = null;
     searchOpen = false;
@@ -443,6 +481,96 @@
     kick();
   }
 
+  // ── Favoriten ──────────────────────────────────────────────────
+  const photoCount = (n) => (n === 1 ? '1 Foto' : `${formatNumber(n)} Fotos`);
+
+  function openFavorites(folder) {
+    filters = NO_FILTERS; // die Suche der Fotoansicht gilt im Ordner nicht
+    setView('favorites', folder?.id ?? null);
+  }
+
+  async function createFolder(name) {
+    try {
+      const folder = await api.createFolder(name);
+      folders = [...folders, folder].sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
+      kick();
+      return folder;
+    } catch (e) {
+      notifyError(e);
+      throw e;
+    }
+  }
+
+  async function renameFolder(folder, name) {
+    try {
+      await api.renameFolder(folder.id, name);
+      folders = folders.map((f) => (f.id === folder.id ? { ...f, name } : f));
+      kick();
+    } catch (e) {
+      notifyError(e);
+      throw e;
+    }
+  }
+
+  function confirmDeleteFolder(folder) {
+    dialog = {
+      type: 'confirm',
+      title: 'Ordner löschen?',
+      text: `Der Ordner „${folder.name}“ verschwindet. Die ${photoCount(folder.count)} darin bleiben im Archiv.`,
+      confirmLabel: 'Ordner löschen',
+      onconfirm: async () => {
+        try {
+          await api.deleteFolder(folder.id);
+          setView('favorites');
+          notify(`Ordner „${folder.name}“ gelöscht`);
+        } catch (e) {
+          notifyError(e);
+        }
+      },
+    };
+  }
+
+  async function addToFolder(folder, ids) {
+    try {
+      const { added, already } = await api.addToFolder(folder.id, ids);
+      const text = added
+        ? `${photoCount(added)} zu „${folder.name}“ hinzugefügt${already ? ` · ${already} waren schon drin` : ''}`
+        : `Schon alle in „${folder.name}“`;
+      // Rückgängig nur, wenn nichts schon vorher drin war – sonst verschwänden auch die
+      notify(text, added && !already ? { actionLabel: 'Rückgängig', action: () => removeIds(folder, ids, false) } : {});
+      selected.clear();
+      kick();
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
+  async function removeIds(folder, ids, offerUndo = true) {
+    try {
+      const { removed } = await api.removeFromFolder(folder.id, ids);
+      if (offerUndo) {
+        notify(`${photoCount(removed)} aus „${folder.name}“ entfernt`, {
+          actionLabel: 'Rückgängig',
+          action: () => api.addToFolder(folder.id, ids).then(kick, notifyError),
+        });
+      }
+      selected.clear();
+      kick();
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
+  async function saveFavorite(folder, name) {
+    const ids = [...selected];
+    dialog = null;
+    try {
+      await addToFolder(folder ?? (await createFolder(name)), ids);
+    } catch {
+      /* Meldung kam schon */
+    }
+  }
+
   function deleteSelected() {
     const ids = [...selected];
     runBatch({ ids, action: 'delete' }, () => runBatch({ ids, action: 'restore' }));
@@ -454,8 +582,10 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || folderOverview || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
+    // Im Favoritenordner nimmt Entf das Foto nur aus dem Ordner, es bleibt im Archiv
+    else if (e.key === 'Delete' && selected.size && openFolder) removeIds(openFolder, [...selected]);
     else if (e.key === 'Delete' && selected.size && canDelete) (trash ? isAdmin && confirmPurge([...selected]) : deleteSelected());
     else if (e.key === 'a' && (e.ctrlKey || e.metaKey) && items.length) items.forEach((item) => selected.add(item[0]));
     else return;
@@ -499,6 +629,12 @@
           </button>
         {/if}
       {:else}
+        {#if openFolder}
+          <button onclick={() => removeIds(openFolder, [...selected])} title="Aus diesem Ordner nehmen – die Fotos bleiben im Archiv (Entf)">
+            <Icon name="starOff" size={20} /><span class="label">Aus Ordner entfernen</span>
+          </button>
+        {/if}
+        <button class="icon" onclick={() => (dialog = { type: 'favorite' })} title="Zu Favoriten hinzufügen"><Icon name="star" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'persons' })} title="Personen ändern"><Icon name="person" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'tags' })} title="Schlagworte ändern"><Icon name="tag" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'date' })} title="Datum setzen"><Icon name="calendar" /></button>
@@ -514,7 +650,7 @@
           </button>
         {/if}
         {#if canDelete}
-          <button class="icon" onclick={deleteSelected} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>
+          <button class="icon" onclick={deleteSelected} title={openFolder ? 'In den Papierkorb' : 'In den Papierkorb (Entf)'}><Icon name="delete" /></button>
         {:else if canPropose}
           <button onclick={() => (dialog = { type: 'propose', ids: [...selected] })} title="Dem Admin zum Löschen vorschlagen">
             <Icon name="delete" size={20} /><span class="label">Löschen vorschlagen</span>
@@ -542,6 +678,31 @@
         <span class="sub">Auswählen, dann in den Papierkorb legen oder ablehnen</span>
       </div>
       <span class="grow"></span>
+    </header>
+  {:else if folderOverview}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">Favoriten</strong>
+        <span class="sub">Ordner mit Verweisen auf Fotos – die Dateien bleiben, wo sie sind</span>
+      </div>
+      <span class="grow"></span>
+    </header>
+  {:else if inFolder}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('favorites')} title="Zur Ordnerübersicht"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">{openFolder?.name ?? 'Favoriten'}</strong>
+        <span class="sub">{photoCount(items.length)} · Favoriten</span>
+      </div>
+      <span class="grow"></span>
+      {#if canEdit && openFolder}
+        <button class="icon" onclick={() => (dialog = { type: 'rename', folder: openFolder })} title="Ordner umbenennen"><Icon name="pencil" /></button>
+        <button class="icon" onclick={() => confirmDeleteFolder(openFolder)} title="Ordner löschen (die Fotos bleiben)"><Icon name="delete" /></button>
+      {/if}
+      {#if wide && !showFolders}
+        <button class="icon" onclick={() => toggleFolders(true)} title="Ordnerleiste einblenden"><Icon name="folderStar" /></button>
+      {/if}
     </header>
   {:else if view === 'duplicates'}
     <header class="topbar">
@@ -571,11 +732,15 @@
         <button class:active={view === 'photos'} onclick={() => setView('photos')} title="Fotos"><Icon name="images" size={20} /><span class="label">Fotos</span></button>
         <button class:active={view === 'map'} onclick={() => setView('map')} title="Karte"><Icon name="map" size={20} /><span class="label">Karte</span></button>
         <button class:active={view === 'people'} onclick={() => setView('people')} title="Personen"><Icon name="person" size={20} /><span class="label">Personen</span></button>
+        <button onclick={() => openFavorites(null)} title="Favoriten"><Icon name="star" size={20} /><span class="label">Favoriten</span></button>
       </nav>
       <div class="search-inline"><SearchBar {labels} {filters} onchange={setFilters} /></div>
       <span class="grow"></span>
       <div class="actions">
         {#if info?.importing}<span class="busy" title="Import läuft"></span>{/if}
+        {#if view === 'photos' && wide && !showFolders}
+          <button class="icon" onclick={() => toggleFolders(true)} title="Favoritenordner einblenden"><Icon name="folderStar" /></button>
+        {/if}
         <button class="icon search-toggle" class:on={searchOpen} onclick={() => (searchOpen = !searchOpen)} title="Suchen"><Icon name="search" /></button>
         {#if canUpload}
           <button onclick={() => fileInput.click()} title="Dateien hochladen">
@@ -659,7 +824,31 @@
     </div>
   {/if}
 
-  {#if view === 'people'}
+  <div class="main">
+  {#if sideFolders}
+    <FavoriteFolders
+      {folders}
+      active={folderId}
+      {canEdit}
+      onopen={openFavorites}
+      ondropids={addToFolder}
+      oncreate={createFolder}
+      onrename={renameFolder}
+      onhide={() => toggleFolders(false)}
+    />
+  {/if}
+  <div class="content">
+  {#if folderOverview}
+    <FavoriteFolders
+      {folders}
+      {canEdit}
+      mode="page"
+      onopen={openFavorites}
+      ondropids={addToFolder}
+      oncreate={createFolder}
+      onrename={renameFolder}
+    />
+  {:else if view === 'people'}
     <PeopleView
       {canEdit}
       revision={info?.revision}
@@ -682,6 +871,7 @@
         {items}
         {selected}
         selectable={canEdit}
+        dragging={canEdit && sideFolders}
         {zoom}
         onzoom={changeZoom}
         onopen={(i) => (openId = items[i][0])}
@@ -697,6 +887,16 @@
       {:else if proposals}
         <Icon name="checkCircle" size={64} />
         <h2>Keine offenen Löschvorschläge</h2>
+      {:else if inFolder}
+        <Icon name="folderStar" size={64} />
+        <h2>Der Ordner ist leer</h2>
+        {#if canEdit}
+          <p>
+            {sideFolders ? 'Fotos aus der Galerie auf den Ordner links ziehen' : 'In der Fotoansicht Fotos auswählen und auf den Stern tippen'}
+            – sie werden hier verlinkt, nicht kopiert.
+          </p>
+          <button class="primary" onclick={() => setView('photos')}><Icon name="images" size={20} /> Zu den Fotos</button>
+        {/if}
       {:else if filtered}
         <Icon name="search" size={64} />
         <h2>Keine Treffer</h2>
@@ -712,6 +912,8 @@
       {/if}
     </div>
   {/if}
+  </div>
+  </div>
 </div>
 
 {#if openIndex >= 0}
@@ -776,6 +978,19 @@
       dialog = null;
     }}
   />
+{:else if dialog?.type === 'favorite'}
+  <FavoriteDialog count={selected.size} {folders} oncancel={() => (dialog = null)} onsave={saveFavorite} />
+{:else if dialog?.type === 'rename'}
+  <NameDialog
+    title="Ordner umbenennen"
+    value={dialog.folder.name}
+    label="Name des Ordners"
+    oncancel={() => (dialog = null)}
+    onsave={async (name) => {
+      await renameFolder(dialog.folder, name);
+      dialog = null;
+    }}
+  />
 {:else if dialog?.type === 'propose'}
   <ProposeDeleteDialog
     count={dialog.ids.length}
@@ -817,6 +1032,17 @@
   .app {
     height: 100vh;
     height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+  .content {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
   }

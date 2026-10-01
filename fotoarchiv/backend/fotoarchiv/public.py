@@ -33,13 +33,14 @@ OPEN = {"auth_session", "auth_login", "auth_logout"}
 VIEW = {
     "state", "asset_index", "asset_largest", "asset_geo", "label_list", "asset_detail", "asset_thumb", "asset_preview",
     "asset_original", "task_list", "face_status", "people", "group_faces", "person_faces", "asset_faces",
-    "face_crop", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
+    "face_crop", "favorite_list", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
     "delete_request_create",       # Löschen vorschlagen: jede angemeldete Rolle, der Admin entscheidet
 }
 EDIT = {
     "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload", "upload_chunk", "upload_known",
     "group_name", "group_hide", "person_rename", "person_merge", "person_delete", "face_assign", "face_remove",
     "duplicate_list", "duplicate_resolve", "duplicate_ignore",
+    "favorite_create", "favorite_rename", "favorite_delete", "favorite_add", "favorite_remove",
 }
 # Was eine Rolle über das Ansehen hinaus darf
 # Alles, womit Bilder verschwinden: Papierkorb, Wiederherstellen und die Duplikat-Bereinigung

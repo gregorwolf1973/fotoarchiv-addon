@@ -90,6 +90,12 @@ export const api = {
   duplicates: () => request('api/duplicates'),
   resolveDuplicates: (groups, transfer) => request('api/duplicates/resolve', send('POST', { groups, transfer })),
   ignoreDuplicates: (ids) => request('api/duplicates/ignore', send('POST', { ids })),
+  favorites: () => request('api/favorites'),
+  createFolder: (name) => request('api/favorites', send('POST', { name })),
+  renameFolder: (id, name) => request(`api/favorites/${id}/rename`, send('POST', { name })),
+  deleteFolder: (id) => request(`api/favorites/${id}/delete`, { method: 'POST' }),
+  addToFolder: (id, ids) => request(`api/favorites/${id}/add`, send('POST', { ids })),
+  removeFromFolder: (id, ids) => request(`api/favorites/${id}/remove`, send('POST', { ids })),
   admin: {
     access: () => request('api/admin/access'),
     users: () => request('api/admin/users'),

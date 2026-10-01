@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.52
+
+- **Favoritenordner:** Unter **Favoriten** eigene Ordner anlegen, umbenennen und löschen. Ein Ordner enthält nur Verweise auf Fotos – die Dateien bleiben, wo sie sind, und ein Foto kann in mehreren Ordnern stecken
+- **Drag & Drop:** Am Computer steht links neben der Galerie eine Leiste mit den Ordnern; Fotos (oder die ganze Auswahl) einfach auf einen Ordner ziehen. Doppelklick auf einen Ordner benennt ihn um
+- Am Handy: Fotos auswählen und auf den **Stern** tippen, dann Ordner wählen oder neu anlegen
+- Im Ordner nimmt *Aus Ordner entfernen* bzw. `Entf` ein Foto nur aus dem Ordner; das Foto bleibt im Archiv
+- Beim Aussortieren doppelter Fotos übernimmt das behaltene Foto die Favoritenordner des gelöschten
+
 ## 0.51
 
 - **Hochladen vom Handy robuster:** Fotos unter 32 MB wurden bisher in einem Rutsch und ohne zweiten Versuch hochgeladen – ein kurzer Verbindungsabbruch, eine Fehlerseite des Proxys oder eine halb angekommene Datei endete sofort als *Fehler*. Jetzt gibt es wie bei großen Dateien bis zu sechs weitere Versuche. War eine Datei doch schon angekommen, meldet der nächste Versuch sie als vorhanden; doppelt ins Archiv kommt nichts

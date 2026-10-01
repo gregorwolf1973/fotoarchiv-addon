@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import duplicates_api, faces_api, labels, media
+from . import duplicates_api, faces_api, favorites_api, labels, media
 from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
@@ -142,6 +142,7 @@ class AssetFilter:
     located: bool | None = None   # nur mit / nur ohne Aufnahmeort
     editable: bool | None = None  # nur Formate, die Metadaten speichern können
     proposed: bool = False        # nur Fotos, deren Löschen jemand vorgeschlagen hat
+    folder: int | None = None     # nur Fotos aus diesem Favoritenordner
 
     def clause(self) -> tuple[str, list]:
         where = ["deleted_at IS NOT NULL" if self.trash else "deleted_at IS NULL"]
@@ -169,6 +170,9 @@ class AssetFilter:
             params += [f"%{word}%"] * 4
         if self.located is not None:
             where.append("lat IS NOT NULL" if self.located else "lat IS NULL")
+        if self.folder is not None:
+            where.append("EXISTS (SELECT 1 FROM favorite_items f WHERE f.asset_id = a.id AND f.folder_id = ?)")
+            params.append(self.folder)
         if self.proposed:
             where.append("EXISTS (SELECT 1 FROM delete_requests r WHERE r.asset_id = a.id)")
         if self.editable is not None:
@@ -592,3 +596,4 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
 
     faces_api.register(app, db, faces, tasks)
     duplicates_api.register(app, ctx)
+    favorites_api.register(app, db)

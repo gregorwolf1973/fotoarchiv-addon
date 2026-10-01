@@ -2,12 +2,17 @@
   import { untrack } from 'svelte';
   import { buildLayout, dayLabel, monthLabel, rowAt, rowOfItem, ZOOM_LEVELS } from '../lib/layout.js';
   import { thumbUrl } from '../lib/api.js';
+  import { canDrag, startPhotoDrag } from '../lib/dragphotos.js';
   import Icon from './Icon.svelte';
   import Timeline from './Timeline.svelte';
 
   // selected: SvelteSet mit Bild-IDs. Ist etwas ausgewählt, wählt ein Klick aus statt zu öffnen.
   // zoom: Index in ZOOM_LEVELS; onzoom(schritt) ändert ihn (+1 größer, -1 kleiner)
-  let { items, selected, selectable = true, zoom, onopen, ontoggle, ontoggleday, onzoom } = $props();
+  // dragging: Fotos lassen sich in einen Favoritenordner ziehen (die Auswahl oder das eine Foto)
+  let { items, selected, selectable = true, dragging = false, zoom, onopen, ontoggle, ontoggleday, onzoom } = $props();
+
+  const draggable = $derived(dragging && canDrag());
+  const dragstart = (e, id) => startPhotoDrag(e, selected.has(id) ? [...selected] : [id]);
 
   const LONG_PRESS = 450;
 
@@ -157,9 +162,12 @@
       {/each}
       {#each visible.cells as cell (cell.item[0])}
         {@const isSelected = selected.has(cell.item[0])}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="cell"
           class:selected={isSelected}
+          draggable={draggable ? 'true' : undefined}
+          ondragstart={draggable ? (e) => dragstart(e, cell.item[0]) : undefined}
           style:top="{cell.top}px"
           style:left="{pad + cell.left}px"
           style:width="{cell.width}px"

@@ -182,6 +182,21 @@ MIGRATIONS = [
         PRIMARY KEY (asset_id, username)
     );
     """,
+    """
+    -- Favoritenordner: verweisen nur auf Fotos, die Dateien bleiben, wo sie sind
+    CREATE TABLE favorite_folders (
+        id         INTEGER PRIMARY KEY,
+        name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        created_at TEXT NOT NULL
+    );
+    CREATE TABLE favorite_items (
+        folder_id INTEGER NOT NULL REFERENCES favorite_folders (id) ON DELETE CASCADE,
+        asset_id  INTEGER NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
+        added_at  TEXT NOT NULL,
+        PRIMARY KEY (folder_id, asset_id)
+    );
+    CREATE INDEX favorite_items_asset ON favorite_items (asset_id);
+    """,
 ]
 
 # Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID

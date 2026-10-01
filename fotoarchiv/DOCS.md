@@ -19,6 +19,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext (Dateiname, Kamera, Personen- und Schlagwortnamen). Mehrere Filter gelten gemeinsam.
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum und Ort setzen, drehen und löschen für viele Dateien auf einmal.
+- **Favoriten:** eigene Ordner anlegen und umbenennen, Fotos per Drag & Drop hineinziehen. Die Ordner enthalten nur Verweise, die Dateien bleiben, wo sie sind. Siehe [Favoriten](#favoriten).
 - **Papierkorb:** Gelöschte Dateien lassen sich wiederherstellen und werden nach einstellbarer Zeit endgültig gelöscht.
 - **Speicherplatz:** Nach Größe sortiert – größte oder kleinste zuerst –, gefiltert nach Videos oder Fotos und Mindestgröße, zum Ansehen und Aussortieren. Siehe [Speicherplatz und Backups](#speicherplatz-und-backups).
 - **Internetzugang** mit eigenen Konten, Sperren nach Fehlversuchen und CrowdSec-Anbindung. Siehe [Zugriff übers Internet](#zugriff-übers-internet).
@@ -185,6 +186,16 @@ Legst du eine von Hand gelöschte Datei später wieder in den Import-Ordner oder
 - Das dauert auf dem Raspberry Pi mehrere Stunden (jede Datei wird ganz gelesen) und lässt sich mit **Prüfung abbrechen** beenden. Einmal nach einem großen Import und danach alle paar Monate reicht.
 
 **Schutz vor Datenverlust:** Fehlende Einträge werden nie automatisch entfernt. Ist die Bibliothek leer, etwa weil das Laufwerk gerade nicht eingebunden ist, lehnt das Add-on das Entfernen ab.
+
+## Favoriten
+
+Favoritenordner sammeln Verweise auf Fotos – ein Foto kann in beliebig vielen Ordnern stecken, ohne kopiert zu werden. Die Ordner gelten für alle, die das Archiv sehen; anlegen und befüllen darf jedes Konto, das auch bearbeiten darf.
+
+- **Am Computer:** Links neben der Galerie steht die Leiste *Favoriten*. Mit dem Ordner-Knopf oben einen Ordner anlegen, dann Fotos aus der Galerie auf ihn ziehen. Sind Fotos ausgewählt, wandert die ganze Auswahl mit. Doppelklick oder der Stift benennt um. Die Leiste lässt sich mit dem Pfeil ausblenden und über den Ordner-Knopf in der Kopfzeile wieder einblenden.
+- **Am Handy:** Fotos auswählen (lange drücken) und auf den **Stern** tippen, dann einen Ordner wählen oder gleich einen neuen anlegen. Die Ordner selbst findet man unter **Favoriten** in der Kopfzeile.
+- **Im Ordner:** *Aus Ordner entfernen* (oder `Entf`) nimmt Fotos nur aus dem Ordner, sie bleiben im Archiv. Der Papierkorb-Knopf löscht dagegen wie gewohnt. Ein gelöschter Ordner nimmt keine Fotos mit.
+
+Fotos im Papierkorb erscheinen nicht im Ordner, kommen nach dem Wiederherstellen aber zurück. Wird ein doppeltes Foto aussortiert, übernimmt das behaltene seine Ordner. Die Ordner stehen nur in der Datenbank, nicht in den Bilddateien.
 
 ## Gesichtserkennung
 

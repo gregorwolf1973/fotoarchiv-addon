@@ -329,4 +329,8 @@ class DuplicateService:
                 self.editor.set_location(keep_id, removed["lat"], removed["lon"])
             if DATE_RANK.get(keep["date_source"], 0) < DATE_RANK.get(removed["date_source"], 0):
                 self.editor.set_date(keep_id, datetime.fromisoformat(removed["taken_at"]))
+        # Favoriten zeigen danach aufs behaltene Foto, sonst stünde im Ordner ein Foto aus dem Papierkorb
+        self.db.execute(
+            """INSERT OR IGNORE INTO favorite_items (folder_id, asset_id, added_at)
+               SELECT folder_id, ?, added_at FROM favorite_items WHERE asset_id = ?""", (keep_id, remove_id))
         self.editor.delete(remove_id)
