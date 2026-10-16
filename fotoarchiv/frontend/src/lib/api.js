@@ -68,6 +68,8 @@ export const api = {
   remove: (id) => request(`api/assets/${id}`, { method: 'DELETE' }),
   restore: (id) => request(`api/assets/${id}/restore`, { method: 'POST' }),
   batch: (body) => request('api/batch', send('POST', body)),
+  // Auswahl als ZIP: liefert einen Token, unter dem der Browser die Datei dann per GET lädt
+  createDownload: (ids) => request('api/downloads', send('POST', { ids })),
   tasks: () => request('api/tasks'),
   emptyTrash: () => request('api/trash/empty', { method: 'POST' }),
   removeMissing: () => request('api/library/remove-missing', { method: 'POST' }),

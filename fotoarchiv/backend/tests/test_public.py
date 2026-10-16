@@ -395,3 +395,23 @@ def test_delete_proposals_reach_the_admin(admin, public, make_jpeg, tmp_path):
     assert admin.post(f"/api/assets/{asset_id}/restore").status_code == 200
     assert admin.get(f"/api/assets/{asset_id}").json()["delete_requests"] == []
     assert oma.post("/api/delete-requests/dismiss", json={"ids": [other]}).status_code == 404  # nur über Home Assistant
+
+
+def test_download_needs_csrf_and_belongs_to_its_user(admin, public, make_jpeg, tmp_path):
+    photo = make_jpeg(tmp_path / "IMG_20200101_120000.jpg")
+    asset_id = admin.put("/api/upload", params={"name": photo.name}, content=photo.read_bytes()).json()["asset_id"]
+    make_user(admin, "leser")
+    make_user(admin, "andere")
+
+    viewer = visitor(public, ip="198.51.100.2")
+    login(viewer, "leser")
+    csrf = viewer.headers.pop("X-CSRF-Token")
+    assert viewer.post("/api/downloads", json={"ids": [asset_id]}).status_code == 403  # ohne CSRF
+    viewer.headers["X-CSRF-Token"] = csrf
+    token = viewer.post("/api/downloads", json={"ids": [asset_id]}).json()["token"]
+    assert viewer.get(f"/api/downloads/{token}").content[:2] == b"PK"
+
+    other = visitor(public, ip="198.51.100.3")
+    login(other, "andere")
+    assert other.get(f"/api/downloads/{token}").status_code == 404  # fremder Token: wie nicht vorhanden
+    assert visitor(public, ip="198.51.100.4").get(f"/api/downloads/{token}").status_code == 401

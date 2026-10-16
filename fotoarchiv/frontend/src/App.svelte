@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import { api, auth, cache, filterQuery } from './lib/api.js';
+  import { api, auth, cache, filterQuery, originalUrl } from './lib/api.js';
   import { ZOOM_LEVELS } from './lib/layout.js';
   import { formatBytes, formatNumber } from './lib/format.js';
   import { notify, notifyError } from './lib/notices.svelte.js';
@@ -44,7 +44,7 @@
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | map | people | favorites | trash | duplicates | storage
+  let view = $state('photos'); // photos | map | people | favorites | trash | duplicates | storage | recent
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
@@ -74,10 +74,13 @@
 
   const trash = $derived(view === 'trash');
   const proposals = $derived(view === 'proposals'); // Löschvorschläge (nur Admin)
+  const recent = $derived(view === 'recent'); // zuletzt eingelesen, nach Tag des Imports
   const inFolder = $derived(view === 'favorites' && folderId !== null);
   const folderOverview = $derived(view === 'favorites' && folderId === null);
   const openFolder = $derived(inFolder ? folders.find((f) => f.id === folderId) : null);
-  const listExtra = $derived(proposals ? { proposed: true } : inFolder ? { folder: folderId } : {});
+  const listExtra = $derived(
+    proposals ? { proposed: true } : recent ? { order: 'imported' } : inFolder ? { folder: folderId } : {},
+  );
   // Rechte: admin = Home Assistant, editor/viewer = Konten des Internetzugangs
   // uploader: hochladen und bearbeiten, aber keine Bilder löschen
   const canEdit = $derived(['admin', 'editor', 'uploader'].includes(session?.role));
@@ -339,6 +342,32 @@
   }
 
   // ── Aktionen ───────────────────────────────────────────────────
+  // Ein Foto: das Original direkt. Mehrere: als ZIP, das der Server beim Herunterladen zusammenstellt
+  async function downloadSelected() {
+    const ids = [...selected];
+    try {
+      if (ids.length === 1) {
+        save(originalUrl(items[indexById.get(ids[0])], true));
+        return;
+      }
+      const { token, count, missing, bytes } = await api.createDownload(ids);
+      save(`api/downloads/${token}`);
+      const gone = missing ? ` · ${formatNumber(missing)} fehlen auf dem Datenträger` : '';
+      notify(`${photoCount(count)} (${formatBytes(bytes)}) werden als ZIP heruntergeladen${gone}`);
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
+  function save(url) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    document.body.append(link);
+    link.click();
+    link.remove();
+  }
+
   async function runBatch(body, undo = null) {
     try {
       const task = await api.batch(body);
@@ -489,6 +518,11 @@
     setView('favorites', folder?.id ?? null);
   }
 
+  function openRecent() {
+    filters = NO_FILTERS; // alle neuen Fotos zeigen, nicht nur die Treffer einer alten Suche
+    setView('recent');
+  }
+
   async function createFolder(name) {
     try {
       const folder = await api.createFolder(name);
@@ -634,6 +668,7 @@
             <Icon name="starOff" size={20} /><span class="label">Aus Ordner entfernen</span>
           </button>
         {/if}
+        <button class="icon" onclick={downloadSelected} title={selected.size === 1 ? 'Original herunterladen' : 'Als ZIP herunterladen'}><Icon name="download" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'favorite' })} title="Zu Favoriten hinzufügen"><Icon name="star" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'persons' })} title="Personen ändern"><Icon name="person" /></button>
         <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'tags' })} title="Schlagworte ändern"><Icon name="tag" /></button>
@@ -676,6 +711,15 @@
       <div class="title-block">
         <strong class="title">Löschvorschläge</strong>
         <span class="sub">Auswählen, dann in den Papierkorb legen oder ablehnen</span>
+      </div>
+      <span class="grow"></span>
+    </header>
+  {:else if recent}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">Zuletzt eingelesen</strong>
+        <span class="sub">Nach dem Tag des Imports, das Neueste oben</span>
       </div>
       <span class="grow"></span>
     </header>
@@ -733,6 +777,7 @@
         <button class:active={view === 'map'} onclick={() => setView('map')} title="Karte"><Icon name="map" size={20} /><span class="label">Karte</span></button>
         <button class:active={view === 'people'} onclick={() => setView('people')} title="Personen"><Icon name="person" size={20} /><span class="label">Personen</span></button>
         <button onclick={() => openFavorites(null)} title="Favoriten"><Icon name="star" size={20} /><span class="label">Favoriten</span></button>
+        <button onclick={openRecent} title="Zuletzt eingelesen"><Icon name="recent" size={20} /><span class="label">Neu</span></button>
       </nav>
       <div class="search-inline"><SearchBar {labels} {filters} onchange={setFilters} /></div>
       <span class="grow"></span>
@@ -897,6 +942,9 @@
           </p>
           <button class="primary" onclick={() => setView('photos')}><Icon name="images" size={20} /> Zu den Fotos</button>
         {/if}
+      {:else if recent}
+        <Icon name="recent" size={64} />
+        <h2>Noch nichts eingelesen</h2>
       {:else if filtered}
         <Icon name="search" size={64} />
         <h2>Keine Treffer</h2>
@@ -943,6 +991,10 @@
     onclose={() => (showImport = false)}
     onchanged={kick}
     ontask={trackTask}
+    onshowrecent={() => {
+      showImport = false;
+      openRecent();
+    }}
   />
 {/if}
 

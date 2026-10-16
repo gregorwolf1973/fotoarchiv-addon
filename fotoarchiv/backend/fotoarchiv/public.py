@@ -34,6 +34,7 @@ VIEW = {
     "state", "asset_index", "asset_largest", "asset_geo", "label_list", "asset_detail", "asset_thumb", "asset_preview",
     "asset_original", "task_list", "face_status", "people", "group_faces", "person_faces", "asset_faces",
     "face_crop", "favorite_list", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
+    "download_create", "download_zip",  # Auswahl als ZIP: dieselben Originale wie asset_original
     "delete_request_create",       # Löschen vorschlagen: jede angemeldete Rolle, der Admin entscheidet
 }
 EDIT = {

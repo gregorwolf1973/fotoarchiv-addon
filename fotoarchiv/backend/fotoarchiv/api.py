@@ -5,7 +5,10 @@ import calendar
 import logging
 import mimetypes
 import re
+import secrets
 import shutil
+import threading
+import time
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
@@ -14,11 +17,11 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import duplicates_api, faces_api, favorites_api, labels, media
+from . import duplicates_api, faces_api, favorites_api, labels, media, zipstream
 from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
@@ -113,6 +116,10 @@ class RotateRequest(BaseModel):
     degrees: Literal[90, 180, 270]
 
 
+class DownloadRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=5000)
+
+
 class BatchRequest(BaseModel):
     ids: list[int] = Field(min_length=1)
     action: Literal["tags", "persons", "date", "location", "shift", "rotate", "delete", "restore", "purge", "convert"]
@@ -186,7 +193,7 @@ def install_common(app: FastAPI):
     # Web-App-Manifest; ohne Eintrag liefert StaticFiles es als application/octet-stream aus
     mimetypes.add_type("application/manifest+json", ".webmanifest")
     # Nur Text/JSON komprimieren; Bilder und Videos sind es schon, das kostet auf dem Pi nur Zeit
-    binary_types = ("image/webp", *media.IMAGE_TYPES.values(), *media.VIDEO_TYPES.values())
+    binary_types = ("image/webp", "application/zip", *media.IMAGE_TYPES.values(), *media.VIDEO_TYPES.values())
     app.add_middleware(GZipMiddleware, minimum_size=1024, exclude_content_types=tuple(set(binary_types)))
 
 
@@ -238,22 +245,30 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         }
 
     INDEX_FIELDS = ["id", "ts", "w", "h", "video", "rev"]
+    # Zeitachse der Galerie: das Aufnahmedatum, in "Zuletzt eingelesen" das Importdatum. Beides als
+    # Ortszeit in Sekunden, UTC gerechnet – so gruppiert die Galerie dort nach dem Tag des Imports.
+    ORDERS = {
+        "taken": ("taken_ts", "taken_ts DESC, id DESC"),
+        "imported": ("CAST(strftime('%s', imported_at) AS INTEGER)", "imported_at DESC, id DESC"),
+    }
 
-    def index_rows(filters: AssetFilter, extra: str = "", columns: str = ""):
+    def index_rows(filters: AssetFilter, extra: str = "", columns: str = "", order: str = "taken"):
         where, params = filters.clause()
+        ts, sort = ORDERS[order]
         return db.query(
-            f"""SELECT id, taken_ts, width, height, kind, rev{columns} FROM assets a
-                WHERE {where}{extra} ORDER BY taken_ts DESC, id DESC""",
+            f"""SELECT id, {ts} AS ts, width, height, kind, rev{columns} FROM assets a
+                WHERE {where}{extra} ORDER BY {sort}""",
             params,
         )
 
     def index_item(r) -> list:
-        return [r["id"], r["taken_ts"], r["width"] or 0, r["height"] or 0, 1 if r["kind"] == "video" else 0, r["rev"]]
+        return [r["id"], r["ts"], r["width"] or 0, r["height"] or 0, 1 if r["kind"] == "video" else 0, r["rev"]]
 
     @app.get("/api/assets")
-    def asset_index(filters: AssetFilter = Depends()):
-        """Kompakte Liste für Galerie und Zeitleiste, neueste zuerst. Filter werden UND-verknüpft."""
-        items = [index_item(r) for r in index_rows(filters)]
+    def asset_index(filters: AssetFilter = Depends(), order: Literal["taken", "imported"] = "taken"):
+        """Kompakte Liste für Galerie und Zeitleiste, neueste zuerst. Filter werden UND-verknüpft.
+        order=imported: zuletzt eingelesene zuerst, ts ist dann das Importdatum."""
+        items = [index_item(r) for r in index_rows(filters, order=order)]
         return {"revision": db.revision, "fields": INDEX_FIELDS, "items": items}
 
     @app.get("/api/largest")
@@ -276,7 +291,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         condition = " AND ".join(where)
         direction = "ASC" if order == "asc" else "DESC"
         rows = db.query(
-            f"""SELECT id, taken_ts, width, height, kind, rev, size, path, duration, damaged FROM assets
+            f"""SELECT id, taken_ts AS ts, width, height, kind, rev, size, path, duration, damaged FROM assets
                 WHERE {condition} ORDER BY size {direction}, id DESC LIMIT ?""",
             (*params, limit),
         )
@@ -402,6 +417,55 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             media_type=media.mime_of(path),
             filename=path.name,
             content_disposition_type="attachment" if download else "inline",
+        )
+
+    # ── Auswahl herunterladen ──────────────────────────────────────
+    # Zwei Schritte: POST merkt sich die Auswahl unter einem Token, der Browser holt das ZIP dann per GET
+    # wie jeden Download (direkt auf die Platte, mit Fortschritt). Ein POST-Formular scheitert am
+    # CSRF-Schutz, und tausende IDs passen in keine URL (Ingress: 8 KB je Zeile).
+    downloads: dict[str, dict] = {}  # Token -> {"paths", "owner", "expires"}
+    downloads_lock = threading.Lock()  # Endpunkte laufen im Thread-Pool
+    DOWNLOAD_TTL = 600  # s, bis der Download beginnen muss; ein laufender wird nicht abgebrochen
+    DOWNLOAD_PENDING = 20  # wartende Auswahlen; mehr braucht niemand, und jede hält bis zu 5000 Pfade
+
+    def download_owner(request: Request):
+        session = getattr(request.state, "session", None)  # nur im Internetzugang gesetzt
+        return session["user_id"] if session else None
+
+    @app.post("/api/downloads")
+    def download_create(body: DownloadRequest, request: Request):
+        ids = sorted(set(body.ids))
+        rows = db.query(
+            f"SELECT path FROM assets WHERE id IN ({','.join('?' * len(ids))}) ORDER BY taken_ts, id", ids
+        )
+        paths, size = [], 0
+        for r in rows:
+            path = settings.library / r["path"]
+            try:
+                size += path.stat().st_size
+            except OSError:
+                continue  # fehlt auf dem Datenträger
+            paths.append(path)
+        now = time.time()
+        token = secrets.token_urlsafe(24)
+        with downloads_lock:
+            for old in [t for t, entry in downloads.items() if entry["expires"] < now]:
+                del downloads[old]
+            while len(downloads) >= DOWNLOAD_PENDING:
+                del downloads[min(downloads, key=lambda t: downloads[t]["expires"])]
+            downloads[token] = {"paths": paths, "owner": download_owner(request), "expires": now + DOWNLOAD_TTL}
+        return {"token": token, "count": len(paths), "missing": len(ids) - len(paths), "bytes": size}
+
+    @app.get("/api/downloads/{token}")
+    def download_zip(token: str, request: Request):
+        entry = downloads.get(token)
+        if entry is None or entry["expires"] < time.time() or entry["owner"] != download_owner(request):
+            raise HTTPException(404, "Download abgelaufen – bitte noch einmal auswählen")
+        name = f"fotoarchiv-{datetime.now():%Y-%m-%d-%H%M}-{len(entry['paths'])}.zip"
+        return StreamingResponse(
+            zipstream.stream(entry["paths"]),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
         )
 
     # ── Mehrfachauswahl ────────────────────────────────────────────

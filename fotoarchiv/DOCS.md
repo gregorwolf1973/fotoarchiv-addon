@@ -10,6 +10,8 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Handy automatisch sichern:** Eine Sync-App lädt im WLAN in den Import-Ordner hoch, das Add-on liest neue Dateien von selbst ein. Nur in eine Richtung. Siehe [Handy automatisch sichern](#handy-automatisch-sichern).
 - **Als App aufs Handy:** installierbar über den Internetzugang, unter Android mit Teilen-Menü. Siehe [Als App aufs Handy](#als-app-aufs-handy-familie).
 - **Upload per Drag & Drop.** Dateien oder ganze Ordner auf die Seite ziehen oder über **Hochladen** auswählen.
+- **Zuletzt eingelesen:** **Neu** in der Kopfzeile zeigt alle Fotos nach dem Tag, an dem sie ins Archiv kamen, das Neueste oben, egal wann sie aufgenommen wurden. Nach einem Import führt *Eingelesene ansehen* im Import-Fenster direkt dorthin.
+- **Herunterladen:** Fotos auswählen und auf den Pfeil nach unten tippen. Ein einzelnes Foto kommt als Original, mehrere als ein ZIP mit den Originalen (bis zu 5000 auf einmal). Das ZIP wird beim Herunterladen zusammengestellt und belegt keinen Platz auf dem Server.
 - **Duplikaterkennung per MD5.** Bereits vorhandene Dateien werden nicht noch einmal aufgenommen. Beim Ordner-Import landen sie in `_duplikate` im Import-Ordner. Die Prüfsumme vom Import wird dauerhaft gespeichert, damit ein Bild auch nach späterer Bearbeitung noch als Duplikat erkannt wird.
 - **Doppelte und ähnliche Fotos finden:** verkleinerte Kopien, anders gespeicherte Fassungen und Serien. Die beste Fassung wird vorgeschlagen, der Rest kommt in den Papierkorb. Siehe [Doppelte Fotos](#doppelte-fotos).
 - **Bibliothek abgleichen.** Übernimmt Dateien, die schon in der Bibliothek liegen, ohne sie zu verschieben, und erkennt von Hand verschobene oder gelöschte Dateien. Siehe [Dateien außerhalb des Fotoarchivs ändern](#dateien-außerhalb-des-fotoarchivs-ändern).
@@ -69,6 +71,7 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Alles auswählen | Strg + A | – |
 | Auswahl aufheben | Esc | ✕ in der Leiste |
 | Löschen | Entf | Papierkorb-Symbol |
+| Auswahl herunterladen | Pfeil nach unten in der Leiste: ein Foto als Original, mehrere als ZIP | wie Maus |
 | In der Einzelansicht blättern | ← → | wischen |
 | Foto vergrößern | Mausrad, Doppelklick, + / − (0 = zurück) | zwei Finger auseinanderziehen, doppelt tippen |
 | Vergrößertes Foto verschieben | ziehen | mit einem Finger ziehen |

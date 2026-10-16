@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54
+
+- **Zuletzt eingelesen:** Neuer Punkt **Neu** in der Kopfzeile. Er zeigt alle Fotos nach dem Tag, an dem sie ins Archiv kamen, das Neueste oben – auch ein Foto von 2015, das heute importiert wurde, steht ganz oben. Nach einem Import mit neuen Fotos führt *Eingelesene ansehen* im Import-Fenster direkt dorthin
+- **Auswahl herunterladen:** Neuer Knopf (Pfeil nach unten) in der Auswahlleiste. Ein Foto kommt als Original, mehrere als ein ZIP mit den Originalen, bis zu 5000 auf einmal. Das ZIP wird beim Herunterladen zusammengestellt, ohne Zwischendatei und unkomprimiert (Fotos und Videos sind es schon), gleichnamige Dateien heißen darin *(2)*, *(3)* … Über den Internetzugang gilt ein Download nur für das Konto, das ihn angefordert hat
+
 ## 0.53
 
 - **Automatischer Import wartet, bis die Kopie fertig ist:** Er beginnt erst, wenn sich im ganzen Import-Ordner eine Minute lang nichts mehr geändert hat. Bisher zählte jede Datei für sich, und weil Kopierprogramme am Ende das alte Datum einer Datei setzen, wirkte ein eben kopiertes Foto sofort fertig. Der Import lief dann mitten in die Kopie hinein: Fotos aus Google Takeout kamen ohne ihre JSON-Begleitdatei ins Archiv (also ohne Datum und Ort daraus), eine gerade geschriebene JSON wurde mit ihrem doppelten Foto gelöscht, und die Kopie brach ab. Jeder neue Versuch meldete dann, dass der Ordner schon existiert

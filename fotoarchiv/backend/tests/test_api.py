@@ -358,3 +358,53 @@ def test_batch_shift_moves_a_group_and_keeps_its_arrangement(client, make_jpeg, 
     moved = {i: client.get(f"/api/assets/{i}").json() for i in (a, b)}
     assert (round(moved[a]["lat"], 4), round(moved[a]["lon"], 4)) == (48.5, 10.75)
     assert (round(moved[b]["lat"], 4), round(moved[b]["lon"], 4)) == (48.501, 10.752)
+
+
+def test_recently_imported_come_first(client, make_jpeg, tmp_path):
+    """Zuletzt eingelesen: die neuesten Importe zuerst, ts ist dann das Importdatum (Ortszeit, UTC gerechnet)."""
+    import calendar
+    from datetime import datetime
+
+    ids = []
+    for name, mtime in (("aufgenommen_2023.jpg", 1672567200000), ("aufgenommen_2010.jpg", 1262340000000)):
+        photo = make_jpeg(tmp_path / name)
+        r = client.put("/api/upload", params={"name": name, "mtime": mtime}, content=photo.read_bytes())
+        ids.append(r.json()["asset_id"])
+    photo_2023, photo_2010 = ids  # das ältere Foto wurde zuletzt eingelesen
+
+    assert [i[0] for i in client.get("/api/assets").json()["items"]] == [photo_2023, photo_2010]
+    recent = client.get("/api/assets", params={"order": "imported"}).json()["items"]
+    assert [i[0] for i in recent] == [photo_2010, photo_2023]
+    assert abs(recent[0][1] - calendar.timegm(datetime.now().timetuple())) < 60
+    assert client.get("/api/assets", params={"order": "zufall"}).status_code == 422
+
+
+def test_selection_downloads_as_zip(client, make_jpeg, tmp_path):
+    """Mehrere Fotos als ein ZIP: gleichnamige aus verschiedenen Monaten kommen beide mit, nicht noch einmal gzippt."""
+    import io
+    import zipfile
+
+    bodies, ids = [], []
+    for folder, mtime in (("a", 1660557600000), ("b", 1672567200000)):
+        photo = make_jpeg(tmp_path / folder / "foto.jpg")
+        bodies.append(photo.read_bytes())
+        r = client.put("/api/upload", params={"name": "foto.jpg", "mtime": mtime}, content=bodies[-1])
+        ids.append(r.json()["asset_id"])
+
+    created = client.post("/api/downloads", json={"ids": ids + [999999]})
+    assert created.status_code == 200, created.text
+    body = created.json()
+    assert (body["count"], body["missing"], body["bytes"]) == (2, 1, sum(map(len, bodies)))
+
+    response = client.get(f"/api/downloads/{body['token']}")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"].startswith('attachment; filename="fotoarchiv-')
+    assert "content-encoding" not in response.headers
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        assert archive.testzip() is None
+        assert archive.namelist() == ["foto.jpg", "foto (2).jpg"]  # in Aufnahmereihenfolge
+        assert [archive.read(n) for n in archive.namelist()] == bodies
+
+    assert client.get("/api/downloads/gibtsnicht").status_code == 404
+    assert client.post("/api/downloads", json={"ids": []}).status_code == 422

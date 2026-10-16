@@ -5,7 +5,8 @@
   import Icon from './Icon.svelte';
 
   // ontask(task): Hintergrundaufgabe an die App zur Verfolgung übergeben
-  let { info, onclose, onchanged, ontask } = $props();
+  // onshowrecent(): Fenster schließen und die zuletzt eingelesenen Fotos zeigen
+  let { info, onclose, onchanged, ontask, onshowrecent } = $props();
 
   let job = $state(null);
   let error = $state('');
@@ -148,6 +149,9 @@
           <span class="count bad">{count('error')} Fehler</span>
           {#if job.mode === 'library' && !job.running}<span class="count" class:bad={job.counts.missing}>{count('missing')} {plural('missing', 'Datei fehlt', 'Dateien fehlen')}</span>{/if}
         </div>
+        {#if job.mode === 'import' && !job.running && job.counts.imported}
+          <button onclick={onshowrecent}><Icon name="recent" size={18} /> Eingelesene ansehen</button>
+        {/if}
         {#if job.mode === 'library' && !job.running && job.counts.missing}
           <div class="missing">
             <p>
