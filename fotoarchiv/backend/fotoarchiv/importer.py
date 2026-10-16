@@ -118,11 +118,21 @@ def _move_one(source: Path, target: Path):
         source.unlink()
 
 
-def remove_empty_dirs(root: Path):
+def changed_at(stat: os.stat_result) -> float:
+    """Letzte Änderung an Inhalt, Datum oder Ordnerinhalt. Kopierprogramme setzen am Ende das alte
+    Änderungsdatum (mtime) – die ctime lässt sich nicht setzen, das System erneuert sie bei jeder Änderung."""
+    return max(stat.st_mtime, stat.st_ctime)
+
+
+def remove_empty_dirs(root: Path, *, emptied=frozenset(), quiet_since: float | None = None):
+    """Leere Ordner entfernen. Mit quiet_since bleibt ein Ordner stehen, der sich danach noch geändert hat –
+    etwa weil eine laufende Kopie ihn gerade angelegt hat –, außer der Import hat ihn selbst geleert."""
     for directory in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
         if directory.name in (DUPLICATE_DIR, DAMAGED_DIR):
             continue
         try:
+            if quiet_since is not None and directory not in emptied and changed_at(directory.stat()) > quiet_since:
+                continue
             directory.rmdir()  # klappt nur, wenn leer
         except OSError:
             pass
@@ -137,6 +147,7 @@ class Importer:
         # Rückmeldungen: "imported" -> Funktion(asset_id), darf den Pfad eines ähnlichen Fotos liefern
         self.hooks: dict[str, list] = {"imported": []}
         self.ffprobe = media.ffprobe_for(settings.ffmpeg)
+        self.now = time.time  # Uhr für "seit wann unverändert"; Tests stellen sie vor
         self._file_lock = threading.Lock()  # immer nur eine Datei gleichzeitig (Duplikatprüfung)
         self._job_lock = threading.Lock()
         self._cancel = threading.Event()
@@ -438,13 +449,46 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
                 stat = path.stat()
             except OSError:
                 continue  # inzwischen verschoben oder gelöscht
-            if time.time() - stat.st_mtime >= self.settings.import_quiet_seconds:
+            if self.now() - changed_at(stat) >= self.settings.import_quiet_seconds:
                 ready[path.relative_to(root).as_posix()] = (stat.st_size, stat.st_mtime)
         return ready
 
+    def import_settled(self) -> bool:
+        """True, wenn sich im ganzen Import-Ordner seit import_quiet_seconds nichts mehr geändert hat.
+
+        Für den automatischen Import. Eine einzelne Datei wirkt fertig, während die Kopie noch läuft – bei
+        Google Takeout oft mit der JSON-Begleitdatei genau dieses Fotos. Ein Import mitten hinein las Fotos
+        ohne ihre JSON ein, löschte Begleitdateien unter dem Kopierprogramm weg und brach so die Kopie ab."""
+        root = self.settings.import_dir
+        since = self.now() - self.settings.import_quiet_seconds
+        stack = [root]
+        while stack:
+            folder = stack.pop()
+            try:
+                if changed_at(folder.stat()) > since:  # Einträge kamen hinzu oder verschwanden
+                    return False
+                entries = list(os.scandir(folder))
+            except OSError:
+                continue  # inzwischen verschwunden
+            for entry in entries:
+                if entry.name in IGNORED_NAMES or (folder == root and entry.name in (DUPLICATE_DIR, DAMAGED_DIR)):
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(Path(entry.path))
+                    elif changed_at(entry.stat(follow_symlinks=False)) > since:
+                        return False  # auch versteckte Dateien: Sync-Apps schreiben oft erst in eine solche
+                except OSError:
+                    continue
+        return True
+
     def _recently_written(self, path: Path) -> bool:
-        """Beim Kopieren per Samba ändert sich die Datei laufend; Windows setzt das alte Datum erst am Ende."""
-        return time.time() - path.stat().st_mtime < self.settings.import_quiet_seconds
+        """Beim Kopieren per Samba ändert sich die Datei laufend; Windows setzt das alte Datum erst am Ende.
+        Darum zählt auch die ctime. Eine verschwundene Datei wird nicht mehr geschrieben."""
+        try:
+            return self.now() - changed_at(path.stat()) < self.settings.import_quiet_seconds
+        except FileNotFoundError:
+            return False
 
     def cancel(self) -> bool:
         """Laufenden Import bzw. Abgleich nach der aktuellen Datei beenden."""
@@ -505,6 +549,8 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
             sizes = {path: path.stat().st_size for path in files}
             job.total = len(files)
             root = self.settings.import_dir if mode == "import" else self.settings.library
+            # Ordner, aus denen dieser Lauf Dateien holt: die dürfen danach weg, auch wenn sie sich gerade geändert haben
+            emptied = {parent for path in files for parent in path.parents if root in parent.parents} if mode == "import" else set()
             for path in files:
                 rel = path.relative_to(root).as_posix()
                 job.current = rel
@@ -520,8 +566,10 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
                         # Beim Handy-Sync kommt das ständig vor; in _duplikate würde es sich nur sammeln.
                         sidecar = metadata.sidecar_for(path)
                         path.unlink()
-                        if sidecar is not None:
-                            sidecar.unlink(missing_ok=True)  # sonst bliebe sie für immer im Eingang liegen
+                        # Sonst bliebe sie für immer im Eingang liegen. Eine, die gerade geschrieben wird, bleibt:
+                        # unter dem Kopierprogramm weggelöscht, bricht es die ganze Kopie ab.
+                        if sidecar is not None and not self._recently_written(sidecar):
+                            sidecar.unlink(missing_ok=True)
                         result.message += " – Kopie gelöscht"
                     elif result.status == "duplicate" and mode == "import":
                         move_file(path, unique_path(root / DUPLICATE_DIR / rel))
@@ -533,7 +581,7 @@ f"""INSERT INTO assets (id, path, kind, mime, size, md5, md5_import, taken_at, t
                 self._record(result, rel)
                 job.done += 1
             if mode == "import":
-                remove_empty_dirs(root)
+                remove_empty_dirs(root, emptied=emptied, quiet_since=self.now() - self.settings.import_quiet_seconds)
             else:
                 job.current = "Fehlende Dateien suchen"
                 missing = self.missing_assets()

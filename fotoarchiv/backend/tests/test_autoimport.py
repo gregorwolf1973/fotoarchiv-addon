@@ -1,16 +1,24 @@
+import json
 import os
 import time
 from dataclasses import replace
+from datetime import datetime, timezone
 
 from fotoarchiv.autoimport import AutoImport
-from fotoarchiv.importer import DUPLICATE_DIR
+from fotoarchiv.importer import DUPLICATE_DIR, changed_at
 
 
 def settle(path, age=3600):
-    """Datei als längst fertig kopiert markieren."""
+    """Altes Änderungsdatum setzen, wie es Kopierprogramme am Ende tun. Als fertig gilt die Datei
+    damit nur in Tests ohne Wartezeit – sonst erst, wenn die Uhr des Imports weiterläuft (later)."""
     old = time.time() - age
     os.utime(path, (old, old))
     return path
+
+
+def later(importer, seconds):
+    """Die Uhr des Imports vorstellen. Die ctime lässt sich anders als das Änderungsdatum nicht zurücksetzen."""
+    importer.now = lambda: time.time() + seconds
 
 
 def wait(importer):
@@ -53,11 +61,61 @@ def test_waits_for_copies_and_does_not_retry_leftovers(settings, importer, make_
     settle(settings.import_dir / "notiz.txt")
     assert auto.check() is False  # Foto zu frisch, Textdatei nicht unterstützt
 
-    settle(fresh)
+    settle(fresh)  # das Kopierprogramm setzt am Ende das alte Datum - fertig ist die Kopie damit nicht
+    assert auto.check() is False
+    later(importer, 61)
     assert auto.check()
     wait(importer)
     assert importer.job.counts["imported"] == 1
     assert auto.check() is False  # die Textdatei bleibt liegen, stößt aber keinen Import mehr an
+
+
+def test_waits_until_the_copy_is_done_and_reads_the_json(settings, importer, make_jpeg):
+    """Google Takeout per Samba: das Foto ist fertig kopiert und trägt sein altes Datum, die Kopie schreibt
+    gerade seine JSON-Begleitdatei. Bisher lief der Import mitten hinein, weil das Foto für sich fertig
+    aussah: Fotos kamen ohne ihre JSON ins Archiv, und Kopien brachen ab."""
+    settings = importer.settings = replace(settings, import_quiet_seconds=60)
+    auto = AutoImport(settings, importer, enabled=True)
+    folder = settings.import_dir / "Google Fotos" / "Fotos von 2015"
+    photo = settle(make_jpeg(folder / "foto.jpg"))  # ohne Datum im Namen: käme sonst vom Dateidatum
+    done = changed_at(photo.stat())
+    time.sleep(0.2)  # die ctime ist nur auf wenige Millisekunden genau
+    sidecar = folder / "foto.jpg.supplemental-metadata.json"
+    taken = datetime(2015, 6, 1, 10, 0, tzinfo=timezone.utc)
+    sidecar.write_text(json.dumps({"photoTakenTime": {"timestamp": str(int(taken.timestamp()))}}), encoding="utf-8")
+
+    importer.now = lambda: done + 60.1  # das Foto ist seit einer Minute fertig, die JSON noch nicht
+    assert auto.check() is False
+    assert photo.is_file() and sidecar.is_file()
+
+    quiet = changed_at(sidecar.stat()) + 61
+    importer.now = lambda: quiet  # eine Minute Ruhe im ganzen Ordner
+    assert auto.check()
+    wait(importer)
+    assert importer.job.counts["imported"] == 1
+    assert importer.db.one("SELECT taken_at FROM assets")["taken_at"].startswith("2015-06-01")
+    assert not (settings.import_dir / "Google Fotos").exists()  # JSON mitgewandert, leere Ordner weg
+
+
+def test_json_still_being_written_survives_its_duplicate(settings, importer, make_jpeg):
+    """Startet eine Kopie, während der Import schon läuft: eine Begleitdatei, die gerade geschrieben wird,
+    nicht mit ihrem doppelten Foto löschen. Unter dem Kopierprogramm weggelöscht, bricht die Kopie ab."""
+    photo = settle(make_jpeg(settings.import_dir / "foto.jpg"))
+    copy = photo.read_bytes()
+    importer.start("import", auto=True)
+    wait(importer)
+
+    importer.settings = replace(settings, import_quiet_seconds=60)
+    photo.write_bytes(copy)  # dieselbe Datei noch einmal ...
+    done = changed_at(settle(photo).stat())
+    time.sleep(0.2)
+    sidecar = settings.import_dir / "foto.jpg.supplemental-metadata.json"
+    sidecar.write_text("{}", encoding="utf-8")  # ... und die Kopie schreibt gerade die JSON dazu
+    importer.now = lambda: done + 60.1
+    importer.start("import", auto=True)
+    wait(importer)
+    assert importer.job.counts["duplicate"] == 1 and not photo.exists()
+    assert sidecar.is_file()
 
 
 def test_manual_import_still_moves_duplicates(settings, importer, make_jpeg):

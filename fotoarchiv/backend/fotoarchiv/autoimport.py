@@ -1,4 +1,4 @@
-"""Automatischer Import: den Import-Ordner regelmäßig prüfen und neue, fertig kopierte Dateien einlesen.
+"""Automatischer Import: den Import-Ordner regelmäßig prüfen und neue Dateien einlesen, sobald dort niemand mehr kopiert.
 
 Gedacht für Handys, die per Sync-App (FolderSync, PhotoSync) im WLAN in den Samba-Ordner hochladen.
 Das geht nur in eine Richtung: Das Fotoarchiv schreibt nie aufs Handy zurück, und Löschen auf dem
@@ -47,6 +47,8 @@ class AutoImport:
         """Import starten, wenn neue Dateien fertig kopiert sind. True, wenn einer gestartet wurde."""
         if self.importer.job.running:
             return False  # läuft schon (auch ein Abgleich); beim nächsten Blick sind die Dateien dran
+        if not self.importer.import_settled():
+            return False  # es wird noch kopiert: erst wenn im ganzen Ordner Ruhe ist, alles zusammen einlesen
         ready = self.importer.ready_files()
         new = [rel for rel, signature in ready.items() if self._tried.get(rel) != signature]
         if not new:

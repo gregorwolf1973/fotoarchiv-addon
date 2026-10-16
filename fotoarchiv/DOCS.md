@@ -103,7 +103,7 @@ Das Handy lädt neue Fotos und Videos im WLAN in den Import-Ordner hoch, das Add
 
 **Was das Add-on dabei tut:**
 
-- Jede Minute schaut es in den Import-Ordner. Dateien, die sich seit einer Minute nicht mehr geändert haben, gelten als fertig übertragen und werden importiert, wie beim Knopf *Import starten*.
+- Jede Minute schaut es in den Import-Ordner. Hat sich dort seit einer Minute nichts mehr geändert, ist die Übertragung fertig, und alle neuen Dateien werden importiert, wie beim Knopf *Import starten*. Solange noch kopiert wird, wartet es. Das gilt auch für große Ordner wie einen Google-Takeout-Export: So wird jedes Foto zusammen mit seiner JSON-Begleitdatei eingelesen.
 - **Duplikate** sind byte-gleiche Kopien von etwas, das schon im Archiv oder im Papierkorb liegt, erkannt über MD5. Sie werden beim automatischen Import **gelöscht** statt nach `_duplikate` verschoben. So räumt sich der Ordner selbst auf, wenn die App ein Foto noch einmal schickt. Fotos, die du im Archiv in den Papierkorb gelegt hast, kommen dadurch nicht zurück.
 - Beschädigte Dateien landen wie gewohnt in `_defekt`. Nicht unterstützte Dateien bleiben liegen und stoßen erst wieder einen Import an, wenn sie sich ändern.
 - Der letzte Lauf steht im Import-Fenster mit dem Zusatz *automatisch*.

@@ -39,7 +39,7 @@ def test_import_folder_sorts_deduplicates_and_cleans_up(settings, importer, make
     job = importer.job
 
     assert job.counts == {"imported": 2, "relinked": 0, "duplicate": 1, "damaged": 0, "skipped": 1, "error": 0,
-                          "missing": 0, "similar": 0}
+                          "missing": 0, "similar": 0, "checked": 0, "changed": 0}
     assert (settings.library / "2019" / "05" / "strand.jpg").is_file()
     assert (settings.library / "2020" / "01" / "IMG_20200101_101010.jpg").is_file()
     assert (inbox / DUPLICATE_DIR / "Urlaub" / "strand_kopie.jpg").is_file()
@@ -168,6 +168,7 @@ def test_damaged_files_go_to_defekt_folder(settings, importer, make_jpeg):
 def test_files_still_being_copied_wait_for_next_import(settings, importer, make_jpeg):
     import dataclasses
     import os
+    import time
 
     from fotoarchiv.importer import Importer
 
@@ -177,10 +178,38 @@ def test_files_still_being_copied_wait_for_next_import(settings, importer, make_
     assert patient.job.counts["skipped"] == 1 and "noch kopiert" in patient.job.skipped[0]["message"]
     assert photo.is_file()
 
-    old = photo.stat().st_mtime - 3600  # Windows setzt am Ende des Kopierens das alte Datum
+    old = photo.stat().st_mtime - 3600  # Windows setzt am Ende des Kopierens das alte Datum ...
     os.utime(photo, (old, old))
     patient._run("import")
+    assert patient.job.counts["imported"] == 0 and photo.is_file()  # ... fertig erst nach einer Minute Ruhe (ctime)
+
+    patient.now = lambda: time.time() + 61
+    patient._run("import")
     assert patient.job.counts["imported"] == 1 and not photo.exists()
+
+
+def test_cleanup_keeps_folders_a_copy_is_creating(settings, importer, make_jpeg):
+    """Nach dem Import verschwinden leere Ordner - nicht aber einer, den eine laufende Kopie gerade angelegt
+    hat und gleich füllen will. Ordner, die der Import selbst geleert hat, räumt er wie bisher weg."""
+    import dataclasses
+    import time
+
+    from fotoarchiv.importer import Importer, changed_at
+
+    inbox = settings.import_dir
+    patient = Importer(dataclasses.replace(settings, import_quiet_seconds=60), importer.db, importer.exiftool)
+    photo = make_jpeg(inbox / "Google Fotos" / "Fotos von 2021" / "foto.jpg")
+    (inbox / "leer").mkdir()  # schon lange leer
+    done = max(changed_at(path.stat()) for path in (photo, inbox / "leer"))
+    time.sleep(0.2)  # die ctime ist nur auf wenige Millisekunden genau
+    (inbox / "Google Fotos" / "Fotos von 2022").mkdir()  # legt die Kopie gerade an
+    patient.now = lambda: done + 60.1
+
+    patient._run("import")
+    assert patient.job.counts["imported"] == 1
+    assert not (inbox / "Google Fotos" / "Fotos von 2021").exists()
+    assert not (inbox / "leer").exists()
+    assert (inbox / "Google Fotos" / "Fotos von 2022").is_dir()
 
 
 def test_move_across_filesystems_keeps_source_if_it_changes(tmp_path, monkeypatch):

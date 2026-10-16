@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53
+
+- **Automatischer Import wartet, bis die Kopie fertig ist:** Er beginnt erst, wenn sich im ganzen Import-Ordner eine Minute lang nichts mehr geändert hat. Bisher zählte jede Datei für sich, und weil Kopierprogramme am Ende das alte Datum einer Datei setzen, wirkte ein eben kopiertes Foto sofort fertig. Der Import lief dann mitten in die Kopie hinein: Fotos aus Google Takeout kamen ohne ihre JSON-Begleitdatei ins Archiv (also ohne Datum und Ort daraus), eine gerade geschriebene JSON wurde mit ihrem doppelten Foto gelöscht, und die Kopie brach ab. Jeder neue Versuch meldete dann, dass der Ordner schon existiert
+- Auch beim Knopf *Import starten* gilt eine Datei erst nach einer Minute ohne jede Änderung als fertig kopiert. Dafür zählt jetzt auch der Zeitpunkt der letzten Änderung am Dateieintrag (ctime), den kein Kopierprogramm zurücksetzen kann
+- Leere Ordner im Import-Ordner räumt der Import nur noch weg, wenn er sie selbst geleert hat oder sich eine Minute lang nichts in ihnen getan hat. Einen Ordner, den eine laufende Kopie gerade angelegt hat, lässt er stehen
+- Eine JSON-Begleitdatei, die gerade geschrieben wird, bleibt liegen, wenn ihr doppeltes Foto gelöscht wird
+
 ## 0.52
 
 - **Favoritenordner:** Unter **Favoriten** eigene Ordner anlegen, umbenennen und löschen. Ein Ordner enthält nur Verweise auf Fotos – die Dateien bleiben, wo sie sind, und ein Foto kann in mehreren Ordnern stecken
