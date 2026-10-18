@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55
+
+- **Fotos mit Video-Endung:** Manche Kopien alter Handys tragen *.mp4*, obwohl ein JPEG darin steckt. Solche Dateien erkennt das Fotoarchiv jetzt am Inhalt statt am Namen. Beim Import werden sie gleich mit der richtigen Endung als Foto einsortiert. Liegen sie schon im Archiv, benennt *Umwandeln* sie nur um (*.jpg*, *.png* …) und führt sie ab dann als Foto, mit Vorschaubild, Gesichtserkennung und Duplikatsuche. Bisher machte *Umwandeln* daraus ein Video aus einem einzigen Bild. Der Inhalt bleibt Byte für Byte gleich, deshalb kommt nichts in den Papierkorb
+- Taucht die Datei eines Eintrags unter neuem Namen wieder auf, übernimmt der Eintrag auch die Art (Foto oder Video), die zur neuen Endung passt
+
 ## 0.54
 
 - **Zuletzt eingelesen:** Neuer Punkt **Neu** in der Kopfzeile. Er zeigt alle Fotos nach dem Tag, an dem sie ins Archiv kamen, das Neueste oben – auch ein Foto von 2015, das heute importiert wurde, steht ganz oben. Nach einem Import mit neuen Fotos führt *Eingelesene ansehen* im Import-Fenster direkt dorthin

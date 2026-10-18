@@ -116,6 +116,26 @@ def test_failed_conversion_shows_reason_and_can_be_dismissed(settings, importer,
 
 
 
+def test_jpeg_with_video_suffix_is_renamed_not_converted(settings, importer, editor, make_jpeg):
+    """Ein JPEG mit .mp4-Endung im Archiv: Umwandeln benennt nur um, statt ein Ein-Bild-Video zu bauen."""
+    from fotoarchiv.convert import ConvertService
+
+    source = make_jpeg(settings.library / "2017" / "04" / "bild.jpg", DateTimeOriginal="2017:04:20 19:59:44")
+    source = source.rename(source.with_suffix(".mp4"))
+    asset_id = importer.import_file(source, move=False).asset_id  # Abgleich: Name und Art bleiben, wie sie sind
+    assert importer.db.one("SELECT kind FROM assets WHERE id = ?", (asset_id,))["kind"] == "video"
+    service = ConvertService(settings, importer.db, importer, editor)
+
+    service.request(asset_id)
+    assert service.work_once()
+
+    row = importer.db.one("SELECT * FROM assets WHERE id = ?", (asset_id,))
+    assert (row["path"], row["kind"], row["mime"]) == ("2017/04/bild.jpg", "image", "image/jpeg")
+    assert row["convert"] == 0 and row["faces_scanned"] == 0 and row["taken_at"] == "2017-04-20T19:59:44"
+    assert (settings.library / row["path"]).is_file() and not source.exists()
+    assert importer.db.one("SELECT COUNT(*) AS n FROM assets WHERE deleted_at IS NOT NULL")["n"] == 0
+
+
 def test_old_formats_mpg_and_wmv_become_mp4():
     mpg = decide(".mpg", "video", streams("mpeg2video", audio="mp2"))
     assert (mpg.action, mpg.suffix, mpg.copy_audio) == ("transcode", ".mp4", False)

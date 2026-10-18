@@ -168,6 +168,13 @@ class Importer:
         kind = media.kind_of(Path(name))
         if kind is None:
             return Result("skipped", name, "Dateityp wird nicht unterstützt")
+        if kind == "video" and move:
+            # Bild mit Video-Endung (JPEG als .mp4): gleich mit der richtigen Endung einsortieren.
+            # Beim Abgleich (move=False) bleibt der Name; das übernimmt dann "Umwandeln".
+            real = media.image_suffix(source)
+            if real:
+                log.info("%s ist ein Bild, wird als %s eingelesen", name, real)
+                name, kind = Path(name).stem + real, "image"
 
         with self._file_lock:
             try:
@@ -257,11 +264,13 @@ class Importer:
         """Vorhandenen Eintrag auf eine neue Datei zeigen lassen; ID, Import-Prüfsumme und Import-Datum bleiben."""
         with self.db.transaction() as conn:
             conn.execute(
-                """UPDATE assets SET path = ?, size = ?, md5 = ?, taken_at = ?, taken_ts = ?, date_source = ?,
-                       tz_offset = ?, width = ?, height = ?, duration = ?, lat = ?, lon = ?, camera = ?,
-                       rev = rev + 1, thumb_ok = 0, phash = NULL, damaged = NULL
+                """UPDATE assets SET path = ?, kind = ?, mime = ?, size = ?, md5 = ?, taken_at = ?, taken_ts = ?,
+                       date_source = ?, tz_offset = ?, width = ?, height = ?, duration = ?, lat = ?, lon = ?,
+                       camera = ?, rev = rev + 1, thumb_ok = 0, phash = NULL, damaged = NULL
                    WHERE id = ?""",
-                (rel, size, checksum, meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
+                # Art und MIME-Typ neu: die neue Datei kann die richtige Endung tragen (Bild statt .mp4)
+                (rel, media.kind_of(Path(rel)), meta.mime or media.mime_of(Path(rel)), size, checksum,
+                 meta.taken.isoformat(), meta.taken_ts, meta.date_source, meta.tz_offset,
                  meta.width, meta.height, meta.duration, meta.lat, meta.lon, meta.camera, asset_id),
             )
             labels.replace(conn, asset_id, "tags", meta.tags)

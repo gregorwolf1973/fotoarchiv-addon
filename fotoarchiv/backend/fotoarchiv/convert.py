@@ -1,4 +1,5 @@
-"""Problematische Formate umwandeln: HEIC → JPEG, nicht abspielbare Videos → H.264-MP4.
+"""Problematische Formate umwandeln: HEIC → JPEG, nicht abspielbare Videos → H.264-MP4, Bilder mit
+Video-Endung → richtige Endung (nur umbenannt).
 
 Der Eintrag behält seine ID (Personen, Schlagworte, Gesichter bleiben dran) und zeigt danach auf
 die neue Datei. Das Original kommt als eigener Eintrag in den Papierkorb und wird nach der
@@ -265,6 +266,10 @@ class ConvertService:
             # Wer ein Original aus dem Papierkorb holt und erneut umwandelt, bekäme sonst eine zweite
             # Fassung mit _1 im Namen – die fertige Datei liegt längst im Archiv
             raise EditError(f"Es gibt schon eine umgewandelte Fassung: {twin}")
+        real = media.image_suffix(source) if row["kind"] == "video" else None
+        if real:
+            # ffmpeg machte aus einem JPEG mit .mp4-Endung ein Video aus einem einzigen Bild
+            return self._fix_suffix(row, source, real)
         info = media.probe(self.ffprobe, source) if row["kind"] == "video" else None
         plan = decide(source.suffix, row["kind"], info)
         if plan is None:
@@ -374,6 +379,27 @@ class ConvertService:
         if readable and after < before and abs(readable - after) <= max(1.0, readable * 0.02):
             return f"Original war unvollständig: nur {after:.0f} s von {before:.0f} s ließen sich retten"
         raise RuntimeError(f"Länge passt nicht ({after:.1f} s statt {before:.1f} s)")
+
+    def _fix_suffix(self, row, source: Path, suffix: str) -> str:
+        """Bild mit Video-Endung: nur umbenennen und als Foto führen. Der Inhalt bleibt Byte für Byte
+        gleich, darum kommt auch nichts in den Papierkorb."""
+        library = self.settings.library
+        with self.editor._lock:
+            now = self.db.one("SELECT path, rev, deleted_at FROM assets WHERE id = ?", (row["id"],))
+            if now is None or now["deleted_at"] or now["path"] != row["path"] or now["rev"] != row["rev"]:
+                raise Changed("Datei wurde während des Umwandelns geändert")
+            target = unique_path(source.with_suffix(suffix))
+            move_file(source, target)
+            new_rel = target.relative_to(library).as_posix()
+            # Als Foto bekommt es Gesichtserkennung und Duplikatsuche wie jedes andere Foto
+            self.db.execute(
+                """UPDATE assets SET path = ?, kind = 'image', mime = ?, duration = NULL, phash = NULL,
+                       faces_scanned = 0 WHERE id = ?""",
+                (new_rel, media.mime_of(target), row["id"]))
+            self.editor._refresh(row["id"], new_thumbnail=True)
+        log.info("%s ist ein Bild mit falscher Endung, heißt jetzt %s", row["path"], target.name)
+        self.db.bump()
+        return new_rel
 
     def _replace(self, row, source: Path, temp: Path, plan: Plan) -> str:
         library = self.settings.library

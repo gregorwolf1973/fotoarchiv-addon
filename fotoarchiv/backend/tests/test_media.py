@@ -38,3 +38,17 @@ def test_save_webp_failure_leaves_no_temp_file(tmp_path):
     with pytest.raises(RuntimeError):
         media._save_webp(FakeImage(b"halb", during_save=fail), target, 75)
     assert list(target.parent.iterdir()) == []
+
+
+def test_image_suffix_from_content_not_name(tmp_path):
+    cases = {
+        "a.mp4": (b"\xff\xd8\xff\xe1" + b"\0" * 20, ".jpg"),
+        "b.mov": (b"\x89PNG\r\n\x1a\n" + b"\0" * 8, ".png"),
+        "c.avi": (b"RIFF\0\0\0\0WEBPVP8 ", ".webp"),
+        "d.avi": (b"RIFF\0\0\0\0AVI LIST", None),           # echtes AVI ist auch RIFF
+        "e.mp4": (b"\0\0\0\x18ftypmp42\0\0\0\0", None),     # echtes MP4
+    }
+    for name, (head, expected) in cases.items():
+        (tmp_path / name).write_bytes(head)
+        assert media.image_suffix(tmp_path / name) == expected, name
+    assert media.image_suffix(tmp_path / "fehlt.mp4") is None

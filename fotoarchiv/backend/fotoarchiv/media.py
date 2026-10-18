@@ -132,6 +132,25 @@ def mime_of(path: Path) -> str:
     return IMAGE_TYPES.get(suffix) or VIDEO_TYPES.get(suffix) or "application/octet-stream"
 
 
+def image_suffix(path: Path) -> str | None:
+    """Richtige Endung, wenn die Datei in Wahrheit ein Bild ist – erkannt an den ersten Bytes, nicht am
+    Namen. Manche Handys und Kopierprogramme speichern ein JPEG als .mp4; ein Video wird daraus nie."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(12)
+    except OSError:
+        return None
+    if head.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if head.startswith((b"GIF87a", b"GIF89a")):
+        return ".gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":  # AVI ist auch RIFF, dort steht "AVI "
+        return ".webp"
+    return None
+
+
 def md5_file(path: Path) -> str:
     digest = hashlib.md5()
     with open(path, "rb") as f:

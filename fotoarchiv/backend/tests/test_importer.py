@@ -369,3 +369,15 @@ def test_sidecar_follows_the_file_into_the_trash_and_is_purged_with_it(settings,
     editor.delete(asset_id)
     editor.purge(asset_id)
     assert not list((settings.library / TRASH_DIR).rglob("*.xmp"))
+
+
+def test_jpeg_with_video_suffix_is_imported_as_photo(settings, importer, make_jpeg):
+    """Manche Kopien alter Handys tragen .mp4, obwohl ein JPEG drinsteckt."""
+    source = make_jpeg(settings.import_dir / "IMG_1.jpg", DateTimeOriginal="2017:04:20 19:59:44")
+    source = source.rename(source.with_suffix(".mp4"))
+
+    asset_id = importer.import_file(source).asset_id
+
+    row = importer.db.one("SELECT path, kind, mime FROM assets WHERE id = ?", (asset_id,))
+    assert (row["path"], row["kind"], row["mime"]) == ("2017/04/IMG_1.jpg", "image", "image/jpeg")
+    assert (settings.library / row["path"]).is_file() and not source.exists()

@@ -490,6 +490,7 @@
       text:
         (trash ? 'Die Dateien werden zuerst aus dem Papierkorb wiederhergestellt. ' : '') +
         `HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann, zu MP4 (H.264). ` +
+        `Fotos, die fälschlich eine Video-Endung tragen, bekommen nur die richtige Endung. ` +
         `Andere Dateien bleiben, wie sie sind. Die neue Datei ersetzt das Original; das Original kommt für ` +
         `${info?.trash_days ?? 30} Tage in den Papierkorb. Ein Video braucht auf dem Pi etwa so lange, wie es dauert.`,
       confirmLabel: `${ids.length === 1 ? '1 Datei' : `${formatNumber(ids.length)} Dateien`} umwandeln`,
