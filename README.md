@@ -25,6 +25,28 @@
 
 ---
 
+<details>
+<summary><b>🇩🇪 Auf Deutsch: Warum Fotoarchiv?</b></summary>
+
+### Deine Fotos. Dein Zuhause. Deine Regeln.
+
+**Die Google-Fotos-Alternative als Home-Assistant-Add-on. Installation mit einem Klick, ganz ohne Cloud.**
+
+- 🔓 **Kein Lock-in:** Deine Fotos bleiben normale Dateien in Ordnern nach Jahr und Monat. Datum, Ort, Schlagwörter und Personen stehen direkt in der Datei (EXIF/XMP). Jedes andere Programm kann sie lesen. Die Datenbank ist nur ein Index.
+- 🧠 **Intelligente Suche, komplett lokal:** Tippe „Kinder am Strand im Sommer" und finde die Bilder. Die Suche versteht Deutsch. Dazu kommen Schlagwortvorschläge und die automatische Korrektur falsch gedrehter Fotos.
+- 👨‍👩‍👧 **Gesichtserkennung ohne Cloud:** Gesichter werden lokal gruppiert. Du vergibst einmal einen Namen, und er wird in die Dateien geschrieben.
+- 🗺️ **Weltkarte & Zeitreise:** Fotos erscheinen nach Ort gebündelt. Mit dem Zeitregler siehst du, wo ihr in einem bestimmten Jahr wart. Fotos ohne GPS ziehst du einfach auf die Karte.
+- 📱 **Familien-App für alle:** Die PWA läuft auf Android und iPhone. Große Videos lassen sich auch bei schwacher Verbindung hochladen, weil Uploads fortsetzbar sind. Bereits vorhandene Fotos werden übersprungen.
+- 🧹 **Aufräumen leicht gemacht:** Identische Dateien werden nicht doppelt importiert. Ähnliche Aufnahmen, WhatsApp-Kopien und verkleinerte Versionen findest du und bereinigst sie, ohne dass Schlagwörter oder Orte verloren gehen. Der Papierkorb fängt Fehler ab.
+- 🔐 **Sicher übers Internet:** Eigene Konten mit Rollen, Sperre nach Fehlversuchen, CrowdSec-Anbindung, Betrieb hinter Nginx Proxy Manager oder Cloudflare Tunnel.
+- ⚡ **Läuft auf kleiner Hardware:** Zehntausende Bilder auf einem Raspberry Pi 5.
+
+**In 3 Schritten startklar:** Repository in Home Assistant hinzufügen → Fotoarchiv installieren und starten → Fotos in den Importordner legen oder im Browser hineinziehen.
+
+Open Source (MIT). Keine Abos, kein Tracking, keine Werbung. Die Gesichtserkennungsmodelle (InsightFace `buffalo_l`) sind nur für nicht-kommerzielle Nutzung freigegeben. Die Gesichtserkennung lässt sich abschalten. Ausführliche Doku auf Deutsch: [DOCS.md](fotoarchiv/DOCS.md)
+
+</details>
+
 ## Why Fotoarchiv?
 
 - **Runs where your smart home already runs.** One click in Home Assistant, no extra server, no Docker compose files. Built and tested for **tens of thousands of photos on a Raspberry Pi 5**.
