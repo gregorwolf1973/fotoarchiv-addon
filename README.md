@@ -39,6 +39,7 @@
 | 🗺️ **World map** | Photos clustered by location, **time slider** to show only one year (or 2, 5, 10), drag photos without GPS onto the map to place them |
 | 🙂 **Face recognition** | Runs locally (InsightFace), groups faces, names are written into the files and are searchable |
 | 🔍 **Search** | People, tags, date range and free text; click the search field to pick from all tags |
+| ✨ **Image recognition** | Natural-language search ("dog on the beach", German works too), tag suggestions you accept or reject, and mis-rotated photos found – clear cases are fixed automatically (face-confirmed, undoable), the rest goes to a review list. Runs locally |
 | ✏️ **Edit in the file** | Date, location, tags, people, rotation – single photos or hundreds at once, with undo |
 | 🧹 **Duplicates** | Exact duplicates (MD5) never get imported twice; similar shots, WhatsApp copies and resized versions are found and cleaned up while keeping tags and locations |
 | 📱 **Family app (PWA)** | Installable on Android and iPhone, share-to-upload on Android, resumable chunked uploads (works through Cloudflare's 100 MB limit), skips photos the archive already has |
@@ -70,6 +71,7 @@ Found a bug or have an idea? Please open an [issue](https://github.com/gregorwol
 
 The code is released under the [MIT License](LICENSE).
 Face recognition uses the InsightFace model pack `buffalo_l`, which is **not** part of this repository: the add-on downloads it on first start from the official InsightFace release. Those models are licensed for **non-commercial use only**. If you don't want that, switch off `face_recognition` – everything else works without it.
+Image recognition downloads two MIT-licensed models from Hugging Face on first start: an orientation classifier (*deep-image-orientation-detection*) and multilingual CLIP (*XLM-RoBERTa ViT-B/32*, as exported by Immich).
 
 ---
 
@@ -81,6 +83,7 @@ Face recognition uses the InsightFace model pack `buffalo_l`, which is **not** p
 - **Weltkarte** mit Zeitregler: nur die Fotos eines Jahres (oder 2, 5, 10 Jahre) zeigen; Fotos ohne Ort einfach auf die Karte ziehen
 - **Gesichtserkennung** lokal auf dem Pi, die Namen landen in den Dateien
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext
+- **Bilderkennung:** Suche in normaler Sprache („Hund am Strand“), Schlagwort-Vorschläge zum Übernehmen, falsch gedrehte Fotos finden und eindeutige Fälle selbst drehen – alles lokal
 - **Bearbeiten direkt in der Datei:** Datum, Ort, Schlagworte, Personen, Drehen – auch für viele Fotos auf einmal
 - **Doppelte und ähnliche Fotos finden** und aufräumen, Schlagworte und Ort bleiben erhalten
 - **Familien-App:** auf Android und iPhone installierbar, unter Android Hochladen direkt aus dem Teilen-Menü, große Videos in Stücken, schon Vorhandenes wird nicht erneut übertragen

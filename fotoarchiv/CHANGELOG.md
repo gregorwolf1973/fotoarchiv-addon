@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56
+
+- **Bilderkennung** (neu, abschaltbar mit `image_recognition`). Sie lädt beim ersten Start ihre Modelle (ca. 1,6 GB) und geht im Hintergrund alle Fotos und Videos durch. Die Gesichtserkennung hat Vorrang. Siehe *Bilderkennung* in der Dokumentation
+- **Suche in normaler Sprache:** Im Suchfeld beschreiben, was auf dem Foto ist, etwa „Hund am Strand“ oder „Weihnachtsbaum“, dann *Fotos von „…“* wählen. Die Suche versteht auch Deutsch, lässt sich mit allen Filtern kombinieren und gilt auch auf der Karte
+- **Schlagwort-Vorschläge** für gut 50 häufige Motive. Sie stehen nur in der Datenbank, bis jemand sie übernimmt: einzeln in der Einzelansicht (✓/✕) oder für alle Treffer eines Vorschlags über die Leiste über der Galerie. Abgelehnte kommen nicht wieder
+- **Falsch gedrehte Fotos:** Eindeutige Fälle dreht das Add-on selbst, wenn das Modell sich einig ist und ein Gesicht die neue Lage bestätigt (abschaltbar mit `auto_rotate`). Verdachtsfälle ohne diese Bestätigung kommen in die neue Liste **Drehen prüfen** (Drehen-Symbol mit Zahl oben rechts). Dort zeigt sich jedes Foto schon gedreht: Falsche antippen, dann *Übernehmen*. Automatisch gedrehte lassen sich dort und in der Einzelansicht rückgängig machen
+- Die Modelle laufen in einem eigenen Prozess mit niedriger Priorität und geben ihren Speicher nach einigen Minuten ohne Arbeit wieder frei
+
 ## 0.55
 
 - **Fotos mit Video-Endung:** Manche Kopien alter Handys tragen *.mp4*, obwohl ein JPEG darin steckt. Solche Dateien erkennt das Fotoarchiv jetzt am Inhalt statt am Namen. Beim Import werden sie gleich mit der richtigen Endung als Foto einsortiert. Liegen sie schon im Archiv, benennt *Umwandeln* sie nur um (*.jpg*, *.png* …) und führt sie ab dann als Foto, mit Vorschaubild, Gesichtserkennung und Duplikatsuche. Bisher machte *Umwandeln* daraus ein Video aus einem einzigen Bild. Der Inhalt bleibt Byte für Byte gleich, deshalb kommt nichts in den Papierkorb

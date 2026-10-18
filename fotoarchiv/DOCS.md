@@ -19,6 +19,7 @@ Foto- und Video-Datenbank direkt in Home Assistant. Die Bilder bleiben ganz norm
 - **Zeitleiste rechts.** Ein fester Balken mit Jahreszahlen und einem Cursor zum Ziehen, der Monat und Jahr anzeigt.
 - **Einzelansicht** mit Aufnahmedatum, Ort, Personen, Schlagworten, Kamera und Download des Originals. Blättern geht mit den Pfeiltasten oder per Wischen. Zoomen bis 8-fach mit Mausrad, Doppelklick oder zwei Fingern; beim Hineinzoomen wird das Original in voller Auflösung nachgeladen (JPEG, PNG, WebP, GIF, AVIF bis 60 MB – HEIC und TIFF kann der Browser nicht anzeigen, dort bleibt es bei der Großansicht).
 - **Suche** nach Personen, Schlagworten, Zeitraum und Freitext (Dateiname, Kamera, Personen- und Schlagwortnamen). Mehrere Filter gelten gemeinsam.
+- **Bilderkennung:** Suche in normaler Sprache („Hund am Strand“, „Weihnachtsbaum“), Schlagwort-Vorschläge zum Übernehmen und falsch gedrehte Fotos finden. Siehe [Bilderkennung](#bilderkennung).
 - **Bearbeiten direkt in der Datei:** Drehen, Aufnahmedatum, Personen, Schlagworte und Ort entfernen. Siehe [Bearbeiten](#bearbeiten).
 - **Mehrfachauswahl:** Personen und Schlagworte hinzufügen oder entfernen, Datum und Ort setzen, drehen und löschen für viele Dateien auf einmal.
 - **Favoriten:** eigene Ordner anlegen und umbenennen, Fotos per Drag & Drop hineinziehen. Die Ordner enthalten nur Verweise, die Dateien bleiben, wo sie sind. Siehe [Favoriten](#favoriten).
@@ -47,6 +48,8 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `trash_days` | `30` | So viele Tage bleiben gelöschte Dateien im Papierkorb |
 | `face_recognition` | `true` | Gesichtserkennung im Hintergrund ein/aus |
 | `face_threads` | `2` | Prozessorkerne für die Gesichtserkennung (1–8). Auf dem Pi 5 sind 3 ein guter Wert, wenn Home Assistant flüssig bleiben soll. Wirkt nach einem Neustart des Add-ons. |
+| `image_recognition` | `true` | Bilderkennung ein/aus: Suche in normaler Sprache, Schlagwort-Vorschläge, falsch gedrehte Fotos. Siehe [Bilderkennung](#bilderkennung) |
+| `auto_rotate` | `true` | Eindeutig falsch gedrehte Fotos selbst drehen (rückgängig machbar). Aus: alle Verdachtsfälle nur zur Prüfung vorschlagen |
 | `duplicate_detection` | `true` | Suche nach doppelten und ähnlichen Fotos ein/aus |
 | `duplicate_bits` | `6` | Strenge der Liste **Doppelt** (1–7). Kleiner = strenger, siehe [Doppelte Fotos](#doppelte-fotos). Wirkt nach einem Neustart des Add-ons. |
 | `series_bits` | `12` | Strenge der Liste **Serien** (1–24). Wirkt nach einem Neustart des Add-ons. |
@@ -227,6 +230,43 @@ Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zu
 - Die Modelle **InsightFace buffalo_l** (ca. 280 MB) werden beim ersten Start von GitHub geladen und über SHA-256 geprüft. Sie sind **nur für nicht-kommerzielle Nutzung** freigegeben. Für ein privates Fotoarchiv ist das in Ordnung. Die Modelle sind vom Backup ausgenommen und werden bei Bedarf neu geladen.
 - Die Erkennung läuft komplett lokal, es verlassen keine Fotos oder Gesichtsdaten Home Assistant.
 - Mit `face_recognition: false` wird sie abgeschaltet. Bereits erkannte Personen bleiben in den Dateien.
+
+## Bilderkennung
+
+Beim ersten Start lädt das Add-on die Modelle (ca. 1,6 GB) und geht dann alle Fotos und Videos durch, die neuesten zuerst. Die Gesichtserkennung hat Vorrang: Solange sie neue Fotos durchsucht, wartet die Bilderkennung. Den Fortschritt zeigt das Suchfeld, wenn man hineintippt.
+
+**Suche in normaler Sprache**
+
+Ins Suchfeld beschreiben, was auf dem Foto zu sehen ist, zum Beispiel „Hund am Strand“, „Kinder im Schnee“, „Fische unter Wasser“ oder „Sonnenuntergang am Meer“, und *Fotos von „…“* wählen. Passt der Text zu keinem Namen oder Schlagwort, genügt Enter. Gefunden werden Fotos, deren Inhalt klar zur Beschreibung passt, höchstens die 2.000 ähnlichsten, sortiert nach Datum wie immer. Die Suche lässt sich mit allen anderen Filtern kombinieren und gilt auch auf der Karte.
+
+Die erste Suche nach einer Pause dauert ein paar Sekunden länger, weil erst das Sprachmodell geladen wird. Nach 10 Minuten ohne Suche gibt es seinen Speicher wieder frei.
+
+**Schlagwort-Vorschläge**
+
+Für gut 50 häufige Motive schlägt die Bilderkennung Schlagworte vor, etwa Strand, Berge, Schnee, Hund, Katze, Fisch, Angeln, Geburtstag, Weihnachten, Essen, Schwimmbad oder Spielplatz. Die Vorschläge stehen nur in der Datenbank. In eine Datei kommt ein Schlagwort erst, wenn es jemand übernimmt.
+
+- **Einzeln:** In der Einzelansicht steht unter *Schlagworte* die Zeile *Erkannt*. ✓ übernimmt das Schlagwort, es wird mit *Speichern* in die Datei geschrieben. ✕ lehnt es ab, dann wird es für dieses Foto nicht wieder vorgeschlagen.
+- **Viele auf einmal:** Im leeren Suchfeld stehen unter *Erkannt (Vorschläge)* alle vorgeschlagenen Schlagworte mit ihrer Anzahl. Eins wählen, und über den Treffern erscheinen *„…“ übernehmen* (schreibt es in alle angezeigten Fotos) und *Ablehnen*. Einzelne falsche Treffer lehnst du vorher in der Einzelansicht ab.
+- An 400 Fotos dieser Bibliothek lagen etwa 9 von 10 Vorschlägen richtig.
+
+**Falsch gedrehte Fotos**
+
+Jedes Foto wird einmal auf die richtige Lage geprüft.
+
+- **Eindeutige Fälle dreht das Add-on selbst:** wenn das Modell das Foto in allen vier Lagen beurteilt, mindestens drei Urteile übereinstimmen und ein Gesicht nur in der neuen Lage klar zu erkennen ist. Bei der Prüfung an 400 Fotos dieser Bibliothek wurde dabei kein Foto falsch gedreht. Gedreht wird wie von Hand, verlustfrei über die Ausrichtungsangabe in der Datei.
+- **Alle anderen Verdachtsfälle werden nur vorgeschlagen**, und nur, wenn alle vier Urteile übereinstimmen. Etwa jeder vierte Vorschlag liegt daneben, vor allem bei Texturen, Nahaufnahmen und dunklen Fotos.
+- Das Drehen-Symbol mit der Zahl oben rechts öffnet **Drehen prüfen**. Dort erscheinen alle Fotos so, wie sie gedreht aussähen. Antippen, was nicht stimmt, dann *Übernehmen*: Vorschläge werden gedreht, automatisch gedrehte bleiben so. Angetippte Fotos bleiben, wie sie waren, bzw. werden zurückgedreht.
+- In der Einzelansicht steht derselbe Hinweis, mit *Rückgängig*/*Stimmt* bzw. *Passt so*/*Drehen*.
+- Mit `auto_rotate: false` dreht das Add-on nichts selbst, alle Verdachtsfälle kommen nur in die Liste. Ohne Gesichtserkennung gibt es ebenfalls nur Vorschläge.
+
+**Gut zu wissen:**
+
+- Die Modelle sind *deep-image-orientation-detection* für die Ausrichtung (MIT-Lizenz) und *CLIP XLM-RoBERTa ViT-B/32* für den Bildinhalt, in der Fassung von Immich (OpenCLIP, MIT-Lizenz). CLIP versteht auch Deutsch. Sie werden in festem Stand von Hugging Face geladen, über SHA-256 geprüft und sind vom Backup ausgenommen.
+- Alles läuft lokal, keine Fotos verlassen Home Assistant.
+- Die Modelle laufen in einem eigenen Prozess mit niedriger Priorität. Er beendet sich nach 5 Minuten (Fotos) bzw. 10 Minuten (Suche) ohne Arbeit und gibt den Speicher frei. Während er arbeitet, braucht er knapp 1 GB RAM, bei der Suche etwa 1,1 GB.
+- Videos werden über ihr Vorschaubild erfasst: Sie sind durchsuchbar und bekommen Vorschläge, werden aber nicht auf Drehung geprüft. Ebenso wenig HEIC-Fotos, die das Fotoarchiv nicht drehen kann.
+- Die Option `face_threads` gilt auch für die Bilderkennung.
+- Mit `image_recognition: false` wird alles abgeschaltet. Übernommene Schlagworte und Drehungen bleiben in den Dateien.
 
 ## Doppelte Fotos
 

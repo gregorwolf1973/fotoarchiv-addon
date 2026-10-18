@@ -197,6 +197,32 @@ MIGRATIONS = [
     );
     CREATE INDEX favorite_items_asset ON favorite_items (asset_id);
     """,
+    """
+    -- Bilderkennung: Merkmale für die Suche, Schlagwort-Vorschläge, falsch gedrehte Fotos
+    ALTER TABLE assets ADD COLUMN vision_scanned INTEGER NOT NULL DEFAULT 0;  -- 0 offen, 1 fertig, -1 Fehler
+    ALTER TABLE assets ADD COLUMN orient_checked INTEGER NOT NULL DEFAULT 0;  -- Ausrichtung nur einmal prüfen
+    CREATE INDEX assets_vision_pending ON assets (vision_scanned, deleted_at);
+    CREATE TABLE clip_vectors (
+        asset_id INTEGER PRIMARY KEY REFERENCES assets (id) ON DELETE CASCADE,
+        vector   BLOB NOT NULL                 -- 512 × float16, Länge 1
+    );
+    -- Nur Vorschläge; ins Foto kommt ein Schlagwort erst, wenn es jemand übernimmt
+    CREATE TABLE auto_tags (
+        asset_id INTEGER NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
+        name     TEXT NOT NULL COLLATE NOCASE,
+        score    REAL NOT NULL,
+        state    INTEGER NOT NULL DEFAULT 0,   -- 0 Vorschlag, 1 übernommen, -1 abgelehnt
+        PRIMARY KEY (asset_id, name)
+    );
+    CREATE INDEX auto_tags_name ON auto_tags (name, state);
+    CREATE TABLE orientation (
+        asset_id   INTEGER PRIMARY KEY REFERENCES assets (id) ON DELETE CASCADE,
+        degrees    INTEGER NOT NULL,           -- Korrektur im Uhrzeigersinn
+        status     TEXT NOT NULL,              -- auto | suggested | accepted | applied | dismissed | undone | manual
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX orientation_status ON orientation (status);
+    """,
 ]
 
 # Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID

@@ -36,12 +36,14 @@ VIEW = {
     "face_crop", "favorite_list", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
     "download_create", "download_zip",  # Auswahl als ZIP: dieselben Originale wie asset_original
     "delete_request_create",       # Löschen vorschlagen: jede angemeldete Rolle, der Admin entscheidet
+    "vision_status",
 }
 EDIT = {
     "asset_update", "asset_rotate", "asset_delete", "asset_restore", "batch", "upload", "upload_chunk", "upload_known",
     "group_name", "group_hide", "person_rename", "person_merge", "person_delete", "face_assign", "face_remove",
     "duplicate_list", "duplicate_resolve", "duplicate_ignore",
     "favorite_create", "favorite_rename", "favorite_delete", "favorite_add", "favorite_remove",
+    "orientation_review", "orientation_decide", "suggestion_dismiss", "asset_orientation",
 }
 # Was eine Rolle über das Ansehen hinaus darf
 # Alles, womit Bilder verschwinden: Papierkorb, Wiederherstellen und die Duplikat-Bereinigung

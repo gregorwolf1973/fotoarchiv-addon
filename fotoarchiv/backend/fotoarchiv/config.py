@@ -20,7 +20,9 @@ class Settings:
     trash_days: int = 30
     import_quiet_seconds: int = 60  # so lange unverändert, bevor eine Datei als fertig kopiert gilt
     face_recognition: bool = True
-    face_threads: int = 2  # Kerne für die Gesichtserkennung (1–8)
+    face_threads: int = 2  # Kerne für die Gesichtserkennung (1–8), gilt auch für die Bilderkennung
+    image_recognition: bool = True  # Suche in normaler Sprache, Schlagwort-Vorschläge, Ausrichtung prüfen
+    auto_rotate: bool = True  # eindeutig falsch gedrehte Fotos selbst drehen (sonst nur vorschlagen)
     duplicate_detection: bool = True
     # Wie viele der 64 Hash-Bits abweichen dürfen; kleiner = strenger, siehe duplicates.py
     duplicate_bits: int = 6   # „doppelt“ (1–7, höher bricht die Byte-Vorauswahl)
@@ -80,6 +82,8 @@ def load() -> Settings:
         face_recognition=_bool(os.environ.get("FOTOARCHIV_FACES", options.get("face_recognition")), True),
         # 0 wäre bei pick() nicht unterscheidbar vom fehlenden Wert, darum erst ab 1
         face_threads=min(8, max(1, int(pick("FOTOARCHIV_FACE_THREADS", "face_threads", 2)))),
+        image_recognition=_bool(os.environ.get("FOTOARCHIV_VISION", options.get("image_recognition")), True),
+        auto_rotate=_bool(os.environ.get("FOTOARCHIV_AUTO_ROTATE", options.get("auto_rotate")), True),
         duplicate_detection=_bool(os.environ.get("FOTOARCHIV_DUPLICATES", options.get("duplicate_detection")), True),
         duplicate_bits=min(7, max(1, int(pick("FOTOARCHIV_DUPLICATE_BITS", "duplicate_bits", 6)))),
         series_bits=min(24, max(1, int(pick("FOTOARCHIV_SERIES_BITS", "series_bits", 12)))),

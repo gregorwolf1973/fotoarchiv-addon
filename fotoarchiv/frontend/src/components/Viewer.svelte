@@ -214,6 +214,20 @@
     }
   }
   const mine = $derived(detail?.delete_requests?.some((r) => r.username === myName) ?? false);
+
+  // ── Bilderkennung ──────────────────────────────────────────────
+  // Vorschläge, die nicht schon (auch im ungespeicherten Entwurf) als Schlagwort dastehen
+  const suggested = $derived(
+    (detail?.suggestions ?? []).filter((s) => !tags.some((t) => t.toLocaleLowerCase() === s.name.toLocaleLowerCase())),
+  );
+  const takeSuggestion = (name) => (draft.tags = [...tags, name]); // gespeichert wird mit "Speichern"
+  const dismissSuggestion = (name) => save(async () => (await api.dismissSuggestion(name, [itemId]), api.asset(itemId)));
+  const turn = (degrees) => (degrees === 90 ? 'um 90° nach rechts' : degrees === 270 ? 'um 90° nach links' : 'um 180°');
+  function decideOrientation(accept) {
+    const auto = detail.orientation.status === 'auto';
+    const message = accept ? (auto ? 'Drehung bestätigt' : 'Gedreht') : auto ? 'Zurückgedreht' : 'Vorschlag verworfen';
+    save(() => api.decideOrientation(itemId, accept), message);
+  }
   const setLabels = (kind, values) => (draft[kind] = values);
   function setDate(value) {
     editDate = false;
@@ -473,6 +487,27 @@
             </div>
           </div>
         {/if}
+        {#if detail.orientation && allowed && !trash}
+          <div class="notice">
+            <Icon name="rotate" size={16} />
+            <div>
+              {#if detail.orientation.status === 'auto'}
+                Von der Bilderkennung automatisch {turn(detail.orientation.degrees)} gedreht.
+              {:else}
+                Vielleicht falsch gedreht. Vorschlag der Bilderkennung: {turn(detail.orientation.degrees)} drehen.
+              {/if}
+              <div class="proposal-actions">
+                {#if detail.orientation.status === 'auto'}
+                  <button disabled={busy} onclick={() => decideOrientation(false)}>Rückgängig</button>
+                  <button class="primary" disabled={busy} onclick={() => decideOrientation(true)}>Stimmt</button>
+                {:else}
+                  <button disabled={busy} onclick={() => decideOrientation(false)}>Passt so</button>
+                  <button class="primary" disabled={busy} onclick={() => decideOrientation(true)}>Drehen</button>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/if}
         {#if trash}
           <p class="notice"><Icon name="delete" size={16} /> Im Papierkorb – wird am {expires(detail)} endgültig gelöscht.</p>
         {:else if !detail.editable && allowed}
@@ -545,6 +580,22 @@
               />
             {:else}
               <span class="muted">Keine</span>
+            {/if}
+            {#if canEdit && suggested.length}
+              <div class="suggested" title="Von der Bilderkennung erkannt, noch nicht im Foto gespeichert">
+                <span class="muted"><Icon name="sparkle" size={14} /> Erkannt:</span>
+                {#each suggested as s (s.name)}
+                  <span class="suggestion">
+                    {s.name}
+                    <button class="icon small" disabled={busy} onclick={() => takeSuggestion(s.name)} title="Als Schlagwort übernehmen">
+                      <Icon name="check" size={16} />
+                    </button>
+                    <button class="icon small" disabled={busy} onclick={() => dismissSuggestion(s.name)} title="Passt nicht – nicht mehr vorschlagen">
+                      <Icon name="close" size={16} />
+                    </button>
+                  </span>
+                {/each}
+              </div>
             {/if}
           </dd>
 
@@ -805,6 +856,32 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
+  }
+  .suggested {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.85rem;
+  }
+  .suggested .muted {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .suggestion {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding-left: 10px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+  }
+  .suggestion button.icon.small {
+    width: 26px;
+    height: 26px;
+    min-height: 26px;
   }
   .proposal-actions {
     display: flex;

@@ -20,6 +20,17 @@ configuration:
       How many processor cores face recognition may use. More cores get through the photos faster but put a
       heavier load on the Pi. On a Raspberry Pi 5 (4 cores), 3 is a good value if Home Assistant should stay
       responsive. Takes effect after restarting the add-on.
+  image_recognition:
+    name: Image recognition
+    description: >-
+      Natural-language search ("dog on the beach", German works too), tag suggestions and detection of wrongly
+      rotated photos. Downloads the models (about 1.6 GB) on first start, then goes through all photos.
+      Suggestions stay in the database until someone accepts them. Uses as many cores as face recognition.
+  auto_rotate:
+    name: Rotate clearly mis-rotated photos automatically
+    description: >-
+      Only when the model is certain and a face confirms the new orientation; can be undone under
+      "Drehen prüfen". When off, all suspects only go to that review list.
   duplicate_detection:
     name: Detect duplicate photos
     description: >-

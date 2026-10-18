@@ -39,10 +39,12 @@ const send = (method, body) => ({
 });
 
 /** Filter -> Query-String; Listen werden als wiederholte Parameter übergeben. */
-export function filterQuery({ tags = [], persons = [], start = '', end = '', q = '' } = {}, trash = false, extra = {}) {
+export function filterQuery({ tags = [], persons = [], start = '', end = '', q = '', ai = '', auto = [] } = {}, trash = false, extra = {}) {
   const params = new URLSearchParams();
   for (const t of tags) params.append('tag', t.id);
   for (const p of persons) params.append('person', p.id);
+  for (const a of auto) params.append('auto', a.name); // Schlagwort-Vorschläge der Bilderkennung
+  if (ai) params.set('ai', ai); // Bildinhalt in normaler Sprache
   if (start) params.set('start', start);
   if (end) params.set('end', end);
   if (q) params.set('q', q);
@@ -65,6 +67,7 @@ export const api = {
   asset: (id) => request(`api/assets/${id}`),
   update: (id, changes) => request(`api/assets/${id}`, send('PATCH', changes)),
   rotate: (id, degrees) => request(`api/assets/${id}/rotate`, send('POST', { degrees })),
+  decideOrientation: (id, accept) => request(`api/assets/${id}/orientation`, send('POST', { accept })),
   remove: (id) => request(`api/assets/${id}`, { method: 'DELETE' }),
   restore: (id) => request(`api/assets/${id}/restore`, { method: 'POST' }),
   batch: (body) => request('api/batch', send('POST', body)),
@@ -92,6 +95,9 @@ export const api = {
   duplicates: () => request('api/duplicates'),
   resolveDuplicates: (groups, transfer) => request('api/duplicates/resolve', send('POST', { groups, transfer })),
   ignoreDuplicates: (ids) => request('api/duplicates/ignore', send('POST', { ids })),
+  rotationReview: () => request('api/vision/review'),
+  decideRotations: (ids, accept) => request('api/vision/review', send('POST', { ids, accept })),
+  dismissSuggestion: (name, ids) => request('api/vision/suggestions/dismiss', send('POST', { name, ids })),
   favorites: () => request('api/favorites'),
   createFolder: (name) => request('api/favorites', send('POST', { name })),
   renameFolder: (id, name) => request(`api/favorites/${id}/rename`, send('POST', { name })),

@@ -24,13 +24,14 @@
   import MapView from './components/MapView.svelte';
   import NameDialog from './components/NameDialog.svelte';
   import PeopleView from './components/PeopleView.svelte';
+  import RotationView from './components/RotationView.svelte';
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
   import StorageView from './components/StorageView.svelte';
   import Uploader from './components/Uploader.svelte';
   import Viewer from './components/Viewer.svelte';
 
-  const NO_FILTERS = { tags: [], persons: [], start: '', end: '', q: '' };
+  const NO_FILTERS = { tags: [], persons: [], start: '', end: '', q: '', ai: '', auto: [] };
   const ZOOM_KEY = 'fotoarchiv.zoom';
   const FOLDERS_KEY = 'fotoarchiv.favoritesSide';
 
@@ -44,7 +45,7 @@
   let tasks = $state.raw([]);
   let loaded = $state(false);
   let failure = $state('');
-  let view = $state('photos'); // photos | map | people | favorites | trash | duplicates | storage | recent
+  let view = $state('photos'); // photos | map | people | favorites | trash | duplicates | storage | recent | rotation
   let filters = $state.raw(NO_FILTERS);
   let openId = $state(null);
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
@@ -94,8 +95,13 @@
     showFolders && wide && (view === 'photos' || inFolder) && (folders.length > 0 || canEdit),
   );
   const filtered = $derived(
-    !trash && Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q),
+    !trash &&
+      Boolean(filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q || filters.ai ||
+        filters.auto.length),
   );
+  // Genau ein Vorschlag der Bilderkennung gefiltert: für alle Treffer übernehmen oder ablehnen
+  const suggestion = $derived(filters.auto.length === 1 && canEdit && !trash ? filters.auto[0].name : null);
+  const SEARCH_LIMIT = 2000; // höchstens so viele Treffer liefert die Bildsuche
   const indexById = $derived(new Map(items.map((item, i) => [item[0], i])));
   const viewerItems = $derived(
     viewerList ?? (viewerIds ? viewerIds.map((id) => items[indexById.get(id)]).filter(Boolean) : items),
@@ -606,6 +612,22 @@
     }
   }
 
+  async function dismissSuggestion(name) {
+    const ids = items.map((item) => item[0]);
+    try {
+      const { dismissed } = await api.dismissSuggestion(name, ids);
+      notify(`Vorschlag „${name}“ bei ${photoCount(dismissed)} abgelehnt`);
+      setFilters({ ...filters, auto: [] });
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
+  function acceptSuggestion(name) {
+    runBatch({ ids: items.map((item) => item[0]), action: 'tags', add: [name] });
+    setFilters({ ...filters, auto: [] });
+  }
+
   function deleteSelected() {
     const ids = [...selected];
     runBatch({ ids, action: 'delete' }, () => runBatch({ ids, action: 'restore' }));
@@ -617,7 +639,7 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || folderOverview || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || view === 'rotation' || folderOverview || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     // Im Favoritenordner nimmt Entf das Foto nur aus dem Ordner, es bleibt im Archiv
     else if (e.key === 'Delete' && selected.size && openFolder) removeIds(openFolder, [...selected]);
@@ -758,6 +780,15 @@
       </div>
       <span class="grow"></span>
     </header>
+  {:else if view === 'rotation'}
+    <header class="topbar">
+      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <div class="title-block">
+        <strong class="title">Drehen prüfen</strong>
+        <span class="sub">Von der Bilderkennung gefunden</span>
+      </div>
+      <span class="grow"></span>
+    </header>
   {:else if view === 'storage'}
     <header class="topbar">
       <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
@@ -780,7 +811,7 @@
         <button onclick={() => openFavorites(null)} title="Favoriten"><Icon name="star" size={20} /><span class="label">Favoriten</span></button>
         <button onclick={openRecent} title="Zuletzt eingelesen"><Icon name="recent" size={20} /><span class="label">Neu</span></button>
       </nav>
-      <div class="search-inline"><SearchBar {labels} {filters} onchange={setFilters} /></div>
+      <div class="search-inline"><SearchBar {labels} {filters} vision={info?.vision} onchange={setFilters} /></div>
       <span class="grow"></span>
       <div class="actions">
         {#if info?.importing}<span class="busy" title="Import läuft"></span>{/if}
@@ -799,6 +830,12 @@
         {#if isAdmin}
           <button onclick={() => (showImport = true)} title="Aus Ordner importieren">
             <Icon name="import" size={20} /><span class="label">Importieren</span>
+          </button>
+        {/if}
+        {#if canEdit && info?.vision?.review}
+          <button class="icon trash" onclick={() => setView('rotation')} title="Drehen prüfen – von der Bilderkennung gefunden">
+            <Icon name="rotate" />
+            <span class="badge info">{info.vision.review > 99 ? '99+' : info.vision.review}</span>
           </button>
         {/if}
         {#if canDelete}
@@ -832,7 +869,7 @@
       </div>
     </header>
     {#if searchOpen}
-      <div class="search-row"><SearchBar {labels} {filters} onchange={setFilters} /></div>
+      <div class="search-row"><SearchBar {labels} {filters} vision={info?.vision} onchange={setFilters} /></div>
     {/if}
   {/if}
 
@@ -860,13 +897,26 @@
       <button class="icon small" onclick={hideIosHint} title="Hinweis ausblenden"><Icon name="close" size={16} /></button>
     </div>
   {/if}
+  {#if isAdmin && info?.vision?.status === 'error'}
+    <div class="banner error"><Icon name="alert" size={18} /> <span class="banner-text">Bilderkennung: {info.vision.message}</span></div>
+  {/if}
   {#if missingTools.length}
     <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
   {/if}
-  {#if filtered && view !== 'people' && view !== 'duplicates' && view !== 'storage'}
+  {#if filtered && view !== 'people' && view !== 'duplicates' && view !== 'storage' && view !== 'rotation'}
     <div class="resultbar">
       <span>{formatNumber(items.length)} Treffer</span>
+      {#if filters.ai && items.length >= SEARCH_LIMIT}<span class="muted-note">nur die {formatNumber(SEARCH_LIMIT)} ähnlichsten – genauer beschreiben</span>{/if}
       <button class="link" onclick={() => setFilters(NO_FILTERS)}>Filter zurücksetzen</button>
+      {#if suggestion && items.length}
+        <span class="grow"></span>
+        <button onclick={() => acceptSuggestion(suggestion)} title="Schlagwort in alle diese Fotos schreiben">
+          <Icon name="check" size={18} /><span class="label">„{suggestion}“ übernehmen</span>
+        </button>
+        <button onclick={() => dismissSuggestion(suggestion)} title="Vorschlag bei allen diesen Fotos verwerfen">
+          <Icon name="close" size={18} /><span class="label">Ablehnen</span>
+        </button>
+      {/if}
     </div>
   {/if}
 
@@ -907,6 +957,8 @@
     />
   {:else if view === 'duplicates'}
     <DuplicatesView revision={info?.revision} onopen={openList} ontask={trackTask} onchanged={kick} />
+  {:else if view === 'rotation'}
+    <RotationView revision={info?.revision} onopen={openList} ontask={trackTask} />
   {:else if view === 'storage'}
     <StorageView revision={info?.revision} {canEdit} onopen={openList} onbatch={runBatch} onconvert={isAdmin ? confirmConvert : null} />
   {:else if view === 'map'}
@@ -1202,6 +1254,13 @@
     font-size: 10px;
     line-height: 16px;
     text-align: center;
+  }
+  .badge.info {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .muted-note {
+    font-size: 0.85rem;
   }
   .busy {
     width: 18px;

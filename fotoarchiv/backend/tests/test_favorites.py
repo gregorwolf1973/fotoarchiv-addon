@@ -28,7 +28,7 @@ def client(db):
 
 
 def folder_ids(db, folder_id):
-    where, params = AssetFilter(tag=[], person=[], folder=folder_id).clause()
+    where, params = AssetFilter(tag=[], person=[], auto=[], folder=folder_id).clause()
     return [r["id"] for r in db.query(f"SELECT id FROM assets a WHERE {where} ORDER BY id", params)]
 
 

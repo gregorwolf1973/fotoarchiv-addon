@@ -1,8 +1,14 @@
 <script>
+  import { formatNumber } from '../lib/format.js';
   import Icon from './Icon.svelte';
 
-  // filters: { tags: [{id, name}], persons: [{id, name}], start, end, q }
-  let { labels, filters, onchange } = $props();
+  // filters: { tags: [{id, name}], persons: [{id, name}], start, end, q, ai, auto: [{id: name, name}] }
+  // ai: Bildinhalt in normaler Sprache, auto: Schlagwort-Vorschläge der Bilderkennung
+  // vision: Stand der Bilderkennung aus api/state (null = unbekannt)
+  let { labels, filters, vision = null, onchange } = $props();
+
+  const NONE = { tags: [], persons: [], start: '', end: '', q: '', ai: '', auto: [] };
+  const smart = $derived(!!vision?.search);
 
   let text = $state('');
   let open = $state(false);
@@ -11,18 +17,32 @@
   let input = $state();
 
   const hasFilters = $derived(
-    filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q,
+    filters.tags.length || filters.persons.length || filters.start || filters.end || filters.q || filters.ai ||
+      filters.auto?.length,
   );
+  // Fortschritt der ersten Analyse: so lange findet die Bildsuche noch nicht alles
+  const progress = $derived.by(() => {
+    if (!vision?.enabled) return '';
+    if (vision.status === 'downloading' && vision.download_total)
+      return `Bildsuche wird eingerichtet: Modelle ${Math.round((vision.download_done / vision.download_total) * 100)} % geladen`;
+    if (!vision.search) return vision.status === 'error' ? `Bildsuche gestört: ${vision.message}` : 'Bildsuche wird eingerichtet …';
+    if (vision.done < vision.total) return `Bildinhalt: ${formatNumber(vision.done)} von ${formatNumber(vision.total)} analysiert`;
+    return '';
+  });
 
   const browsing = $derived(!text.trim()); // leeres Feld: alle Schlagworte zur Auswahl
 
   const suggestions = $derived.by(() => {
     const needle = text.trim().toLocaleLowerCase();
+    const byCount = (a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name, 'de');
+    const auto = (labels.auto ?? []).map((l) => ({ ...l, id: l.name }));
     if (!needle) {
-      return labels.tags
-        .filter((t) => !filters.tags.some((f) => f.id === t.id))
-        .sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name, 'de'))
-        .map((t) => ({ kind: 'tags', id: t.id, name: t.name, count: t.count }));
+      const unused = (list, kind) =>
+        list
+          .filter((l) => !filters[kind].some((f) => f.id === l.id))
+          .sort(byCount)
+          .map((l) => ({ kind, id: l.id, name: l.name, count: l.count }));
+      return [...unused(labels.tags, 'tags'), ...unused(auto, 'auto')];
     }
     const pick = (list, kind) =>
       list
@@ -30,15 +50,16 @@
         .filter((l) => !filters[kind].some((f) => f.id === l.id))
         .slice(0, 6)
         .map((l) => ({ kind, id: l.id, name: l.name, count: l.count }));
-    return [
-      { kind: 'q', name: text.trim() },
-      ...pick(labels.persons, 'persons'),
-      ...pick(labels.tags, 'tags'),
-    ];
+    const found = [...pick(labels.persons, 'persons'), ...pick(labels.tags, 'tags'), ...pick(auto, 'auto')];
+    const q = { kind: 'q', name: text.trim() };
+    const ai = smart ? [{ kind: 'ai', name: text.trim() }] : [];
+    // Passt der Text zu keinem Namen, ist er meist eine Beschreibung: dann zuerst die Bildsuche
+    return found.length ? [q, ...found, ...ai] : [...ai, q];
   });
+  const firstAuto = $derived(browsing ? suggestions.findIndex((s) => s.kind === 'auto') : -1);
 
   function choose(suggestion) {
-    if (suggestion.kind === 'q') onchange({ ...filters, q: suggestion.name });
+    if (suggestion.kind === 'q' || suggestion.kind === 'ai') onchange({ ...filters, [suggestion.kind]: suggestion.name });
     else onchange({ ...filters, [suggestion.kind]: [...filters[suggestion.kind], { id: suggestion.id, name: suggestion.name }] });
     text = '';
     open = false;
@@ -56,7 +77,9 @@
       if (active >= 0 && suggestions[active]) choose(suggestions[active]);
     } else if (e.key === 'Enter' && suggestions.length) {
       // Genau ein passendes Label: direkt als Filter nehmen, sonst die gewählte Zeile
-      const exact = suggestions.find((s) => s.kind !== 'q' && s.name.toLocaleLowerCase() === text.trim().toLocaleLowerCase());
+      const exact = suggestions.find(
+        (s) => s.kind !== 'q' && s.kind !== 'ai' && s.name.toLocaleLowerCase() === text.trim().toLocaleLowerCase(),
+      );
       choose(active === 0 && exact ? exact : suggestions[active]);
     } else if (e.key === 'Escape') {
       open = false;
@@ -70,10 +93,14 @@
   }
 
   function removeLast() {
-    if (filters.q) onchange({ ...filters, q: '' });
+    if (filters.ai) onchange({ ...filters, ai: '' });
+    else if (filters.q) onchange({ ...filters, q: '' });
+    else if (filters.auto?.length) onchange({ ...filters, auto: filters.auto.slice(0, -1) });
     else if (filters.tags.length) onchange({ ...filters, tags: filters.tags.slice(0, -1) });
     else if (filters.persons.length) onchange({ ...filters, persons: filters.persons.slice(0, -1) });
   }
+
+  const ICONS = { q: 'search', ai: 'sparkle', persons: 'person', tags: 'tag', auto: 'sparkle' };
 
   const without = (kind, id) => onchange({ ...filters, [kind]: filters[kind].filter((f) => f.id !== id) });
 
@@ -99,6 +126,12 @@
     {#each filters.tags as t (t.id)}
       <span class="chip"><Icon name="tag" size={14} />{t.name}<button onclick={() => without('tags', t.id)} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
     {/each}
+    {#each filters.auto ?? [] as t (t.id)}
+      <span class="chip" title="Von der Bilderkennung vorgeschlagen, noch nicht übernommen"><Icon name="sparkle" size={14} />{t.name}<button onclick={() => without('auto', t.id)} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+    {/each}
+    {#if filters.ai}
+      <span class="chip" title="Bildinhalt"><Icon name="sparkle" size={14} />„{filters.ai}“<button onclick={() => onchange({ ...filters, ai: '' })} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+    {/if}
     {#if dateLabel}
       <span class="chip"><Icon name="calendar" size={14} />{dateLabel}<button onclick={() => onchange({ ...filters, start: '', end: '' })} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
     {/if}
@@ -109,7 +142,7 @@
       bind:this={input}
       bind:value={text}
       type="text"
-      placeholder={hasFilters ? '' : 'Suchen: Personen, Schlagworte, Dateiname …'}
+      placeholder={hasFilters ? '' : smart ? 'Suchen: Personen, Schlagworte, Bildinhalt …' : 'Suchen: Personen, Schlagworte, Dateiname …'}
       onkeydown={keydown}
       oninput={() => ((open = true), (active = text.trim() ? 0 : -1))}
       onfocus={() => ((open = true), (active = text.trim() ? 0 : -1))}
@@ -122,24 +155,31 @@
     <Icon name="calendar" size={18} />
   </button>
   {#if hasFilters}
-    <button class="icon small" onclick={() => onchange({ tags: [], persons: [], start: '', end: '', q: '' })} title="Alle Filter entfernen">
+    <button class="icon small" onclick={() => onchange(NONE)} title="Alle Filter entfernen">
       <Icon name="close" size={18} />
     </button>
   {/if}
 
   {#if open && suggestions.length}
     <ul class="suggestions" class:browse={browsing} role="listbox">
-      {#if browsing}<li class="heading">Schlagworte</li>{/if}
+      {#if browsing && firstAuto !== 0}<li class="heading">Schlagworte</li>{/if}
       {#each suggestions as s, i}
+        {#if i === firstAuto}<li class="heading" title="Noch nicht in den Fotos gespeichert – übernehmen oder ablehnen">Erkannt (Vorschläge)</li>{/if}
         <li role="option" aria-selected={i === active}>
           <button class:active={i === active} onmousedown={(e) => (e.preventDefault(), choose(s))}>
-            <Icon name={s.kind === 'q' ? 'search' : s.kind === 'persons' ? 'person' : 'tag'} size={18} />
-            <span class="name">{s.kind === 'q' ? `Suche nach „${s.name}“` : s.name}</span>
+            <Icon name={ICONS[s.kind]} size={18} />
+            <span class="name">
+              {s.kind === 'q' ? `Name, Schlagwort oder Kamera enthält „${s.name}“` : s.kind === 'ai' ? `Fotos von „${s.name}“` : s.name}
+              {#if s.kind === 'ai'}<span class="kind">Bildinhalt</span>{:else if s.kind === 'auto' && !browsing}<span class="kind">erkannt</span>{/if}
+            </span>
             {#if s.count}<span class="count">{s.count}</span>{/if}
           </button>
         </li>
       {/each}
+      {#if progress}<li class="status">{progress}</li>{/if}
     </ul>
+  {:else if open && progress && !text.trim()}
+    <ul class="suggestions"><li class="status">{progress}</li></ul>
   {/if}
 
   {#if showDates}
@@ -261,6 +301,20 @@
     white-space: nowrap;
   }
   .count {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .kind {
+    margin-left: 8px;
+    padding: 0 6px;
+    border-radius: 8px;
+    background: var(--chip);
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .status {
+    padding: 8px 16px 4px;
+    border-top: 1px solid var(--border);
     color: var(--muted);
     font-size: 0.8rem;
   }

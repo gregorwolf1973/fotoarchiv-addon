@@ -2,6 +2,7 @@
 Internetzugang (angemeldet, Rechte je Rolle, ohne Verwaltungsfunktionen)."""
 
 import calendar
+import json
 import logging
 import mimetypes
 import re
@@ -21,10 +22,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from . import duplicates_api, faces_api, favorites_api, labels, media, zipstream
+from . import duplicates_api, faces_api, favorites_api, labels, media, vision_api, zipstream
 from .context import Context
 from .editor import WRITABLE, EditError, capabilities
 from .importer import safe_name
+from .vision import VISIBLE, NotReady
 
 log = logging.getLogger(__name__)
 
@@ -116,6 +118,10 @@ class RotateRequest(BaseModel):
     degrees: Literal[90, 180, 270]
 
 
+class OrientationDecision(BaseModel):
+    accept: bool  # Vorschlag bzw. automatische Drehung stimmt
+
+
 class DownloadRequest(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=5000)
 
@@ -150,8 +156,11 @@ class AssetFilter:
     editable: bool | None = None  # nur Formate, die Metadaten speichern können
     proposed: bool = False        # nur Fotos, deren Löschen jemand vorgeschlagen hat
     folder: int | None = None     # nur Fotos aus diesem Favoritenordner
+    ai: str = ""                  # Bildinhalt in normaler Sprache, z. B. "Hund am Strand"
+    auto: list[str] = Query([])   # noch offene Schlagwort-Vorschläge der Bilderkennung
 
-    def clause(self) -> tuple[str, list]:
+    def clause(self, semantic: list[int] | None = None) -> tuple[str, list]:
+        """semantic: Treffer der Bildsuche für ai (die Suche selbst braucht die Bilderkennung)."""
         where = ["deleted_at IS NOT NULL" if self.trash else "deleted_at IS NULL"]
         params: list = []
         for ids, link, column in ((self.tag, "asset_tags", "tag_id"), (self.person, "asset_persons", "person_id")):
@@ -175,6 +184,12 @@ class AssetFilter:
                                WHERE l.asset_id = a.id AND p.name LIKE ?))"""
             )
             params += [f"%{word}%"] * 4
+        for name in dict.fromkeys(self.auto):
+            where.append(f"EXISTS (SELECT 1 FROM auto_tags s WHERE s.asset_id = a.id AND s.name = ? AND {VISIBLE})")
+            params.append(name)
+        if semantic is not None:
+            where.append("a.id IN (SELECT value FROM json_each(?))")
+            params.append(json.dumps(semantic))
         if self.located is not None:
             where.append("lat IS NOT NULL" if self.located else "lat IS NULL")
         if self.folder is not None:
@@ -233,6 +248,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             "tasks_running": tasks.any_running(),
             "faces": {"enabled": faces.enabled, "status": faces.state["status"]},
             "converting": ctx.converter.status(),
+            "vision": ctx.vision.status(),
             # Offene Löschvorschläge – nur für den Admin in Home Assistant, der darüber entscheidet
             "delete_requests": None if public else db.one(
                 """SELECT COUNT(DISTINCT r.asset_id) AS n FROM delete_requests r
@@ -253,7 +269,13 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
     }
 
     def index_rows(filters: AssetFilter, extra: str = "", columns: str = "", order: str = "taken"):
-        where, params = filters.clause()
+        semantic = None
+        if filters.ai.strip():
+            try:
+                semantic = ctx.vision.search(filters.ai)
+            except NotReady as exc:
+                raise HTTPException(503, str(exc)) from exc
+        where, params = filters.clause(semantic)
         ts, sort = ORDERS[order]
         return db.query(
             f"""SELECT id, {ts} AS ts, width, height, kind, rev{columns} FROM assets a
@@ -321,6 +343,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
                     GROUP BY t.id ORDER BY t.name COLLATE NOCASE"""
             )
             result[kind] = [dict(r) for r in rows]
+        result["auto"] = ctx.vision.suggestion_labels() if ctx.vision.enabled else []
         return result
 
     def detail(asset_id: int) -> dict:
@@ -328,8 +351,10 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         with db.transaction() as conn:
             tags = labels.current(conn, asset_id, "tags")
             persons = labels.current(conn, asset_id, "persons")
-        result = {key: row[key] for key in row.keys() if key not in ("md5_import", "thumb_ok")}
-        result.update(capabilities(row["path"]), name=Path(row["path"]).name, tags=tags, persons=persons)
+        result = {key: row[key] for key in row.keys()
+                  if key not in ("md5_import", "thumb_ok", "vision_scanned", "orient_checked")}
+        result.update(capabilities(row["path"]), name=Path(row["path"]).name, tags=tags, persons=persons,
+                      suggestions=ctx.vision.suggestions(asset_id), orientation=ctx.vision.orientation_of(asset_id))
         result["delete_requests"] = [dict(r) for r in db.query(
             """SELECT r.username, COALESCE(NULLIF(u.display_name, ''), r.username) AS display_name, r.reason, r.created_at
                FROM delete_requests r LEFT JOIN users u ON u.username = r.username
@@ -378,6 +403,12 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
     @app.post("/api/assets/{asset_id}/rotate")
     def asset_rotate(asset_id: int, body: RotateRequest):
         editor.rotate(asset_id, body.degrees)
+        return detail(asset_id)
+
+    @app.post("/api/assets/{asset_id}/orientation")
+    def asset_orientation(asset_id: int, body: OrientationDecision):
+        """Drehen prüfen für ein Foto: Vorschlag übernehmen/verwerfen, automatische Drehung lassen/rückgängig."""
+        ctx.vision.decide(asset_id, body.accept)
         return detail(asset_id)
 
     @app.delete("/api/assets/{asset_id}")
@@ -661,3 +692,4 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
     faces_api.register(app, db, faces, tasks)
     duplicates_api.register(app, ctx)
     favorites_api.register(app, db)
+    vision_api.register(app, ctx)

@@ -73,8 +73,8 @@ class Editor:
         self.exiftool = exiftool
         self.importer = importer
         self._lock = threading.RLock()  # immer nur eine Änderung gleichzeitig
-        # Rückmeldungen an andere Teile (Gesichtserkennung): Ereignis -> Funktionen(asset_id)
-        self.hooks: dict[str, list] = {"purge": [], "rotate": [], "persons": []}
+        # Rückmeldungen an andere Teile (Gesichts- und Bilderkennung): Ereignis -> Funktionen(asset_id)
+        self.hooks: dict[str, list] = {"purge": [], "rotate": [], "persons": [], "tags": []}
 
     def _emit(self, event: str, asset_id: int):
         for hook in self.hooks[event]:
@@ -230,6 +230,8 @@ class Editor:
                 self._write(path, "-XMP-mwg-rs:all=", "-XMP-MP:all=")
                 meta = self._refresh(asset_id)
             self.db.bump()
+            if kind == "tags":
+                self._emit("tags", asset_id)
             if kind == "persons":
                 self._emit("persons", asset_id)
                 if self._leftover(meta, names):
