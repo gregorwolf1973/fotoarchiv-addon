@@ -265,3 +265,18 @@ def test_truncated_original_is_rescued_with_a_note(settings, importer, editor):
     assert row["convert"] == 0, row["convert_error"]
     assert row["path"].endswith(".mp4") and row["damaged"] and "unvollständig" in row["damaged"]
     assert "von 8 s" in row["damaged"]
+
+
+def test_header_too_short_is_fine_when_the_frames_reach_as_far(settings, importer, editor, monkeypatch, tmp_path):
+    """Alte AVIs: der Kopf nennt 13,8 s, die Bilder reichen bis 15,1 s – das 15,2 s lange Ergebnis ist vollständig."""
+    from fotoarchiv import convert
+
+    service = convert.ConvertService(settings, importer.db, importer, editor)
+    monkeypatch.setattr(convert.media, "probe",
+                        lambda ffprobe, path: {"streams": [{"codec_type": "video"}], "format": {"duration": "15.2"}})
+    monkeypatch.setattr(convert, "readable_duration", lambda ffprobe, path: 15.1)
+    assert service._check_video(tmp_path / "a.avi", tmp_path / "b.mp4", before=13.8) is None
+
+    monkeypatch.setattr(convert, "readable_duration", lambda ffprobe, path: 13.8)  # Ergebnis länger als die Quelle
+    with pytest.raises(RuntimeError, match="Länge passt nicht"):
+        service._check_video(tmp_path / "a.avi", tmp_path / "b.mp4", before=13.8)

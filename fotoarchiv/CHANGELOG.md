@@ -4,6 +4,7 @@
 
 - **Fotos mit Video-Endung:** Manche Kopien alter Handys tragen *.mp4*, obwohl ein JPEG darin steckt. Solche Dateien erkennt das Fotoarchiv jetzt am Inhalt statt am Namen. Beim Import werden sie gleich mit der richtigen Endung als Foto einsortiert. Liegen sie schon im Archiv, benennt *Umwandeln* sie nur um (*.jpg*, *.png* …) und führt sie ab dann als Foto, mit Vorschaubild, Gesichtserkennung und Duplikatsuche. Bisher machte *Umwandeln* daraus ein Video aus einem einzigen Bild. Der Inhalt bleibt Byte für Byte gleich, deshalb kommt nichts in den Papierkorb
 - Taucht die Datei eines Eintrags unter neuem Namen wieder auf, übernimmt der Eintrag auch die Art (Foto oder Video), die zur neuen Endung passt
+- **Umwandeln alter AVIs:** Manche AVIs geben im Dateikopf eine zu kurze Länge an, zum Beispiel 13,8 s, obwohl die Bilder bis 15,1 s reichen. Die Prüfung nach dem Umwandeln lehnte das vollständige Ergebnis deshalb mit *Länge passt nicht* ab. Jetzt zählt in diesem Fall, wie weit die Bilder im Original wirklich reichen
 
 ## 0.54
 

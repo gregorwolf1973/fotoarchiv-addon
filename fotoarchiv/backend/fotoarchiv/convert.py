@@ -376,8 +376,10 @@ class ConvertService:
         if not before or abs(before - after) <= max(1.0, before * 0.02):
             return None
         readable = readable_duration(self.ffprobe, source)
-        if readable and after < before and abs(readable - after) <= max(1.0, readable * 0.02):
-            return f"Original war unvollständig: nur {after:.0f} s von {before:.0f} s ließen sich retten"
+        if readable and abs(readable - after) <= max(1.0, readable * 0.02):
+            if after < before:
+                return f"Original war unvollständig: nur {after:.0f} s von {before:.0f} s ließen sich retten"
+            return None  # Kopf des Originals nennt zu wenig (alte AVIs), die Bilder reichen so weit wie das Ergebnis
         raise RuntimeError(f"Länge passt nicht ({after:.1f} s statt {before:.1f} s)")
 
     def _fix_suffix(self, row, source: Path, suffix: str) -> str:
