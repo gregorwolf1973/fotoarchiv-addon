@@ -223,6 +223,15 @@ MIGRATIONS = [
     );
     CREATE INDEX orientation_status ON orientation (status);
     """,
+    """
+    -- orient_checked: 0 offen, 1 geprüft, 2 von Hand gedreht – solche Fotos prüft die Bilderkennung nur auf
+    -- ausdrücklichen Wunsch. Bekannt sind nur die Mehrfach-Drehungen im Aufgabenverlauf.
+    UPDATE assets SET orient_checked = 2 WHERE orient_checked = 0 AND id IN (
+        SELECT j.value FROM tasks t, json_each(t.asset_ids) j WHERE t.kind = 'rotate' AND json_valid(t.asset_ids));
+    -- Angaben aus der Begleitdatei (Google-JSON, XMP) sind in die Datei übernommen: nur einmal, damit
+    -- später Entferntes nicht aus der Begleitdatei zurückkommt
+    ALTER TABLE assets ADD COLUMN sidecar_absorbed INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 # Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID

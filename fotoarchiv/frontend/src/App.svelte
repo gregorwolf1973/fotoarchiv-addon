@@ -27,6 +27,7 @@
   import RotationView from './components/RotationView.svelte';
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
+  import SettingsPanel from './components/SettingsPanel.svelte';
   import StorageView from './components/StorageView.svelte';
   import Uploader from './components/Uploader.svelte';
   import Viewer from './components/Viewer.svelte';
@@ -58,6 +59,7 @@
   let session = $state(null); // { authenticated, public, role, user, csrf }
   let showAccess = $state(false);
   let showPassword = $state(false);
+  let showSettings = $state(false);
   let installPrompt = $state(null); // Android/Chrome: "App installieren" anbieten
   let iosHint = $state(false);
   const IOS_HINT_KEY = 'fotoarchiv.iosHint';
@@ -241,7 +243,7 @@
     items = [];
     info = null;
     openId = null;
-    showImport = showAccess = showPassword = false;
+    showImport = showAccess = showPassword = showSettings = false;
     dialog = null;
     selected.clear();
     session = { ...(session ?? {}), authenticated: false, public: true, role: null, user: null, csrf: null };
@@ -639,7 +641,7 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || view === 'rotation' || folderOverview || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || showSettings || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || view === 'rotation' || folderOverview || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     // Im Favoritenordner nimmt Entf das Foto nur aus dem Ordner, es bleibt im Archiv
     else if (e.key === 'Delete' && selected.size && openFolder) removeIds(openFolder, [...selected]);
@@ -854,6 +856,7 @@
         {/if}
         {#if isAdmin && !session.public}
           <button class="icon" onclick={() => (showAccess = true)} title="Zugang übers Internet"><Icon name="shield" /></button>
+          <button class="icon" onclick={() => (showSettings = true)} title="Einstellungen"><Icon name="cog" /></button>
         {/if}
         {#if session.public && installPrompt}
           <button onclick={installApp} title="Als App auf diesem Gerät installieren">
@@ -1127,6 +1130,10 @@
 
 {#if showPassword}
   <PasswordDialog onclose={() => (showPassword = false)} />
+{/if}
+
+{#if showSettings}
+  <SettingsPanel vision={info?.vision} revision={info?.revision} onclose={() => (showSettings = false)} ontask={trackTask} onchanged={kick} />
 {/if}
 
 <Uploader bind:this={uploader} enabled={canUpload} onchanged={kick} />

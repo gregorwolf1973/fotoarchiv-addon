@@ -109,6 +109,61 @@ class Editor:
         except ExifToolError as exc:
             raise EditError(f"Schreiben fehlgeschlagen: {exc}") from exc
 
+    def _prepare(self, asset_id: int, action: str, allowed: set = WRITABLE):
+        """Vor jeder Änderung: Foto und Datei holen, Angaben aus der Begleitdatei in die Datei übernehmen."""
+        row = self._asset(asset_id)
+        self._require(row, allowed, action)
+        path = self._file(row)
+        self._absorb(row, path)
+        return row, path
+
+    def _absorb(self, row, path: Path) -> list[str]:
+        """Was nur in der Begleitdatei steht (Google-JSON, XMP), in die Datei schreiben.
+
+        Nach jeder Änderung wird die Datenbank aus der Datei neu gelesen (_refresh). Stünden Datum, Ort,
+        Personen oder Schlagworte dann nur in der Begleitdatei, fielen sie aus der Datenbank. Die Datei
+        selbst hat Vorrang: geschrieben wird nur, was ihr fehlt. Die Begleitdatei bleibt liegen."""
+        if row["sidecar_absorbed"] or path.suffix.lower() not in WRITABLE:
+            return []
+        sidecar = metadata.sidecar_for(path)
+        if sidecar is None:
+            return []
+        try:
+            raw = self.exiftool.read(path)
+            extra = metadata.read_sidecar(sidecar, self.exiftool, self.settings.timezone)
+        except Exception as exc:
+            log.warning("Begleitdatei %s nicht lesbar: %s", sidecar.name, exc)
+            return []
+        mtime = path.stat().st_mtime
+        own = metadata.extract(raw, path, self.settings.timezone, mtime)
+        full = metadata.extract(metadata.merge_sidecar(raw, extra), path, self.settings.timezone, mtime)
+        written = []
+        if own.date_source != "exif" and full.date_source == "exif":
+            self._write_date(path, row, full.taken)
+            written.append("Datum")
+        if own.lat is None and full.lat is not None:
+            self._write_location(path, full.lat, full.lon)
+            written.append("Ort")
+        for kind, word, mine, theirs in (("tags", "Schlagworte", own.tags, full.tags),
+                                         ("persons", "Personen", own.persons, full.persons)):
+            known = {name.casefold() for name in mine}
+            missing = [name for name in theirs if name.casefold() not in known]
+            if missing:
+                self._write_labels(path, kind, labels.normalize(list(mine) + missing))
+                written.append(word)
+        self.db.execute("UPDATE assets SET sidecar_absorbed = 1 WHERE id = ?", (row["id"],))
+        return written
+
+    def absorb_sidecar(self, asset_id: int) -> list[str]:
+        """Angaben der Begleitdatei in die Datei schreiben (für „Alle Informationen in die Bilder schreiben“)."""
+        with self._lock:
+            row = self._asset(asset_id)
+            written = self._absorb(row, self._file(row))
+            if written:
+                self._refresh(asset_id)
+                self.db.bump()
+            return written
+
     def _refresh(self, asset_id: int, *, new_thumbnail: bool = False):
         """Datenbank aus der Datei neu aufbauen."""
         row = self._asset(asset_id)
@@ -138,28 +193,29 @@ class Editor:
     def set_date(self, asset_id: int, taken: datetime):
         taken = taken.replace(tzinfo=None, microsecond=0)
         with self._lock:
-            row = self._asset(asset_id)
-            self._require(row, WRITABLE, "Datum ändern")
-            path = self._file(row)
-            stamp = taken.strftime("%Y:%m:%d %H:%M:%S")
-            suffix = path.suffix.lower()
-            if suffix in QUICKTIME:
-                # QuickTime speichert UTC; Keys:CreationDate die Ortszeit mit Offset
-                offset = row["tz_offset"] or taken.replace(tzinfo=ZoneInfo(self.settings.timezone)).strftime("%z")
-                offset = offset if ":" in offset else f"{offset[:3]}:{offset[3:]}"
-                utc = (taken - _offset_delta(offset)).strftime("%Y:%m:%d %H:%M:%S")
-                self._write(path, f"-QuickTime:CreateDate={utc}", f"-QuickTime:ModifyDate={utc}",
-                            f"-Keys:CreationDate={stamp}{offset}")
-            else:
-                assignments = [f"-AllDates={stamp}"]
-                if row["tz_offset"]:
-                    assignments.append(f"-OffsetTimeOriginal={row['tz_offset']}")
-                if suffix not in IPTC:
-                    assignments.append(f"-XMP-exif:DateTimeOriginal={stamp}")  # PNG/WebP/HEIC: zusätzlich XMP
-                self._write(path, *assignments)
+            row, path = self._prepare(asset_id, "Datum ändern")
+            self._write_date(path, row, taken)
             self._refresh(asset_id)
             self._resort(asset_id)
             self.db.bump()
+
+    def _write_date(self, path: Path, row, taken: datetime):
+        stamp = taken.strftime("%Y:%m:%d %H:%M:%S")
+        suffix = path.suffix.lower()
+        if suffix in QUICKTIME:
+            # QuickTime speichert UTC; Keys:CreationDate die Ortszeit mit Offset
+            offset = row["tz_offset"] or taken.replace(tzinfo=ZoneInfo(self.settings.timezone)).strftime("%z")
+            offset = offset if ":" in offset else f"{offset[:3]}:{offset[3:]}"
+            utc = (taken - _offset_delta(offset)).strftime("%Y:%m:%d %H:%M:%S")
+            self._write(path, f"-QuickTime:CreateDate={utc}", f"-QuickTime:ModifyDate={utc}",
+                        f"-Keys:CreationDate={stamp}{offset}")
+        else:
+            assignments = [f"-AllDates={stamp}"]
+            if row["tz_offset"]:
+                assignments.append(f"-OffsetTimeOriginal={row['tz_offset']}")
+            if suffix not in IPTC:
+                assignments.append(f"-XMP-exif:DateTimeOriginal={stamp}")  # PNG/WebP/HEIC: zusätzlich XMP
+            self._write(path, *assignments)
 
     def _resort(self, asset_id: int):
         """Nach Datumsänderung in den passenden JJJJ/MM-Ordner verschieben (nur bei einsortierten Dateien)."""
@@ -190,38 +246,28 @@ class Editor:
 
     def set_location(self, asset_id: int, lat: float | None, lon: float | None):
         with self._lock:
-            row = self._asset(asset_id)
-            self._require(row, WRITABLE, "Ort ändern")
-            path = self._file(row)
-            if path.suffix.lower() in QUICKTIME:
-                if lat is None:
-                    self._write(path, "-Keys:GPSCoordinates=", "-UserData:GPSCoordinates=")
-                else:
-                    self._write(path, f"-Keys:GPSCoordinates={lat}, {lon}", "-UserData:GPSCoordinates=")
-            elif lat is None:
-                self._write(path, "-GPS:all=", "-XMP-exif:GPSLatitude=", "-XMP-exif:GPSLongitude=")
-            else:
-                self._write(path, f"-GPSLatitude*={lat}", f"-GPSLongitude*={lon}")
+            row, path = self._prepare(asset_id, "Ort ändern")
+            self._write_location(path, lat, lon)
             self._refresh(asset_id)
             self.db.bump()
+
+    def _write_location(self, path: Path, lat: float | None, lon: float | None):
+        if path.suffix.lower() in QUICKTIME:
+            if lat is None:
+                self._write(path, "-Keys:GPSCoordinates=", "-UserData:GPSCoordinates=")
+            else:
+                self._write(path, f"-Keys:GPSCoordinates={lat}, {lon}", "-UserData:GPSCoordinates=")
+        elif lat is None:
+            self._write(path, "-GPS:all=", "-XMP-exif:GPSLatitude=", "-XMP-exif:GPSLongitude=")
+        else:
+            self._write(path, f"-GPSLatitude*={lat}", f"-GPSLongitude*={lon}")
 
     # ── Schlagworte und Personen ───────────────────────────────────
     def set_labels(self, asset_id: int, kind: str, names: list[str]):
         names = labels.normalize(names)
         with self._lock:
-            row = self._asset(asset_id)
-            self._require(row, WRITABLE, "Bearbeiten")
-            path = self._file(row)
-            suffix = path.suffix.lower()
-            if kind == "tags":
-                tag_lists = ["XMP-dc:Subject"] + (["IPTC:Keywords"] if suffix in IPTC else [])
-                assignments = [] if suffix not in IPTC else ["-IPTC:CodedCharacterSet=UTF8"]
-                for tag in tag_lists:
-                    assignments.append(f"-{tag}=")  # erst leeren, dann neu füllen
-                    assignments += [f"-{tag}={name}" for name in names]
-            else:
-                assignments = ["-XMP-iptcExt:PersonInImage="] + [f"-XMP-iptcExt:PersonInImage={n}" for n in names]
-            self._write(path, *assignments)
+            row, path = self._prepare(asset_id, "Bearbeiten")
+            self._write_labels(path, kind, names)
             meta = self._refresh(asset_id)
             if kind == "persons" and self._leftover(meta, names):
                 # Der Name steckt in Gesichtsmarkierungen eines anderen Programms (Picasa, Google Fotos,
@@ -236,6 +282,18 @@ class Editor:
                 self._emit("persons", asset_id)
                 if self._leftover(meta, names):
                     raise EditError("Person ist über eine Gesichtsmarkierung zugeordnet und bleibt erhalten")
+
+    def _write_labels(self, path: Path, kind: str, names: list[str]):
+        suffix = path.suffix.lower()
+        if kind == "tags":
+            tag_lists = ["XMP-dc:Subject"] + (["IPTC:Keywords"] if suffix in IPTC else [])
+            assignments = [] if suffix not in IPTC else ["-IPTC:CodedCharacterSet=UTF8"]
+            for tag in tag_lists:
+                assignments.append(f"-{tag}=")  # erst leeren, dann neu füllen
+                assignments += [f"-{tag}={name}" for name in names]
+        else:
+            assignments = ["-XMP-iptcExt:PersonInImage="] + [f"-XMP-iptcExt:PersonInImage={n}" for n in names]
+        self._write(path, *assignments)
 
     @staticmethod
     def _leftover(meta, names: list[str]) -> bool:
@@ -256,9 +314,7 @@ class Editor:
         if degrees % 90:
             raise EditError("Nur Vierteldrehungen möglich")
         with self._lock:
-            row = self._asset(asset_id)
-            self._require(row, ROTATABLE, "Drehen")
-            path = self._file(row)
+            row, path = self._prepare(asset_id, "Drehen", ROTATABLE)
             raw = self.exiftool.read(path)
             if path.suffix.lower() in QUICKTIME:
                 current = next((v for k, v in raw.items() if k.endswith(":Rotation") and isinstance(v, (int, float))), 0)

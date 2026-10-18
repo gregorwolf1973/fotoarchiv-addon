@@ -148,6 +148,7 @@ AVI, MPG und WMV können selbst keine Metadaten aufnehmen. Programme wie digiKam
 Das Add-on behandelt beide als eine Einheit:
 
 - **Beim Import wird die Begleitdatei mitgelesen.** Aufnahmedatum, Ort, Schlagworte, Personen und Kamera daraus landen im Eintrag. Bei einem AVI ist das oft die einzige Quelle – ohne sie bliebe nur der Dateiname oder die Dateizeit.
+- **Bei der ersten Änderung kommen ihre Angaben in die Datei selbst** (JPEG, PNG, WebP, HEIC, MP4 …): Datum, Ort, Personen und Schlagworte, soweit die Datei sie nicht schon hat. Das geht auch für alle auf einmal mit *Einstellungen → Alle Informationen in die Bilder schreiben*. Danach ist die Datei vollständig, und was du später entfernst, kommt nicht aus der Begleitdatei zurück. Die Begleitdatei bleibt liegen.
 - **Was in der Datei selbst steht, hat Vorrang.** Die Begleitdatei füllt nur Lücken.
 - **Sie wandert mit.** Ins Archiv, in den Papierkorb, zurück beim Wiederherstellen, und beim endgültigen Löschen verschwindet sie mit. Beim Umwandeln nach MP4 werden ihre Angaben in die neue Datei geschrieben, die sie dann selbst speichern kann.
 - **Im Bericht taucht sie nicht auf.** Früher wurde sie als *Dateityp wird nicht unterstützt* gezählt.
@@ -258,6 +259,9 @@ Jedes Foto wird einmal auf die richtige Lage geprüft.
 - Das Drehen-Symbol mit der Zahl oben rechts öffnet **Drehen prüfen**. Dort erscheinen alle Fotos so, wie sie gedreht aussähen. Antippen, was nicht stimmt, dann *Übernehmen*: Vorschläge werden gedreht, automatisch gedrehte bleiben so. Angetippte Fotos bleiben, wie sie waren, bzw. werden zurückgedreht.
 - In der Einzelansicht steht derselbe Hinweis, mit *Rückgängig*/*Stimmt* bzw. *Passt so*/*Drehen*.
 - Mit `auto_rotate: false` dreht das Add-on nichts selbst, alle Verdachtsfälle kommen nur in die Liste. Ohne Gesichtserkennung gibt es ebenfalls nur Vorschläge.
+- **Was du von Hand drehst, bleibt so.** Ein Foto, das jemand gedreht hat (Einzelansicht oder Mehrfachauswahl), prüft die Bilderkennung nicht mehr. Bekannt sind alle Drehungen ab Version 0.57, von früher nur die Mehrfach-Drehungen im Aufgabenverlauf. Willst du auch diese Fotos prüfen lassen: *Einstellungen → Alle prüfen, auch die manuell gedrehten*.
+
+**Wann sie läuft:** von selbst im Hintergrund. Einmal über alle Fotos und Videos, die neuesten zuerst (auf dem Pi 5 etwa 0,4 Sekunden je Foto). Danach kommt jedes neue Foto kurz nach dem Import oder Hochladen dran. Solange die Gesichtserkennung arbeitet, wartet sie. Den Stand zeigt *Einstellungen*.
 
 **Gut zu wissen:**
 
@@ -345,6 +349,14 @@ MP4 und WebM, die der Browser abspielen kann, bleiben unangetastet.
 - Wird eine Datei während des Umwandelns bearbeitet, wird sie danach erneut umgewandelt, damit nichts verloren geht.
 - Schlägt etwas fehl, bleibt das Original unverändert; der Grund steht im Protokoll des Add-ons.
 - **Einschränkung:** HDR-Videos (iPhone „HDR-Video") verlieren beim Umwandeln ihr HDR und können etwas blasser wirken.
+
+## Einstellungen
+
+Das Zahnrad oben rechts (nur in Home Assistant) öffnet die Einstellungen:
+
+- **Bilderkennung:** Stand der Analyse, automatisch gedrehte Fotos, offene Prüfungen und Schlagwort-Vorschläge.
+- **Manuell gedrehte Fotos:** wie viele es gibt, und *Alle prüfen, auch die manuell gedrehten*. Eindeutige Fälle (mit Gesicht) dreht das Add-on dabei selbst, die übrigen kommen nach *Drehen prüfen*.
+- **Alle Informationen in die Bilder schreiben:** Schreibt in die Dateien, was bisher nur in der Datenbank steht, nämlich die offenen Schlagwort-Vorschläge (abgelehnte nicht), noch nicht geschriebene Personennamen und Angaben aus Begleitdateien. Drehvorschläge und Favoritenordner gehören nicht dazu. Dateien, die keine Metadaten speichern können (AVI, GIF …), bleiben, wie sie sind. Es läuft als Hintergrundaufgabe und schreibt nur, was fehlt – einfach später noch einmal drücken, wenn neue Vorschläge dazugekommen sind.
 
 ## Papierkorb
 

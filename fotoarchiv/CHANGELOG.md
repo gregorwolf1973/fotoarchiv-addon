@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.57
+
+- **Manuell gedrehte Fotos bleiben so:** Was jemand von Hand dreht, prüft die Bilderkennung nicht mehr und dreht es auch nicht zurück. Bekannt sind alle Drehungen ab jetzt; von früher nur die Mehrfach-Drehungen, die noch im Aufgabenverlauf stehen
+- **Einstellungen** (Zahnrad oben rechts, nur in Home Assistant): Stand der Bilderkennung, *Alle prüfen, auch die manuell gedrehten* und *Alle Informationen in die Bilder schreiben*
+- **Alle Informationen in die Bilder schreiben:** offene Schlagwort-Vorschläge, noch nicht geschriebene Personennamen und Angaben aus Begleitdateien kommen in die Dateien. Läuft als Hintergrundaufgabe und schreibt nur, was fehlt
+- **Behoben:** Bei Fotos mit Begleitdatei (Google-Takeout-JSON, XMP) fielen Datum, Ort, Personen und Schlagworte daraus nach jeder Änderung aus der Datenbank – auch nach dem Drehen. Jetzt kommen diese Angaben vor der ersten Änderung in die Datei selbst
+
 ## 0.56
 
 - **Bilderkennung** (neu, abschaltbar mit `image_recognition`). Sie lädt beim ersten Start ihre Modelle (ca. 1,6 GB) und geht im Hintergrund alle Fotos und Videos durch. Die Gesichtserkennung hat Vorrang. Siehe *Bilderkennung* in der Dokumentation

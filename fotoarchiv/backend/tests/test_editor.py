@@ -198,3 +198,52 @@ def test_ids_are_never_reused_after_purge(settings, importer, editor, make_jpeg,
     editor.purge(doomed)  # war die höchste ID
     fresh = importer.import_file(make_jpeg(tmp_path / "c.jpg")).asset_id
     assert fresh > doomed > first
+
+
+def _google_photo(settings, importer, make_jpeg, people=("Anna",)):
+    """Foto ohne EXIF mit Google-Takeout-JSON: Datum, Ort, Person und Schlagwort stehen nur in der JSON."""
+    import json
+    from datetime import timezone
+
+    inbox = settings.import_dir
+    make_jpeg(inbox / "20190713_173819_D65B5CBE.jpg")
+    taken = datetime(2019, 7, 13, 15, 38, 19, tzinfo=timezone.utc)
+    (inbox / "20190713_173819_D65B5CBE.jpg.json").write_text(json.dumps({
+        "photoTakenTime": {"timestamp": str(int(taken.timestamp()))},
+        "geoData": {"latitude": 48.137154, "longitude": 11.576124},
+        "people": [{"name": n} for n in people],
+        "tags": ["Urlaub"],
+    }), encoding="utf-8")
+    importer._run("import")
+    return importer.db.one("SELECT id FROM assets")["id"]
+
+
+def test_editing_keeps_sidecar_data_by_writing_it_into_the_file(settings, importer, editor, exiftool, make_jpeg):
+    """Vorher fielen Ort, Personen und Datum aus der JSON nach jeder Änderung aus der Datenbank."""
+    asset = _google_photo(settings, importer, make_jpeg)
+    editor.rotate(asset, 90)
+    row = importer.db.one("SELECT * FROM assets WHERE id = ?", (asset,))
+    assert (row["taken_at"], row["date_source"]) == ("2019-07-13T17:38:19", "exif")
+    assert round(row["lat"], 4) == 48.1372
+    with importer.db.transaction() as conn:
+        from fotoarchiv import labels
+        assert labels.current(conn, asset, "persons") == ["Anna"]
+        assert labels.current(conn, asset, "tags") == ["Urlaub"]
+    raw = exiftool.read(settings.library / row["path"])  # jetzt steht alles in der Datei selbst
+    assert raw.get("XMP-iptcExt:PersonInImage") in ("Anna", ["Anna"])
+    assert "GPS:GPSLatitude" in raw or "Composite:GPSLatitude" in raw
+
+    # Entfernen wirkt danach wie bei jeder Datei, die JSON holt nichts zurück
+    editor.set_labels(asset, "tags", [])
+    editor.set_labels(asset, "persons", [])
+    with importer.db.transaction() as conn:
+        assert labels.current(conn, asset, "tags") == [] and labels.current(conn, asset, "persons") == []
+
+
+def test_absorb_sidecar_writes_missing_fields_only(settings, importer, editor, exiftool, make_jpeg):
+    asset = _google_photo(settings, importer, make_jpeg, people=("Anna", "Ben"))
+    assert sorted(editor.absorb_sidecar(asset)) == ["Datum", "Ort", "Personen", "Schlagworte"]
+    assert editor.absorb_sidecar(asset) == []  # steht schon alles drin
+    path = settings.library / importer.db.one("SELECT path FROM assets WHERE id = ?", (asset,))["path"]
+    raw = exiftool.read(path)
+    assert raw.get("XMP-dc:Subject") in ("Urlaub", ["Urlaub"])

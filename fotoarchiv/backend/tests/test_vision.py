@@ -276,6 +276,7 @@ def test_manual_rotation_settles_suggestion(service, importer, editor, make_jpeg
     service.work_once()
     editor.rotate(asset, 270)
     assert importer.db.one("SELECT status FROM orientation WHERE asset_id = ?", (asset,))["status"] == "manual"
+    assert importer.db.one("SELECT orient_checked FROM assets WHERE id = ?", (asset,))["orient_checked"] == 2
     service.decide(asset, accept=True)
     assert importer.db.one("SELECT width FROM assets WHERE id = ?", (asset,))["width"] == 240  # nur einmal gedreht
 
@@ -390,3 +391,103 @@ def test_real_models_in_worker_process(tmp_path, make_jpeg):
         image.close()
         text.close()
     assert not image.running and not text.running
+
+
+# ── Von Hand gedreht, erneut prüfen, alles in die Bilder schreiben ─
+def test_manually_rotated_photos_stay_unless_rechecked(service, importer, editor, make_jpeg, tmp_path):
+    asset = imported(importer, make_jpeg, tmp_path, "schief.jpg")
+    editor.rotate(asset, 90)  # von Hand, bevor die Bilderkennung das Foto gesehen hat
+    service.image.needs = {asset: 270}  # das Modell wäre anderer Meinung
+    service.work_once()
+    assert service.image.calls == [(asset, ())]  # Ausrichtung nicht geprüft
+    assert service.orientation_of(asset) is None
+    assert service.details()["manual"] == 1
+
+    # „Alle prüfen, auch die manuell gedrehten“
+    service.image.calls.clear()
+    assert service.recheck_manual() == 1
+    service.work_once()
+    assert service.image.calls[0] == (asset, (0,))
+    assert service.orientation_of(asset) == {"degrees": 270, "status": "suggested"}
+    assert service.details()["manual"] == 0
+
+
+def test_writeback_writes_suggestions_persons_and_sidecars(service, settings, importer, editor, exiftool, make_jpeg,
+                                                           tmp_path):
+    import json
+
+    from fotoarchiv import writeback
+
+    dog = imported(importer, make_jpeg, tmp_path, "hund.jpg", Keywords="Garten")
+    # Foto mit Google-JSON, deren Ort nur in der Datenbank steht
+    make_jpeg(settings.import_dir / "takeout.jpg")
+    (settings.import_dir / "takeout.jpg.json").write_text(json.dumps({"geoData": {"latitude": 47.5, "longitude": 11.1}}))
+    importer._run("import")
+    takeout = importer.db.one("SELECT id FROM assets WHERE path LIKE '%takeout.jpg'")["id"]
+    importer.db.execute("UPDATE assets SET persons_dirty = 1 WHERE id = ?", (takeout,))
+    service.image.vectors = {dog: tag_vector(service, "Hund")}
+    service.work_once()
+
+    plan = writeback.plan(importer.db, settings.library)
+    assert (plan["suggestion_photos"], plan["suggestion_tags"], plan["persons"], plan["sidecars"]) == (1, 1, 1, 1)
+    assert plan["ids"] == sorted([dog, takeout])
+
+    faces = type("Faces", (), {"sync_asset": lambda self, i: None})()
+    for asset in plan["ids"]:
+        writeback.write_one(editor, faces, service, asset)
+    dog_file = settings.library / importer.db.one("SELECT path FROM assets WHERE id = ?", (dog,))["path"]
+    assert sorted(exiftool.read(dog_file)["XMP-dc:Subject"]) == ["Garten", "Hund"]
+    takeout_file = settings.library / importer.db.one("SELECT path FROM assets WHERE id = ?", (takeout,))["path"]
+    assert "GPS:GPSLatitude" in exiftool.read(takeout_file)
+    again = writeback.plan(importer.db, settings.library)
+    assert (again["suggestion_photos"], again["sidecars"], again["ids"]) == (0, 0, [takeout])  # nur noch persons_dirty
+
+
+def test_migration_marks_known_manual_rotations(tmp_path):
+    import json
+    import sqlite3
+
+    from fotoarchiv.db import MIGRATIONS, Database, _statements
+
+    path = tmp_path / "alt.db"
+    conn = sqlite3.connect(path)
+    for number, script in enumerate(MIGRATIONS[:12], start=1):
+        for statement in _statements(script):
+            conn.execute(statement)
+        conn.execute(f"PRAGMA user_version = {number}")
+    for asset_id in (1, 2, 3):
+        conn.execute("INSERT INTO assets (id, path, kind, size, md5, md5_import, taken_ts, date_source, imported_at) "
+                     "VALUES (?, ?, 'image', 1, 'x', 'x', 0, 'exif', '')", (asset_id, f"{asset_id}.jpg"))
+    conn.execute("UPDATE assets SET orient_checked = 1 WHERE id = 3")
+    conn.execute("INSERT INTO tasks (kind, label, params, asset_ids, total, started_at) VALUES "
+                 "('rotate', 'drehen', '{}', ?, 2, '')", (json.dumps([1, 3]),))
+    conn.execute("INSERT INTO tasks (kind, label, params, asset_ids, total, started_at) VALUES "
+                 "('rotate', 'kaputt', '{}', 'kein json', 1, '')")
+    conn.commit()
+    conn.close()
+
+    db = Database(path)
+    assert [tuple(r) for r in db.query("SELECT id, orient_checked, sidecar_absorbed FROM assets ORDER BY id")] == [
+        (1, 2, 0), (2, 0, 0), (3, 1, 0)]  # schon geprüfte bleiben, wie sie sind
+    db.close()
+
+
+def test_api_settings_overview_recheck_and_writeback(client, make_jpeg, tmp_path):
+    vision = client.app.state.ctx.vision
+    vision.prepare()
+    vision.image.default = vision._vocab[2][0]
+    dog = upload(client, make_jpeg, tmp_path, "hund.jpg")
+    vision.image.vectors = {dog: tag_vector(vision, "Hund")}
+    client.post(f"/api/assets/{dog}/rotate", json={"degrees": 90})  # von Hand
+    vision.work_once()
+
+    overview = client.get("/api/settings/overview").json()
+    assert overview["vision"]["manual"] == 1 and overview["vision"]["suggestions"] == {"tags": 1, "photos": 1}
+    assert overview["writeback"] == {"files": 1, "suggestion_photos": 1, "suggestion_tags": 1, "unwritable": 0, "persons": 0,
+                                     "sidecars": 0}
+    assert client.post("/api/vision/orientation/recheck").json() == {"count": 1}
+
+    assert client.post("/api/settings/writeback").json()["total"] == 1
+    wait_for_tasks(client)
+    assert client.get(f"/api/assets/{dog}").json()["tags"] == ["Hund"]
+    assert client.post("/api/settings/writeback").status_code == 400  # nichts mehr zu tun

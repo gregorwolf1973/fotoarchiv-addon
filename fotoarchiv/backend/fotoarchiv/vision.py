@@ -24,7 +24,7 @@ import numpy as np
 from . import vocab
 from .config import Settings
 from .db import Database
-from .editor import ROTATABLE, EditError, Editor
+from .editor import ROTATABLE, WRITABLE, EditError, Editor
 from .faces import FaceService, load_rgb
 from .importer import Importer
 from .visionengine import DEGREES, ModelCrash, ModelError, ModelProcess, ensure_models, missing
@@ -443,10 +443,31 @@ class VisionService:
     def _after_rotate(self, asset_id: int):
         self.db.execute("UPDATE assets SET vision_scanned = 0 WHERE id = ?", (asset_id,))  # Merkmale der neuen Lage
         if asset_id not in self._rotating:
-            # Von Hand gedreht: Vorschlag oder automatische Drehung sind damit erledigt
+            # Von Hand gedreht: bleibt so. Vorschlag oder automatische Drehung sind damit erledigt, und geprüft
+            # wird das Foto nur noch auf ausdrücklichen Wunsch (recheck_manual)
+            self.db.execute("UPDATE assets SET orient_checked = 2 WHERE id = ?", (asset_id,))
             self.db.execute("UPDATE orientation SET status = 'manual' WHERE asset_id = ? AND status IN ('auto', 'suggested')",
                             (asset_id,))
         self.wake()
+
+    def recheck_manual(self) -> int:
+        """„Alle prüfen, auch die manuell gedrehten“: von Hand gedrehte Fotos noch einmal prüfen lassen.
+        Alle anderen sind schon geprüft; das Modell käme bei ihnen wieder zum selben Ergebnis."""
+        count = self.db.execute(
+            "UPDATE assets SET orient_checked = 0, vision_scanned = 0 WHERE orient_checked = 2 AND deleted_at IS NULL"
+        ).rowcount
+        self.db.bump()
+        self.wake()
+        return count
+
+    def accept_suggestions(self, asset_id: int) -> list[str]:
+        """Alle offenen Vorschläge eines Fotos als Schlagworte in die Datei schreiben."""
+        names = [s["name"] for s in self.suggestions(asset_id)]
+        row = self.db.one("SELECT path FROM assets WHERE id = ? AND deleted_at IS NULL", (asset_id,))
+        if names and row and Path(row["path"]).suffix.lower() in WRITABLE:
+            self.editor.change_labels(asset_id, "tags", names, [])  # der Haken "tags" markiert sie als übernommen
+            return names
+        return []
 
     def _after_tags(self, asset_id: int):
         """Schlagwort von Hand gesetzt: passender Vorschlag gilt als übernommen und kommt nicht wieder."""
@@ -468,3 +489,14 @@ class VisionService:
                WHERE o.status IN ('auto', 'suggested')""")["n"]
         return {**self.state, "enabled": self.enabled, "auto_rotate": self.auto_rotate, "search": self.search_ready,
                 "total": counts["total"], "done": counts["done"], "review": review}
+
+    def details(self) -> dict:
+        """Für die Einstellungen: was die Bilderkennung bisher getan hat."""
+        manual = self.db.one("SELECT COUNT(*) AS n FROM assets WHERE orient_checked = 2 AND deleted_at IS NULL")["n"]
+        rotations = {r["status"]: r["n"] for r in self.db.query(
+            """SELECT o.status, COUNT(*) AS n FROM orientation o JOIN assets a ON a.id = o.asset_id AND a.deleted_at IS NULL
+               GROUP BY o.status""")}
+        suggestions = self.db.one(
+            f"""SELECT COUNT(*) AS tags, COUNT(DISTINCT s.asset_id) AS photos FROM auto_tags s
+                JOIN assets a ON a.id = s.asset_id AND a.deleted_at IS NULL WHERE {VISIBLE}""")
+        return {**self.status(), "manual": manual, "rotations": rotations, "suggestions": dict(suggestions)}

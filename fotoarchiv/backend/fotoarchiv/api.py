@@ -352,7 +352,7 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             tags = labels.current(conn, asset_id, "tags")
             persons = labels.current(conn, asset_id, "persons")
         result = {key: row[key] for key in row.keys()
-                  if key not in ("md5_import", "thumb_ok", "vision_scanned", "orient_checked")}
+                  if key not in ("md5_import", "thumb_ok", "vision_scanned", "orient_checked", "sidecar_absorbed")}
         result.update(capabilities(row["path"]), name=Path(row["path"]).name, tags=tags, persons=persons,
                       suggestions=ctx.vision.suggestions(asset_id), orientation=ctx.vision.orientation_of(asset_id))
         result["delete_requests"] = [dict(r) for r in db.query(
@@ -692,4 +692,4 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
     faces_api.register(app, db, faces, tasks)
     duplicates_api.register(app, ctx)
     favorites_api.register(app, db)
-    vision_api.register(app, ctx)
+    vision_api.register(app, ctx, public=public)
