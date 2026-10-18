@@ -1,6 +1,6 @@
 <script>
   import { api, thumbUrl } from '../lib/api.js';
-  import { formatBytes, formatNumber } from '../lib/format.js';
+  import { formatBytes, formatDuration, formatNumber } from '../lib/format.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import Confirm from './Confirm.svelte';
   import Icon from './Icon.svelte';
@@ -12,7 +12,7 @@
 
   let data = $state.raw(null);
   let tab = $state('duplicates'); // duplicates | series
-  let keepByGroup = $state({}); // Gruppe -> behaltene Fotos (abweichend von der Empfehlung)
+  let keepByGroup = $state({}); // Gruppe -> behaltene Dateien (abweichend von der Empfehlung)
   let done = $state(new Set()); // erledigte Gruppen bis zum nächsten Laden ausblenden
   let transfer = $state(true);
   let limit = $state(PAGE);
@@ -47,7 +47,9 @@
   }
 
   // Viewer-Eintrag wie im Index: [id, ts, w, h, video, rev]
-  const asItem = (i) => [i.id, i.taken_ts, i.width || 1, i.height || 1, 0, i.rev];
+  const asItem = (i) => [i.id, i.taken_ts, i.width || 1, i.height || 1, i.kind === 'video' ? 1 : 0, i.rev];
+  const what = (group) => (group.items[0].kind === 'video' ? 'Videos' : 'Fotos');
+  const analysing = $derived(data ? data.hashed < data.images || data.videos_hashed < data.videos : false);
 
   const date = (ts) =>
     new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
@@ -108,15 +110,19 @@
         </button>
       </nav>
       <span class="grow"></span>
-      {#if data.hashed < data.images}
-        <span class="progress muted"><span class="spinner"></span>{formatNumber(data.hashed)} von {formatNumber(data.images)} Fotos analysiert</span>
+      {#if analysing}
+        <span class="progress muted"><span class="spinner"></span>
+          {#if data.hashed < data.images}{formatNumber(data.hashed)} von {formatNumber(data.images)} Fotos analysiert
+          {:else}{formatNumber(data.videos_hashed)} von {formatNumber(data.videos)} Videos analysiert{/if}
+        </span>
       {/if}
     </div>
 
     <p class="hint">
       {#if tab === 'duplicates'}
-        Gleiches Motiv – z. B. verkleinerte Kopie, anderes Format oder erneut gespeichert. Vorgeschlagen wird die beste
-        Fassung (Auflösung, Datum, Metadaten).
+        Gleiches Motiv – z. B. verkleinerte Kopie, anderes Format oder erneut gespeichert. Auch Videos, die es zusätzlich
+        als verkleinerte Kopie gibt (Google Fotos, WhatsApp). Vorgeschlagen wird die beste Fassung (Auflösung, Datum,
+        Metadaten, bei gleicher Auflösung die größere Datei).
       {:else}
         Sehr ähnliche Fotos, die innerhalb von 30 Sekunden aufgenommen wurden. Vorgeschlagen wird die größte Datei – meist
         die schärfste. Bitte selbst prüfen.
@@ -144,17 +150,17 @@
           <header>
             <strong>{date(group.items[0].taken_ts)}</strong>
             <span class="muted">
-              {group.items.length} Fotos{#if group.kind === 'series' && group.span} · innerhalb von {group.span} s{/if}
+              {group.items.length} {what(group)}{#if group.kind === 'series' && group.span} · innerhalb von {group.span} s{/if}
             </span>
             <span class="grow"></span>
-            <button onclick={() => ignore(group)} title="Diese Fotos nicht mehr als Duplikate vorschlagen">
+            <button onclick={() => ignore(group)} title="Diese Dateien nicht mehr als Duplikate vorschlagen">
               <Icon name="hide" size={18} /><span class="label">Keine Duplikate</span>
             </button>
             <button
               class="primary"
               disabled={busy || !keep.length || keep.length === group.items.length}
               onclick={() => resolve([group])}
-              title={keep.length ? '' : 'Mindestens ein Foto behalten'}
+              title={keep.length ? '' : 'Mindestens eine Datei behalten'}
             >
               <Icon name="delete" size={18} />
               {group.items.length - keep.length} löschen
@@ -174,7 +180,7 @@
                 </button>
                 <figcaption>
                   <span class="name" title={item.path}>{item.name}</span>
-                  <span>{item.width && item.height ? `${item.width} × ${item.height}` : '–'} · {formatBytes(item.size)} · {item.format}</span>
+                  <span>{item.width && item.height ? `${item.width} × ${item.height}` : '–'} · {formatBytes(item.size)} · {item.format}{#if item.kind === 'video' && item.duration} · {formatDuration(item.duration)}{/if}</span>
                   <span class="muted">{SOURCES[item.date_source] ?? item.date_source}{#if item.camera} · {item.camera}{/if}</span>
                   <span class="labels muted">
                     {#if item.tags}<span title="Schlagworte"><Icon name="tag" size={14} />{item.tags}</span>{/if}
@@ -193,8 +199,8 @@
     {:else}
       <div class="empty">
         <Icon name="checkCircle" size={64} />
-        <h2>{tab === 'duplicates' ? 'Keine doppelten Fotos gefunden' : 'Keine Serien gefunden'}</h2>
-        {#if data.hashed < data.images}<p>Die Analyse läuft noch – später erneut vorbeischauen.</p>{/if}
+        <h2>{tab === 'duplicates' ? 'Keine doppelten Fotos oder Videos gefunden' : 'Keine Serien gefunden'}</h2>
+        {#if analysing}<p>Die Analyse läuft noch – später erneut vorbeischauen.</p>{/if}
       </div>
     {/if}
   {/if}
@@ -203,7 +209,7 @@
 {#if confirmAll}
   <Confirm
     title="Alle Vorschläge übernehmen?"
-    text={`${formatNumber(extra)} ${extra === 1 ? 'Foto kommt' : 'Fotos kommen'} aus ${formatNumber(groups.length)} Gruppen in den Papierkorb.${transfer ? ' Metadaten werden vorher aufs behaltene Foto übertragen.' : ''}`}
+    text={`${formatNumber(extra)} ${extra === 1 ? 'Datei kommt' : 'Dateien kommen'} aus ${formatNumber(groups.length)} Gruppen in den Papierkorb.${transfer ? ' Metadaten werden vorher aufs behaltene Foto übertragen.' : ''}`}
     confirmLabel="In den Papierkorb"
     danger
     oncancel={() => (confirmAll = false)}

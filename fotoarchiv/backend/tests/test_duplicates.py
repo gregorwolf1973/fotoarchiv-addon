@@ -73,6 +73,56 @@ def test_groups_series_and_ignore(service, importer, tmp_path):
     assert {i["id"] for i in result["series"][0]["items"]} == {a, c}
 
 
+def test_video_duplicates_need_same_length_and_both_frames(service, importer, tmp_path):
+    db = importer.db
+    start, middle = 0x0123_4567_89AB_CDEF, 0x7654_3210_FEDC_BA98
+
+    def video(name, duration, start_hash, middle_hash, **extra):
+        return add(importer, tmp_path, name, kind="video", duration=duration,
+                   vhash=f"{start_hash:016x}:{middle_hash:016x}", **extra)
+
+    original = video("orig.jpg", 10.39, start, middle, width=1920, height=1080, size=22_000_000, taken_ts=1000)
+    # Kopie aus Google Fotos: gleich groß, stärker komprimiert, Länge leicht anders
+    copy = video("kopie.jpg", 10.47, start ^ 0b11, middle ^ 0b1, width=1920, height=1080, size=5_800_000, taken_ts=1000)
+    # WhatsApp-Kopie mit Versanddatum: kleiner, Tage später
+    chat = video("chat.jpg", 10.1, start ^ 0b1, middle, width=352, height=640, size=3_000_000, taken_ts=900_000)
+    video("szene.jpg", 10.5, start, middle ^ 0xFFFFF, taken_ts=1046)  # gleicher Anfang, andere Mitte
+    video("lang.jpg", 30.0, start, middle, taken_ts=1000)  # andere Länge
+    add(importer, tmp_path, "kaputt.jpg", kind="video", duration=10.4, vhash="")  # nicht berechenbar
+    add(importer, tmp_path, "foto.jpg", phash=f"{start:016x}", taken_ts=1000)  # Foto, nie mit Videos gruppiert
+    db.bump()
+
+    result = service.groups()
+    assert (result["videos"], result["videos_hashed"]) == (6, 6)
+    [group] = result["duplicates"]
+    assert {i["id"] for i in group["items"]} == {original, copy, chat}
+    assert group["keep"] == original
+    assert {i["kind"] for i in group["items"]} == {"video"}
+
+    service.ignore([original, copy, chat])
+    assert service.groups()["duplicates"] == []
+
+
+def test_video_hash_in_background(service, importer, tmp_path, monkeypatch):
+    clip = add(importer, tmp_path, "clip.jpg", kind="video", duration=8.0)
+    thumb = pattern(tmp_path / "thumb.jpg", seed=3)
+    monkeypatch.setattr(importer, "ensure_thumbnail", lambda asset_id: thumb)
+    seen = []
+    monkeypatch.setattr(service, "_frame_hash", lambda source, seconds: seen.append(seconds) or 0xABC)
+    service.hash_pending()
+    value = importer.db.one("SELECT vhash FROM assets WHERE id = ?", (clip,))["vhash"]
+    assert value == f"{phash(thumb):016x}:{0xABC:016x}"
+    assert seen == [4.0]  # Mitte
+
+    def broken(source, seconds):
+        raise RuntimeError("kein Standbild")
+
+    monkeypatch.setattr(service, "_frame_hash", broken)
+    importer.db.execute("UPDATE assets SET vhash = NULL WHERE id = ?", (clip,))
+    service.hash_pending()
+    assert importer.db.one("SELECT vhash FROM assets WHERE id = ?", (clip,))["vhash"] == ""  # nicht immer wieder
+
+
 def test_import_hint_for_similar_photo(service, importer, tmp_path):
     first = importer.import_upload(pattern(tmp_path / "q" / "gross.jpg", seed=5), "gross.jpg", None)
     assert first.similar is None

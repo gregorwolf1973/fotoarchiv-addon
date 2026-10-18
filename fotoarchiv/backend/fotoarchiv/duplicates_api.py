@@ -38,7 +38,7 @@ def register(app: FastAPI, ctx: Context):
             for remove_id in group.remove:
                 keep_for[str(remove_id)] = group.keep[0]
         count = len(keep_for)
-        label = f"{count} {'doppeltes Foto' if count == 1 else 'doppelte Fotos'} in den Papierkorb"
+        label = f"{count} {'doppelte Datei' if count == 1 else 'doppelte Dateien'} in den Papierkorb"
         return tasks.submit("dedupe", label, [int(i) for i in keep_for], {"keep_for": keep_for, "transfer": body.transfer})
 
     @app.post("/api/duplicates/ignore")

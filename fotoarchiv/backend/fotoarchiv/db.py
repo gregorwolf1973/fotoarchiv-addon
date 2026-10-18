@@ -232,6 +232,10 @@ MIGRATIONS = [
     -- später Entferntes nicht aus der Begleitdatei zurückkommt
     ALTER TABLE assets ADD COLUMN sidecar_absorbed INTEGER NOT NULL DEFAULT 0;
     """,
+    """
+    -- Videos: zwei pHashes "Standbild bei 1 s:Bild aus der Mitte", leer = nicht berechenbar
+    ALTER TABLE assets ADD COLUMN vhash TEXT;
+    """,
 ]
 
 # Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID

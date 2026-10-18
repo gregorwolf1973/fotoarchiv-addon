@@ -8,9 +8,17 @@ anderes Format gespeichert oder anders beschriftet bleibt er (fast) gleich.
 
 Beide Schwellen stehen in den Add-on-Optionen. Sie gelten paarweise: sind A und B sowie B und C
 ähnlich genug, landen alle drei in einer Gruppe, auch wenn A und C weiter auseinanderliegen.
+
+Videos sind doppelt, wenn sie gleich lang sind (±1 s bzw. 2 %) und zwei Standbilder passen: das
+Vorschaubild bei 1 s und ein Bild aus der Mitte. Das Vorschaubild allein reicht nicht – kurz
+nacheinander gedrehte Clips derselben Szene beginnen gleich (gemessen: Mitte 12–34 Bit Abstand,
+echte Kopien aus Google Fotos oder WhatsApp 0–6).
 """
 
 import logging
+import os
+import subprocess
+import tempfile
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +37,11 @@ SERIES_SECONDS = 30
 BATCH = 200
 IDLE_WAIT = 600
 DATE_RANK = {"mtime": 0, "filename": 1, "exif": 2}
+VIDEO_MIDDLE = 0.5
+
+
+def same_length(a: float, b: float) -> bool:
+    return abs(a - b) <= max(1.0, 0.02 * max(a, b))
 
 _N = 32
 _DCT = np.cos(np.pi * (2 * np.arange(_N)[None, :] + 1) * np.arange(_N)[:, None] / (2 * _N)).astype(np.float32)
@@ -117,9 +130,40 @@ class DuplicateService:
             if self._stop.is_set():
                 break
             self.hash_asset(row["id"])
-        if rows:
+        videos = [] if rows else self.db.query(  # Fotos zuerst, Videos brauchen ffmpeg
+            "SELECT id FROM assets WHERE vhash IS NULL AND kind = 'video' AND deleted_at IS NULL LIMIT ?", (limit // 4,))
+        for row in videos:
+            if self._stop.is_set():
+                break
+            self.hash_video(row["id"])
+        if rows or videos:
             self.db.bump()
-        return len(rows)
+        return len(rows) + len(videos)
+
+    def hash_video(self, asset_id: int) -> str:
+        row = self.db.one("SELECT path, duration FROM assets WHERE id = ?", (asset_id,))
+        value = ""
+        thumb = self.importer.ensure_thumbnail(asset_id)
+        try:
+            if thumb and row["duration"]:
+                start = phash(thumb)
+                middle = self._frame_hash(self.settings.library / row["path"], row["duration"] * VIDEO_MIDDLE)
+                value = f"{start:016x}:{middle:016x}"
+        except Exception as exc:
+            log.warning("Hash für Video %s nicht berechenbar: %s", asset_id, exc)
+        self.db.execute("UPDATE assets SET vhash = ? WHERE id = ?", (value, asset_id))
+        return value
+
+    def _frame_hash(self, source: Path, seconds: float) -> int:
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = Path(tmp) / "frame.jpg"
+            subprocess.run(
+                [self.settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{seconds:.2f}",
+                 "-i", str(source), "-frames:v", "1", "-vf", "scale=-2:256", str(frame)],
+                capture_output=True, timeout=120, preexec_fn=lambda: os.nice(10))
+            if not frame.is_file() or frame.stat().st_size == 0:
+                raise RuntimeError("kein Standbild")
+            return phash(frame)
 
     def hash_asset(self, asset_id: int) -> int | None:
         thumb = self.importer.ensure_thumbnail(asset_id)
@@ -135,7 +179,7 @@ class DuplicateService:
         return value
 
     def _invalidate(self, asset_id: int):
-        self.db.execute("UPDATE assets SET phash = NULL WHERE id = ?", (asset_id,))
+        self.db.execute("UPDATE assets SET phash = NULL, vhash = NULL WHERE id = ?", (asset_id,))
         self._index_update(asset_id, None)
         self.wake()
 
@@ -157,7 +201,8 @@ class DuplicateService:
         with self._index_lock:
             if self._hashes is None:
                 self._hashes, self._buckets = {}, [{} for _ in range(8)]
-                rows = self.db.query("SELECT id, phash FROM assets WHERE phash IS NOT NULL AND phash != ''")
+                rows = self.db.query(
+                    "SELECT id, phash FROM assets WHERE kind = 'image' AND phash IS NOT NULL AND phash != ''")
                 for row in rows:
                     number = int(row["phash"], 16)
                     self._hashes[row["id"]] = number
@@ -177,6 +222,9 @@ class DuplicateService:
         """Beim Import sofort hashen und auf ein sehr ähnliches vorhandenes Foto hinweisen."""
         if not self.enabled:
             return None
+        if self.db.one("SELECT kind FROM assets WHERE id = ?", (asset_id,))["kind"] != "image":
+            self.wake()  # Videos rechnet der Hintergrund (ffmpeg)
+            return None
         value = self.hash_asset(asset_id)
         match = self.similar_to(asset_id, value) if value is not None else None
         if match is None:
@@ -187,7 +235,9 @@ class DuplicateService:
     def status(self) -> dict:
         row = self.db.one(
             """SELECT COALESCE(SUM(kind = 'image'), 0) AS images,
-                      COALESCE(SUM(kind = 'image' AND phash IS NOT NULL), 0) AS hashed
+                      COALESCE(SUM(kind = 'image' AND phash IS NOT NULL), 0) AS hashed,
+                      COALESCE(SUM(kind = 'video'), 0) AS videos,
+                      COALESCE(SUM(kind = 'video' AND vhash IS NOT NULL), 0) AS videos_hashed
                FROM assets WHERE deleted_at IS NULL""")
         return {"enabled": self.enabled, **dict(row)}
 
@@ -213,19 +263,45 @@ class DuplicateService:
             """SELECT id, phash, taken_ts FROM assets
                WHERE deleted_at IS NULL AND kind = 'image' AND phash IS NOT NULL AND phash != ''
                ORDER BY taken_ts, id""")
-        if len(rows) < 2:
-            return {"duplicates": [], "series": []}
-        ids = np.array([r["id"] for r in rows], dtype=np.int64)
-        hashes = np.array([int(r["phash"], 16) for r in rows], dtype=np.uint64)
-        times = np.array([r["taken_ts"] for r in rows], dtype=np.int64)
         ignored = {(r["a"], r["b"]) for r in self.db.query("SELECT a, b FROM duplicate_ignores")}
 
         def allowed(a: int, b: int) -> bool:
             return (min(a, b), max(a, b)) not in ignored
 
+        same = _UnionFind()
+        series = _UnionFind()
+        if len(rows) >= 2:
+            self._image_groups(rows, allowed, same, series)
+        self._video_groups(allowed, same)
+
+        duplicate_groups = same.groups()
+        series_groups = [g for g in series.groups() if len({same.find(x) for x in g}) > 1]
+        details = self._details({x for g in duplicate_groups + series_groups for x in g})
+        return {
+            "duplicates": self._describe(duplicate_groups, details, "duplicate"),
+            "series": self._describe(series_groups, details, "series"),
+        }
+
+    def _video_groups(self, allowed, same: "_UnionFind"):
+        rows = self.db.query(
+            """SELECT id, vhash, duration FROM assets
+               WHERE deleted_at IS NULL AND kind = 'video' AND vhash IS NOT NULL AND vhash != '' AND duration > 0
+               ORDER BY duration, id""")
+        videos = [(r["id"], r["duration"], *(int(h, 16) for h in r["vhash"].split(":"))) for r in rows]
+        for i, (a, length, start, middle) in enumerate(videos):
+            for b, other_length, other_start, other_middle in videos[i + 1:]:
+                if not same_length(length, other_length):
+                    break
+                if (start ^ other_start).bit_count() <= self.duplicate_bits \
+                        and (middle ^ other_middle).bit_count() <= self.duplicate_bits and allowed(a, b):
+                    same.union(a, b)
+
+    def _image_groups(self, rows, allowed, same: "_UnionFind", series: "_UnionFind"):
+        ids = np.array([r["id"] for r in rows], dtype=np.int64)
+        hashes = np.array([int(r["phash"], 16) for r in rows], dtype=np.uint64)
+        times = np.array([r["taken_ts"] for r in rows], dtype=np.int64)
         # Doppelte: bei Abstand ≤ 7 ist mindestens eines der 8 Bytes identisch (Schubfachprinzip),
         # darum ist duplicate_bits auf 7 begrenzt – sonst würden Paare durch diese Vorauswahl fallen
-        same = _UnionFind()
         for band in range(8):
             keys = ((hashes >> np.uint64(8 * band)) & np.uint64(0xFF)).astype(np.int64)
             order = np.argsort(keys, kind="stable")
@@ -242,7 +318,6 @@ class DuplicateService:
                             same.union(a, b)
 
         # Serien: zeitlich benachbart und ähnlich (Fotos sind nach Zeit sortiert)
-        series = _UnionFind()
         for i in range(len(ids)):
             j = i + 1
             while j < len(ids) and times[j] - times[i] <= SERIES_SECONDS:
@@ -252,20 +327,13 @@ class DuplicateService:
                     series.union(a, b)
                 j += 1
 
-        duplicate_groups = same.groups()
-        series_groups = [g for g in series.groups() if len({same.find(x) for x in g}) > 1]
-        details = self._details({x for g in duplicate_groups + series_groups for x in g})
-        return {
-            "duplicates": self._describe(duplicate_groups, details, "duplicate"),
-            "series": self._describe(series_groups, details, "series"),
-        }
-
     def _details(self, asset_ids: set[int]) -> dict[int, dict]:
         if not asset_ids:
             return {}
         marks = ",".join("?" * len(asset_ids))
         rows = self.db.query(
-            f"""SELECT a.id, a.taken_ts, a.width, a.height, a.rev, a.size, a.path, a.date_source, a.camera,
+            f"""SELECT a.id, a.kind, a.duration, a.taken_ts, a.width, a.height, a.rev, a.size, a.path,
+                       a.date_source, a.camera,
                        a.lat IS NOT NULL AS has_location,
                        (SELECT COUNT(*) FROM asset_tags WHERE asset_id = a.id) AS tags,
                        (SELECT COUNT(*) FROM asset_persons WHERE asset_id = a.id) AS persons

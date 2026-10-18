@@ -777,7 +777,7 @@
     <header class="topbar">
       <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Doppelte Fotos</strong>
+        <strong class="title">Doppelte Fotos und Videos</strong>
         <span class="sub">Gelöschte Fotos landen im Papierkorb</span>
       </div>
       <span class="grow"></span>
@@ -841,7 +841,7 @@
           </button>
         {/if}
         {#if canDelete}
-          <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos"><Icon name="duplicate" /></button>
+          <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos und Videos"><Icon name="duplicate" /></button>
           <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – Dateien nach Größe"><Icon name="storage" /></button>
           {#if isAdmin && info?.delete_requests}
             <button class="icon trash" onclick={() => setView('proposals')} title="Löschvorschläge der Familie">

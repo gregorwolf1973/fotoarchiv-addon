@@ -276,7 +276,9 @@ Jedes Foto wird einmal auf die richtige Lage geprüft.
 
 Dateien mit gleicher MD5-Prüfsumme nimmt das Add-on gar nicht erst auf. Dieselbe Aufnahme gibt es aber oft in mehreren Fassungen: als WhatsApp-Kopie, verkleinert, als PNG oder nachbearbeitet. Dafür berechnet das Add-on im Hintergrund für jedes Foto einen **Wahrnehmungs-Hash**. Das ist ein Fingerabdruck der groben Bildstruktur, den Verkleinern, Neukomprimieren oder ein anderes Format kaum verändert. Das geht schnell, auf dem Raspberry Pi 5 dauert es wenige Millisekunden pro Foto.
 
-Über das Symbol **Doppelte Fotos** oben rechts (neben dem Papierkorb) gibt es zwei Listen:
+**Videos** gelten als doppelt, wenn sie gleich lang sind (±1 s bzw. 2 %) und zwei Standbilder zueinander passen: das Vorschaubild bei 1 s und ein Bild aus der Mitte. So werden verkleinerte Kopien aus Google Fotos oder WhatsApp gefunden, auch mit anderem Datum, aber keine Clips derselben Szene, die kurz nacheinander gedreht wurden. Dafür holt ffmpeg einmal pro Video ein Bild aus der Mitte; das läuft nach den Fotos im Hintergrund. Videos kommen nur in die Liste **Doppelt**, nie in **Serien**.
+
+Über das Symbol **Doppelte Fotos und Videos** oben rechts (neben dem Papierkorb) gibt es zwei Listen:
 
 - **Doppelt:** gleiches Motiv, egal wann. Vorgeschlagen wird die Fassung mit der höchsten Auflösung, danach die mit dem verlässlichsten Datum, den meisten Metadaten und der größten Datei.
 - **Serien:** sehr ähnliche Fotos, die innerhalb von 30 Sekunden aufgenommen wurden, etwa mehrere Auslösungen hintereinander. Vorgeschlagen wird die größte Datei, weil sie meist die schärfste ist. Serien bitte immer selbst ansehen.

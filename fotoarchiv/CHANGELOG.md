@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58
+
+- **Doppelte Videos:** Die Ansicht *Doppelte Fotos und Videos* findet jetzt auch Videos, die es zusätzlich als verkleinerte Kopie gibt, z. B. aus Google Fotos (»Speicherplatz sparen«) oder WhatsApp, auch mit anderem Datum. Doppelt heißt: gleich lang (±1 s bzw. 2 %), und zwei Standbilder passen, bei 1 s und aus der Mitte. Das Vorschaubild allein reicht nicht, weil kurz nacheinander gedrehte Clips derselben Szene gleich beginnen. Vorgeschlagen wird die höhere Auflösung, bei gleicher Auflösung die größere Datei. Die Analyse läuft nach den Fotos im Hintergrund, eine ffmpeg-Abfrage pro Video
+
 ## 0.57
 
 - **Manuell gedrehte Fotos bleiben so:** Was jemand von Hand dreht, prüft die Bilderkennung nicht mehr und dreht es auch nicht zurück. Bekannt sind alle Drehungen ab jetzt; von früher nur die Mehrfach-Drehungen, die noch im Aufgabenverlauf stehen
