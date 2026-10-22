@@ -21,6 +21,8 @@ log = logging.getLogger(__name__)
 
 JOIN_THRESHOLD = 0.5    # Kosinus-Ähnlichkeit zur Gruppenmitte, ab der ein Gesicht dazugehört
 CARRY_THRESHOLD = 0.6   # erneuter Scan (z. B. nach Drehen): bisherige Zuordnung übernehmen
+SUGGEST_THRESHOLD = 0.35  # ab hier "Ist das Person X?" vorschlagen – darüber ordnet learn() selbst zu
+COMPARE_THRESHOLD = 0.55  # unbenannte Gruppen untereinander vereinen: etwas strenger, gegen Ketten
 DECODE_SIZE = 1280      # längste Bildseite für die Erkennung
 CROP_SIZE = 160
 BATCH = 16
@@ -241,7 +243,9 @@ class FaceService:
                 if target not in self._groups:
                     continue
                 refused = conn.execute("SELECT 1 FROM faces WHERE group_id = ? AND rejected_group = ? LIMIT 1",
-                                       (group_id, target)).fetchone()
+                                       (group_id, target)).fetchone() or conn.execute(
+                    "SELECT 1 FROM group_refusals WHERE group_id = ? AND person_id = ?",
+                    (group_id, self._groups[target]["person_id"])).fetchone()
                 if refused:
                     continue  # "nicht diese Person" gilt weiter
                 self._merge(conn, group_id, target)
@@ -249,6 +253,87 @@ class FaceService:
         if merged:
             self.db.bump()
         return merged
+
+    def _person_centroids(self) -> tuple[list[int], np.ndarray]:
+        """Je benannter Person die Mitte aller ihrer Gesichter, normiert."""
+        sums: dict[int, np.ndarray] = {}
+        for group in self._groups.values():
+            if group["person_id"]:
+                sums[group["person_id"]] = sums.get(group["person_id"], 0) + group["sum"]
+        ids = list(sums)
+        if not ids:
+            return [], np.zeros((0, 512), np.float32)
+        matrix = np.stack([sums[i] for i in ids]).astype(np.float32)
+        matrix /= np.linalg.norm(matrix, axis=1, keepdims=True) + 1e-9
+        return ids, matrix
+
+    def suggestions(self, limit: int = 150) -> list[dict]:
+        """Unbenannte Gruppen, die einer benannten Person ähneln: "Ist das X?" – ähnlichste zuerst."""
+        with self._lock:
+            person_ids, matrix = self._person_centroids()
+            if not person_ids:
+                return []
+            refused = {(r["group_id"], r["person_id"]) for r in self.db.query("SELECT group_id, person_id FROM group_refusals")}
+            result = []
+            for group_id, group in self._groups.items():
+                if group["person_id"] or group["hidden"] or group["count"] <= 0:
+                    continue
+                similarity = matrix @ (group["sum"] / (np.linalg.norm(group["sum"]) + 1e-9))
+                best = next((int(i) for i in np.argsort(-similarity) if (group_id, person_ids[int(i)]) not in refused), None)
+                if best is not None and similarity[best] >= SUGGEST_THRESHOLD:
+                    result.append({"group_id": group_id, "person_id": person_ids[best],
+                                   "similarity": round(float(similarity[best]), 3), "count": group["count"]})
+        result.sort(key=lambda r: -r["similarity"])
+        return result[:limit]
+
+    def refuse(self, group_id: int, person_id: int):
+        """Vorschlag abgelehnt: Diese Gruppe ist nicht diese Person – auch nicht beim automatischen Zuordnen."""
+        if group_id not in self._groups:
+            raise NotFound("Gruppe nicht gefunden")
+        if self.db.one("SELECT 1 FROM persons WHERE id = ?", (person_id,)) is None:
+            raise NotFound("Person nicht gefunden")
+        self.db.execute("INSERT OR IGNORE INTO group_refusals (group_id, person_id) VALUES (?, ?)", (group_id, person_id))
+
+    def compare(self) -> dict:
+        """Alle Gesichter neu vergleichen: ähnliche unbenannte Gruppen vereinen, dann mit den Personen abgleichen."""
+        merged = 0
+        with self._lock, self.db.transaction() as conn:
+            ids = [gid for gid, g in self._groups.items() if not g["person_id"] and not g["hidden"] and g["count"] > 0]
+            if len(ids) > 1:
+                matrix = np.stack([self._groups[g]["sum"] for g in ids]).astype(np.float32)
+                matrix /= np.linalg.norm(matrix, axis=1, keepdims=True) + 1e-9
+                forbidden = {(r["group_id"], r["rejected_group"]) for r in conn.execute(
+                    "SELECT DISTINCT group_id, rejected_group FROM faces WHERE rejected_group IS NOT NULL AND group_id IS NOT NULL")}
+                parent = list(range(len(ids)))
+
+                def root(i):
+                    while parent[i] != i:
+                        parent[i] = parent[parent[i]]
+                        i = parent[i]
+                    return i
+
+                for start in range(0, len(ids), 512):  # blockweise, damit der Speicher klein bleibt
+                    block = matrix[start:start + 512] @ matrix.T
+                    for a, b in zip(*np.nonzero(block >= COMPARE_THRESHOLD)):
+                        i, j = start + int(a), int(b)
+                        if j <= i or (ids[i], ids[j]) in forbidden or (ids[j], ids[i]) in forbidden:
+                            continue
+                        parent[root(j)] = root(i)
+                members: dict[int, list[int]] = {}
+                for i, group_id in enumerate(ids):
+                    members.setdefault(root(i), []).append(group_id)
+                for group_ids in members.values():
+                    if len(group_ids) < 2:
+                        continue
+                    target = max(group_ids, key=lambda g: self._groups[g]["count"])
+                    for group_id in group_ids:
+                        if group_id != target and group_id in self._groups:
+                            self._merge(conn, group_id, target)
+                            merged += 1
+        learned = self.learn()
+        if merged:
+            self.db.bump()
+        return {"merged": merged, "learned": learned}
 
     def _merge(self, conn, source_id: int, target_id: int):
         conn.execute("UPDATE assets SET persons_dirty = 1 WHERE id IN (SELECT asset_id FROM faces WHERE group_id = ?)",

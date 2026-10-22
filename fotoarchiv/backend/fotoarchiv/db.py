@@ -236,6 +236,14 @@ MIGRATIONS = [
     -- Videos: zwei pHashes "Standbild bei 1 s:Bild aus der Mitte", leer = nicht berechenbar
     ALTER TABLE assets ADD COLUMN vhash TEXT;
     """,
+    """
+    -- Vorschlag "Ist das Person X?" abgelehnt: gilt auch für das automatische Zuordnen
+    CREATE TABLE group_refusals (
+        group_id  INTEGER NOT NULL,
+        person_id INTEGER NOT NULL REFERENCES persons (id) ON DELETE CASCADE,
+        PRIMARY KEY (group_id, person_id)
+    );
+    """,
 ]
 
 # Für INSERT INTO assets (id, …) VALUES ((NEXT_ASSET_ID), …): größer als jede je vergebene ID

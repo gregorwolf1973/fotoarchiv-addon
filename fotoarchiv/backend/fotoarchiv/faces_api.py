@@ -21,6 +21,10 @@ class MergeRequest(BaseModel):
     target_id: int
 
 
+class RefuseRequest(BaseModel):
+    person_id: int
+
+
 def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
     def guard(action, *args):
         try:
@@ -68,6 +72,28 @@ def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
             "persons": [dict(r) for r in persons if r["count"] or r["face_id"]],
             "groups": [dict(r) for r in groups],
         }
+
+    @app.get("/api/faces/suggestions")
+    def face_suggestions():
+        """Vorschläge "Ist das X?" für unbenannte Gruppen, mit Vorschaugesicht und Namen."""
+        names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM persons")}
+        result = []
+        for row in faces.suggestions():
+            face = db.one(
+                f"""SELECT f.id FROM faces f JOIN assets a ON a.id = f.asset_id AND a.deleted_at IS NULL
+                    WHERE f.group_id = ? {BEST_FACE}""", (row["group_id"],))
+            if face and row["person_id"] in names:
+                result.append({**row, "face_id": face["id"], "name": names[row["person_id"]]})
+        return result
+
+    @app.post("/api/faces/compare")
+    def face_compare():
+        return faces.compare()
+
+    @app.post("/api/groups/{group_id}/refuse")
+    def group_refuse(group_id: int, body: RefuseRequest):
+        guard(faces.refuse, group_id, body.person_id)
+        return {"refused": True}
 
     @app.get("/api/groups/{group_id}/faces")
     def group_faces(group_id: int):

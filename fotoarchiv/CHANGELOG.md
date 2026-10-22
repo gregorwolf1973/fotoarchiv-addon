@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60
+
+- **Gesichter: Name suchen.** Ein Suchfeld oben filtert Personen und Vorschläge nach dem Namen
+- **Vorschläge „Ist das …?“:** Unbekannte Gesichtergruppen, die einer benannten Person ähneln (ab 35 %, unter der Schwelle für die automatische Zuordnung), erscheinen mit *Ja* und *Nein*. *Ja* ordnet die ganze Gruppe zu, *Nein* merkt sich die Ablehnung – auch das automatische Zuordnen hält sich daran
+- **Gesichter vergleichen:** Ein Knopf vergleicht alle unbekannten Gruppen untereinander und vereint, was sehr ähnlich ist (ab 55 %, etwas strenger als beim Einsortieren, damit sich keine Ketten verschiedener Personen bilden), und gleicht danach mit den benannten Personen ab. „Nicht diese Person“ bleibt dabei beachtet
+
 ## 0.59
 
 - **Fotos vor 1900:** Aufnahmedaten ab 1800 gelten jetzt, bisher verwarf das Archiv alles vor 1900 und nahm stattdessen das Dateidatum. Gedacht für abfotografierte Ahnenbilder; Platzhalter wie 0000 oder 1601 bleiben ungültig. Die Jahressuche reicht ebenfalls bis 1800

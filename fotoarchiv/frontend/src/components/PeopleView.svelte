@@ -1,7 +1,7 @@
 <script>
   import { api, cropUrl } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
-  import { notifyError } from '../lib/notices.svelte.js';
+  import { notify, notifyError } from '../lib/notices.svelte.js';
   import FaceStatus from './FaceStatus.svelte';
   import GroupDialog from './GroupDialog.svelte';
   import Icon from './Icon.svelte';
@@ -10,13 +10,21 @@
   let { revision, canEdit = true, onshowphotos, ontask, onchanged } = $props();
 
   let people = $state({ persons: [], groups: [] });
+  let suggestions = $state([]);
   let loaded = $state(false);
   let group = $state(null);
   let person = $state(null);
+  let query = $state('');
+  let comparing = $state(false);
+  let answering = $state(new Set());
+
+  const matches = (name) => !query.trim() || name.toLocaleLowerCase('de').includes(query.trim().toLocaleLowerCase('de'));
+  let persons = $derived(people.persons.filter((p) => matches(p.name)));
+  let shownSuggestions = $derived(suggestions.filter((s) => matches(s.name)));
 
   async function load() {
     try {
-      people = await api.people();
+      [people, suggestions] = await Promise.all([api.people(), canEdit ? api.faceSuggestions() : Promise.resolve([])]);
     } catch (e) {
       notifyError(e);
     } finally {
@@ -41,16 +49,82 @@
     load();
     onchanged();
   }
+
+  /** "Ist das X?" – Ja ordnet die ganze Gruppe der Person zu, Nein merkt sich die Ablehnung. */
+  async function answer(entry, yes) {
+    answering = new Set([...answering, entry.group_id]);
+    try {
+      if (yes) {
+        await api.nameGroup(entry.group_id, entry.name);
+      } else {
+        await api.refuseGroup(entry.group_id, entry.person_id);
+      }
+      suggestions = suggestions.filter((s) => s.group_id !== entry.group_id);
+      if (yes) changed();
+    } catch (e) {
+      notifyError(e);
+    } finally {
+      answering = new Set([...answering].filter((id) => id !== entry.group_id));
+    }
+  }
+
+  async function compare() {
+    comparing = true;
+    try {
+      const result = await api.compareFaces();
+      notify(
+        result.merged || result.learned
+          ? `${formatNumber(result.merged)} ähnliche Gruppen zusammengeführt${result.learned ? ', bekannte Personen zugeordnet' : ''}.`
+          : 'Keine weiteren Übereinstimmungen gefunden.',
+      );
+      changed();
+    } catch (e) {
+      notifyError(e);
+    } finally {
+      comparing = false;
+    }
+  }
 </script>
 
 <div class="people">
   {#if canEdit}<FaceStatus {revision} />{/if}
 
+  <div class="toolbar">
+    <input type="search" class="find" placeholder="Name suchen …" aria-label="Personen nach Namen suchen" bind:value={query} />
+    {#if canEdit}
+      <button onclick={compare} disabled={comparing} title="Alle unbekannten Gesichter erneut miteinander und mit den benannten Personen vergleichen">
+        <Icon name="face" size={18} /> {comparing ? 'Vergleiche …' : 'Gesichter vergleichen'}
+      </button>
+    {/if}
+  </div>
+
+  {#if canEdit && shownSuggestions.length}
   <section>
-    <h2>Personen <span class="count">{formatNumber(people.persons.length)}</span></h2>
-    {#if people.persons.length}
+    <h2>Vorschläge <span class="count">{formatNumber(shownSuggestions.length)}</span></h2>
+    <p class="hint">Diese Gesichter ähneln einer bekannten Person. Antippen zeigt alle Gesichter der Gruppe.</p>
+    <div class="grid">
+      {#each shownSuggestions as entry (entry.group_id)}
+        <div class="card suggestion">
+          <button class="face" onclick={() => (group = { id: entry.group_id, count: entry.count, face_id: entry.face_id })}>
+            <img class="avatar" src={cropUrl(entry.face_id)} alt="" loading="lazy" />
+          </button>
+          <span class="name">Ist das {entry.name}?</span>
+          <span class="meta">{Math.round(entry.similarity * 100)} % ähnlich · {formatNumber(entry.count)} {entry.count === 1 ? 'Gesicht' : 'Gesichter'}</span>
+          <span class="answers">
+            <button class="primary" disabled={answering.has(entry.group_id)} onclick={() => answer(entry, true)}>Ja</button>
+            <button disabled={answering.has(entry.group_id)} onclick={() => answer(entry, false)}>Nein</button>
+          </span>
+        </div>
+      {/each}
+    </div>
+  </section>
+  {/if}
+
+  <section>
+    <h2>Personen <span class="count">{formatNumber(persons.length)}</span></h2>
+    {#if persons.length}
       <div class="grid">
-        {#each people.persons as entry (entry.id)}
+        {#each persons as entry (entry.id)}
           <button class="card" onclick={() => (person = entry)}>
             {#if entry.face_id}
               <img class="avatar" src={cropUrl(entry.face_id)} alt="" loading="lazy" />
@@ -62,6 +136,8 @@
           </button>
         {/each}
       </div>
+    {:else if loaded && query.trim()}
+      <p class="empty">Keine Person mit „{query.trim()}“.</p>
     {:else if loaded}
       <p class="empty">Noch keine Personen. Benenne unten eine Gruppe unbekannter Gesichter.</p>
     {/if}
@@ -116,6 +192,39 @@
   }
   section {
     margin-top: 24px;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 16px;
+  }
+  .toolbar .find {
+    flex: 1 1 220px;
+    max-width: 360px;
+  }
+  .toolbar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .suggestion .face {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .suggestion .name {
+    white-space: normal;
+    text-align: center;
+  }
+  .answers {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .answers button {
+    min-width: 56px;
   }
   h2 {
     margin: 0 0 12px;
