@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.1
+
+- **Behoben:** 0.60 startete nicht, weil die neuen Gesichter-Endpunkte im Internetzugang keine Rechte hatten. Vorschläge, Ablehnen und Vergleichen sind jetzt Bearbeiten-Rechte
+
 ## 0.60
 
 - **Gesichter: Name suchen.** Ein Suchfeld oben filtert Personen und Vorschläge nach dem Namen
