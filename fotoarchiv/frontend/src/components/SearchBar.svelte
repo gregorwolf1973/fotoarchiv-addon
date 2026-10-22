@@ -188,7 +188,7 @@
       <label class="field">Bis<input type="date" value={filters.end} onchange={(e) => onchange({ ...filters, end: e.currentTarget.value })} /></label>
       <label class="field">
         Ganzes Jahr
-        <input type="number" min="1900" max="2100" placeholder="z. B. 2019" onchange={(e) => e.currentTarget.value && setYear(e.currentTarget.value)} />
+        <input type="number" min="1800" max="2100" placeholder="z. B. 2019" onchange={(e) => e.currentTarget.value && setYear(e.currentTarget.value)} />
       </label>
       <button class="icon small close" onclick={() => (showDates = false)} title="Schließen"><Icon name="close" size={18} /></button>
     </div>

@@ -28,6 +28,9 @@ def test_parse_date_variants():
     assert parse_date("2019:05:12 14:03:22.123+02:00") == (datetime(2019, 5, 12, 14, 3, 22), "+02:00")
     assert parse_date("2019:05:12 14:03:22+0200")[1] == "+02:00"
     assert parse_date("0000:00:00 00:00:00") is None
+    # Ahnenbilder: 19. Jahrhundert gilt, Platzhalter wie 1601 nicht
+    assert parse_date("1874:06:01 12:00:00") == (datetime(1874, 6, 1, 12, 0), None)
+    assert parse_date("1601:01:01 00:00:00") is None
     assert parse_date("    :  :     :  :  ") is None
     assert parse_date(None) is None
 

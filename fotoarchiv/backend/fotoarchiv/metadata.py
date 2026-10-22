@@ -68,6 +68,9 @@ _FILENAME_RE = re.compile(
     r"(?:(?:[ _T-]|\sat\s)?([01]\d|2[0-3])[-_.:h]?([0-5]\d)[-_.:m]?([0-5]\d)(?:\d{3})?)?(?!\d)"
 )
 _NUMBER_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
+# Ältere Jahre sind Platzhalter wie 0000 oder 1601 (Windows-Nullzeit). Ab 1800 können es echte
+# Aufnahmen sein - abfotografierte Ahnenbilder tragen ihr Jahr im EXIF.
+MIN_YEAR = 1800
 
 
 @dataclass
@@ -102,7 +105,7 @@ def parse_date(value) -> tuple[datetime, str | None] | None:
         dt = datetime(int(y), int(mo), int(d), int(h), int(mi), int(s or 0))
     except ValueError:
         return None
-    if dt.year < 1900:
+    if dt.year < MIN_YEAR:
         return None
     if off and off != "Z" and ":" not in off:
         off = f"{off[:3]}:{off[3:]}"

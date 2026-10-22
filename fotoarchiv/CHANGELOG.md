@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59
+
+- **Fotos vor 1900:** Aufnahmedaten ab 1800 gelten jetzt, bisher verwarf das Archiv alles vor 1900 und nahm stattdessen das Dateidatum. Gedacht für abfotografierte Ahnenbilder; Platzhalter wie 0000 oder 1601 bleiben ungültig. Die Jahressuche reicht ebenfalls bis 1800
+
 ## 0.58
 
 - **Doppelte Videos:** Die Ansicht *Doppelte Fotos und Videos* findet jetzt auch Videos, die es zusätzlich als verkleinerte Kopie gibt, z. B. aus Google Fotos (»Speicherplatz sparen«) oder WhatsApp, auch mit anderem Datum. Doppelt heißt: gleich lang (±1 s bzw. 2 %), und zwei Standbilder passen, bei 1 s und aus der Mitte. Das Vorschaubild allein reicht nicht, weil kurz nacheinander gedrehte Clips derselben Szene gleich beginnen. Vorgeschlagen wird die höhere Auflösung, bei gleicher Auflösung die größere Datei. Die Analyse läuft nach den Fotos im Hintergrund, eine ffmpeg-Abfrage pro Video
