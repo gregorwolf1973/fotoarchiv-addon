@@ -21,6 +21,7 @@
   <img src="https://img.shields.io/badge/Raspberry%20Pi%205-tested-C51A4A?logo=raspberrypi&amp;logoColor=white" alt="Raspberry Pi 5">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
   <a href="https://buymeacoffee.com/gregorwolf1973"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&amp;logoColor=black" alt="Buy me a coffee"></a>
+  <a href="https://liberapay.com/Gregor_Wolf/donate"><img src="https://img.shields.io/badge/Liberapay-donate-F6C915?logo=liberapay&amp;logoColor=black" alt="Donate using Liberapay"></a>
 </p>
 
 ---
@@ -85,7 +86,7 @@ Full documentation (German): **[DOCS.md](fotoarchiv/DOCS.md)**
 
 If Fotoarchiv saves your family photos, a coffee keeps the development going ☕
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/gregorwolf1973)
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/gregorwolf1973) [![Donate using Liberapay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/Gregor_Wolf/donate)
 
 Found a bug or have an idea? Please open an [issue](https://github.com/gregorwolf1973/fotoarchiv-addon/issues). A ⭐ helps others find the project.
 
