@@ -3,6 +3,7 @@
   import { formatNumber } from '../lib/format.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import FaceStatus from './FaceStatus.svelte';
+  import FotoLupe from './FotoLupe.svelte';
   import GroupDialog from './GroupDialog.svelte';
   import Icon from './Icon.svelte';
   import PersonDialog from './PersonDialog.svelte';
@@ -17,6 +18,7 @@
   let query = $state('');
   let comparing = $state(false);
   let answering = $state(new Set());
+  let lupe = $state(null); // { entry, faces, index }: ganze Fotos eines Vorschlags, vergrößerbar
 
   const matches = (name) => !query.trim() || name.toLocaleLowerCase('de').includes(query.trim().toLocaleLowerCase('de'));
   let persons = $derived(people.persons.filter((p) => matches(p.name)));
@@ -68,6 +70,25 @@
     }
   }
 
+  /** Ganze Fotos der vorgeschlagenen Gruppe zeigen, beginnend mit dem Vorschaugesicht. */
+  async function openLupe(entry) {
+    try {
+      const list = await api.groupFaces(entry.group_id);
+      const faces = list.length ? list : [entry.face];
+      lupe = { entry, faces, index: Math.max(0, faces.findIndex((f) => f.id === entry.face_id)) };
+    } catch (e) {
+      notifyError(e);
+    }
+  }
+
+  async function answerInLupe(yes) {
+    const { entry } = lupe;
+    lupe = null;
+    await answer(entry, yes);
+  }
+
+  const personFace = (personId) => people.persons.find((p) => p.id === personId)?.face_id;
+
   async function compare() {
     comparing = true;
     try {
@@ -101,13 +122,16 @@
   {#if canEdit && shownSuggestions.length}
   <section>
     <h2>Vorschläge <span class="count">{formatNumber(shownSuggestions.length)}</span></h2>
-    <p class="hint">Diese Gesichter ähneln einer bekannten Person. Antippen zeigt alle Gesichter der Gruppe.</p>
+    <p class="hint">Diese Gesichter ähneln einer bekannten Person. Antippen zeigt alle Gesichter der Gruppe, die Lupe die ganzen Fotos zum Vergrößern.</p>
     <div class="grid">
       {#each shownSuggestions as entry (entry.group_id)}
         <div class="card suggestion">
-          <button class="face" onclick={() => (group = { id: entry.group_id, count: entry.count, face_id: entry.face_id })}>
-            <img class="avatar" src={cropUrl(entry.face_id)} alt="" loading="lazy" />
-          </button>
+          <span class="pic">
+            <button class="face" onclick={() => (group = { id: entry.group_id, count: entry.count, face_id: entry.face_id })}>
+              <img class="avatar" src={cropUrl(entry.face_id)} alt="" loading="lazy" />
+            </button>
+            <button class="icon zoom" onclick={() => openLupe(entry)} title="Ganze Fotos vergrößert ansehen"><Icon name="zoom" size={18} /></button>
+          </span>
           <span class="name">Ist das {entry.name}?</span>
           <span class="meta">{Math.round(entry.similarity * 100)} % ähnlich · {formatNumber(entry.count)} {entry.count === 1 ? 'Gesicht' : 'Gesichter'}</span>
           <span class="answers">
@@ -164,6 +188,20 @@
   {/if}
 </div>
 
+{#if lupe}
+  <FotoLupe faces={lupe.faces} index={lupe.index} onclose={() => (lupe = null)}>
+    {#snippet heading()}
+      {#if personFace(lupe.entry.person_id)}
+        <img class="ref" src={cropUrl(personFace(lupe.entry.person_id))} alt="" title="{lupe.entry.name} auf einem bestätigten Foto" />
+      {/if}
+      <strong>Ist das {lupe.entry.name}?</strong>
+    {/snippet}
+    {#snippet actions()}
+      <button class="primary" disabled={answering.has(lupe.entry.group_id)} onclick={() => answerInLupe(true)}>Ja, das ist {lupe.entry.name}</button>
+      <button disabled={answering.has(lupe.entry.group_id)} onclick={() => answerInLupe(false)}>Nein</button>
+    {/snippet}
+  </FotoLupe>
+{/if}
 {#if group}
   <GroupDialog {group} persons={people.persons} onclose={() => (group = null)} onchanged={changed} />
 {/if}
@@ -213,6 +251,28 @@
     padding: 0;
     border: 0;
     background: transparent;
+  }
+  .pic {
+    position: relative;
+  }
+  .zoom {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 32px;
+    height: 32px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  }
+  .ref {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #fff;
   }
   .suggestion .name {
     white-space: normal;

@@ -36,7 +36,7 @@ def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
 
     def face_rows(where: str, params) -> list[dict]:
         rows = db.query(
-            f"""SELECT f.id, f.asset_id, f.confirmed, a.taken_ts, a.rev FROM faces f
+            f"""SELECT f.id, f.asset_id, f.confirmed, f.x, f.y, f.w, f.h, a.taken_ts, a.rev, a.mime, a.size FROM faces f
                 JOIN assets a ON a.id = f.asset_id AND a.deleted_at IS NULL
                 LEFT JOIN face_groups g ON g.id = f.group_id
                 WHERE {where} ORDER BY a.taken_ts DESC LIMIT 2000""",
@@ -75,15 +75,17 @@ def register(app: FastAPI, db: Database, faces: FaceService, tasks: TaskRunner):
 
     @app.get("/api/faces/suggestions")
     def face_suggestions():
-        """Vorschläge "Ist das X?" für unbenannte Gruppen, mit Vorschaugesicht und Namen."""
+        """Vorschläge "Ist das X?" für unbenannte Gruppen, mit Vorschaugesicht und Namen.
+        face enthält Foto und Lage des Vorschaugesichts, damit man das ganze Foto vergrößert ansehen kann."""
         names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM persons")}
         result = []
         for row in faces.suggestions():
             face = db.one(
-                f"""SELECT f.id FROM faces f JOIN assets a ON a.id = f.asset_id AND a.deleted_at IS NULL
+                f"""SELECT f.id, f.asset_id, f.confirmed, f.x, f.y, f.w, f.h, a.taken_ts, a.rev, a.mime, a.size
+                    FROM faces f JOIN assets a ON a.id = f.asset_id AND a.deleted_at IS NULL
                     WHERE f.group_id = ? {BEST_FACE}""", (row["group_id"],))
             if face and row["person_id"] in names:
-                result.append({**row, "face_id": face["id"], "name": names[row["person_id"]]})
+                result.append({**row, "face_id": face["id"], "face": dict(face), "name": names[row["person_id"]]})
         return result
 
     @app.post("/api/faces/compare")

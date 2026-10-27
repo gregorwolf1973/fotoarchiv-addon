@@ -2,6 +2,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { api, cropUrl, thumbUrl } from '../lib/api.js';
   import { notifyError } from '../lib/notices.svelte.js';
+  import FotoLupe from './FotoLupe.svelte';
   import Icon from './Icon.svelte';
 
   // group: { id, count } aus /api/people; persons: bekannte Personen für die Namensvorschläge
@@ -15,6 +16,7 @@
   let name = $state('');
   let busy = $state(false);
   let showPhotos = $state(readPhotosSetting());
+  let lupe = $state(null); // Index des Gesichts, dessen ganzes Foto vergrößert offen ist
   const excluded = new SvelteSet();
 
   // Die Ansicht wird gemerkt: wer Gesichter zuordnet, geht meist mehrere Gruppen hintereinander durch
@@ -74,7 +76,8 @@
   const toggle = (id) => (excluded.has(id) ? excluded.delete(id) : excluded.add(id));
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
+<!-- Escape schließt zuerst die Fotolupe, erst dann den Dialog -->
+<svelte:window onkeydown={(e) => e.key === 'Escape' && lupe === null && onclose()} />
 
 <div class="modal-backdrop" onclick={(e) => e.target === e.currentTarget && onclose()} role="presentation">
   <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="group-title">
@@ -89,10 +92,11 @@
       </header>
       <p>
         {faces.length} ähnliche Gesichter. Tippe Gesichter an, die <strong>nicht</strong> zu dieser Person gehören.
-        Der Name wird in alle übrigen Fotos geschrieben.
+        Die Lupe zeigt das ganze Foto zum Vergrößern. Der Name wird in alle übrigen Fotos geschrieben.
       </p>
       <div class="faces" class:photos={showPhotos}>
-        {#each faces as face (face.id)}
+        {#each faces as face, n (face.id)}
+          <div class="tile">
           <button type="button" class="face" class:excluded={excluded.has(face.id)} onclick={() => toggle(face.id)}
             title={dateFormat.format(face.taken_ts * 1000)}>
             {#if showPhotos}
@@ -105,6 +109,8 @@
             {/if}
             {#if excluded.has(face.id)}<span class="mark"><Icon name="close" size={28} /></span>{/if}
           </button>
+          <button type="button" class="icon zoom" onclick={() => (lupe = n)} title="Ganzes Foto vergrößern"><Icon name="zoom" size={18} /></button>
+          </div>
         {/each}
       </div>
       <label class="field">
@@ -128,6 +134,20 @@
   </div>
 </div>
 
+{#if lupe !== null}
+  <FotoLupe {faces} index={lupe} onclose={() => (lupe = null)}>
+    {#snippet heading()}<strong>Wer ist das?</strong>{/snippet}
+    {#snippet actions(face)}
+      {#if excluded.has(face.id)}
+        <span class="out">Gehört nicht dazu</span>
+        <button type="button" onclick={() => toggle(face.id)}>Doch dazu</button>
+      {:else}
+        <button type="button" onclick={() => toggle(face.id)}><Icon name="close" size={18} /> Gehört nicht dazu</button>
+      {/if}
+    {/snippet}
+  </FotoLupe>
+{/if}
+
 <style>
   .wide {
     width: min(760px, 100%);
@@ -139,8 +159,12 @@
     max-height: 45vh;
     overflow-y: auto;
   }
+  .tile {
+    position: relative;
+  }
   .face {
     position: relative;
+    width: 100%;
     aspect-ratio: 1;
     min-height: 0;
     padding: 0;
@@ -194,6 +218,21 @@
     color: #fff;
     font-size: 0.72rem;
     font-variant-numeric: tabular-nums;
+  }
+  .zoom {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 30px;
+    height: 30px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+  }
+  .out {
+    color: #ff8a80;
   }
   .on {
     color: var(--accent);

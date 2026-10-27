@@ -211,9 +211,10 @@ Nach dem Start durchsucht das Add-on alle Fotos nach Gesichtern, die neuesten zu
 **So gehst du vor:**
 
 1. Unter **Personen → Unbekannte Gesichter** stehen Gruppen ähnlicher Gesichter, die größten zuerst.
-2. Gruppe antippen, falsche Gesichter abwählen, Namen eingeben und speichern. Der Name wird als Person in alle Fotos der Gruppe geschrieben. Erkennst du jemanden am Gesicht allein nicht, zeigt das Bilder-Symbol oben im Fenster die **ganzen Fotos** – mit Aufnahmedatum und dem gemeinten Gesicht klein in der Ecke. Die Einstellung wird gemerkt.
+2. Gruppe antippen, falsche Gesichter abwählen, Namen eingeben und speichern. Der Name wird als Person in alle Fotos der Gruppe geschrieben. Erkennst du jemanden am Gesicht allein nicht, zeigt das Bilder-Symbol oben im Fenster die **ganzen Fotos** – mit Aufnahmedatum und dem gemeinten Gesicht klein in der Ecke. Die Einstellung wird gemerkt. Die **Lupe** auf jedem Gesicht öffnet das ganze Foto groß: zoomen mit Mausrad, zwei Fingern oder Doppeltippen, das Gesicht ist gelb markiert, ← und → blättern durch die Gruppe.
 3. Neue Fotos dieser Person werden ab jetzt automatisch zugeordnet und ebenfalls beschriftet (Markierung „auto“). Auch weitere, bereits vorhandene Gruppen, die der Person deutlich ähneln, werden ihr zugeordnet.
 4. Fremde Personen lassen sich mit **Ausblenden** aus den Vorschlägen nehmen.
+5. Unter **Vorschläge** fragt das Archiv „Ist das …?“. Die Lupe am Gesicht zeigt alle Fotos der Gruppe vergrößerbar, oben zum Vergleich ein Gesicht der vorgeschlagenen Person; *Ja* und *Nein* stehen direkt darunter.
 
 **Korrigieren:**
 

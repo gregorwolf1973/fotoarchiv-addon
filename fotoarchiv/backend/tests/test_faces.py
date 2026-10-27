@@ -173,6 +173,8 @@ def test_rename_person_via_api(settings, make_jpeg):
         people = client.get("/api/people").json()
         group = people["groups"][0]
         assert group["count"] == 2 and client.get(f"/api/faces/{group['face_id']}/crop").status_code == 200
+        shown = client.get(f"/api/groups/{group['id']}/faces").json()[0]
+        assert {"x", "y", "w", "h", "rev", "mime"} <= shown.keys()  # für die Fotolupe: ganzes Foto mit markiertem Gesicht
         person_id = client.post(f"/api/groups/{group['id']}/name", json={"name": "Obama"}).json()["person_id"]
         while faces.work_once():
             pass

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61
+
+- **Gesichter: ganzes Foto vergrößern.** Bei den Vorschlägen „Ist das …?“ und im Fenster *Wer ist das?* hat jedes Gesicht eine Lupe. Sie öffnet das ganze Foto bildschirmfüllend, zum Zoomen mit Mausrad, zwei Fingern, Doppeltippen oder +/−; das Gesicht ist gelb markiert, ein Knopf zoomt direkt darauf, beim Hineinzoomen lädt das Original nach. ← und → (oder Wischen) blättern durch alle Fotos der Gruppe. Bei Vorschlägen steht zum Vergleich ein Gesicht der vorgeschlagenen Person oben, *Ja* und *Nein* direkt darunter; in *Wer ist das?* lässt sich ein Gesicht dort als „gehört nicht dazu“ markieren
+
 ## 0.60.1
 
 - **Behoben:** 0.60 startete nicht, weil die neuen Gesichter-Endpunkte im Internetzugang keine Rechte hatten. Vorschläge, Ablehnen und Vergleichen sind jetzt Bearbeiten-Rechte
