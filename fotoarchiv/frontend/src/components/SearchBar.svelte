@@ -1,5 +1,7 @@
 <script>
+  import { api } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { matchAll, splitPlus } from '../lib/suche.js';
   import Icon from './Icon.svelte';
 
   // filters: { tags: [{id, name}], persons: [{id, name}], start, end, q, ai, auto: [{id: name, name}] }
@@ -32,25 +34,57 @@
 
   const browsing = $derived(!text.trim()); // leeres Feld: alle Schlagworte zur Auswahl
 
+  // Mit gesetzten Filtern zählen nur noch die passenden Fotos: dann zeigt die Liste, womit sich die
+  // Auswahl weiter eingrenzen lässt (alle Filter gelten zusammen), samt Zahl der verbleibenden Fotos.
+  let within = $state(null); // { tags: {id: n}, persons: {id: n}, auto: {name: n}, total }
+  const labelFilters = $derived(filters.tags.length + filters.persons.length + (filters.auto?.length ?? 0) > 0);
+  $effect(() => {
+    const current = filters;
+    if (!hasFilters) return void (within = null); // sonst die alten Zahlen zeigen, bis die neuen da sind
+    let cancelled = false;
+    api.labelCounts(current).then(
+      (c) => !cancelled && (within = c),
+      () => {}, // ohne Zahlen geht es auch (z. B. Bildsuche noch nicht bereit)
+    );
+    return () => (cancelled = true);
+  });
+  /** Liste auf das beschränken, was unter den aktuellen Filtern vorkommt, mit den Zahlen dort. */
+  function narrowed(list, kind) {
+    if (!within) return list;
+    const counts = within[kind] ?? {};
+    return list.filter((l) => counts[String(l.id)]).map((l) => ({ ...l, count: counts[String(l.id)] }));
+  }
+  const lists = $derived([
+    ['persons', narrowed(labels.persons, 'persons')],
+    ['tags', narrowed(labels.tags, 'tags')],
+    ['auto', narrowed((labels.auto ?? []).map((l) => ({ ...l, id: l.name })), 'auto')],
+  ]);
+  const plusParts = $derived(splitPlus(text));
+
   const suggestions = $derived.by(() => {
     const needle = text.trim().toLocaleLowerCase();
     const byCount = (a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name, 'de');
-    const auto = (labels.auto ?? []).map((l) => ({ ...l, id: l.name }));
+    const [[, persons], [, tags], [, auto]] = lists;
+    const unchosen = (list, kind) => list.filter((l) => !filters[kind].some((f) => f.id === l.id));
+    if (plusParts) {
+      // „Fisch + Angeln“: alle Teile auf einmal als Filter
+      const found = matchAll(plusParts, lists.map(([kind, list]) => [kind, unchosen(list, kind)]));
+      const q = { kind: 'q', name: text.trim() };
+      return found ? [{ kind: 'multi', name: found.map((f) => f.name).join(' + '), labels: found }, q] : [q];
+    }
     if (!needle) {
       const unused = (list, kind) =>
-        list
-          .filter((l) => !filters[kind].some((f) => f.id === l.id))
+        unchosen(list, kind)
           .sort(byCount)
           .map((l) => ({ kind, id: l.id, name: l.name, count: l.count }));
-      return [...unused(labels.tags, 'tags'), ...unused(auto, 'auto')];
+      return [...(labelFilters ? unused(persons, 'persons') : []), ...unused(tags, 'tags'), ...unused(auto, 'auto')];
     }
     const pick = (list, kind) =>
-      list
+      unchosen(list, kind)
         .filter((l) => l.name.toLocaleLowerCase().includes(needle))
-        .filter((l) => !filters[kind].some((f) => f.id === l.id))
         .slice(0, 6)
         .map((l) => ({ kind, id: l.id, name: l.name, count: l.count }));
-    const found = [...pick(labels.persons, 'persons'), ...pick(labels.tags, 'tags'), ...pick(auto, 'auto')];
+    const found = [...pick(persons, 'persons'), ...pick(tags, 'tags'), ...pick(auto, 'auto')];
     const q = { kind: 'q', name: text.trim() };
     const ai = smart ? [{ kind: 'ai', name: text.trim() }] : [];
     // Passt der Text zu keinem Namen, ist er meist eine Beschreibung: dann zuerst die Bildsuche
@@ -59,11 +93,16 @@
   const firstAuto = $derived(browsing ? suggestions.findIndex((s) => s.kind === 'auto') : -1);
 
   function choose(suggestion) {
+    const add = (next, l) => ({ ...next, [l.kind]: [...next[l.kind], { id: l.id, name: l.name }] });
     if (suggestion.kind === 'q' || suggestion.kind === 'ai') onchange({ ...filters, [suggestion.kind]: suggestion.name });
-    else onchange({ ...filters, [suggestion.kind]: [...filters[suggestion.kind], { id: suggestion.id, name: suggestion.name }] });
+    else if (suggestion.kind === 'multi') onchange(suggestion.labels.reduce(add, filters));
+    else onchange(add(filters, suggestion));
     text = '';
-    open = false;
     active = -1;
+    // Nach einem Schlagwort bzw. einer Person offen bleiben, damit man gleich das nächste dazunehmen kann
+    open = suggestion.kind !== 'q' && suggestion.kind !== 'ai';
+    if (open) input?.focus();
+    else input?.blur();
   }
 
   function keydown(e) {
@@ -78,7 +117,7 @@
     } else if (e.key === 'Enter' && suggestions.length) {
       // Genau ein passendes Label: direkt als Filter nehmen, sonst die gewählte Zeile
       const exact = suggestions.find(
-        (s) => s.kind !== 'q' && s.kind !== 'ai' && s.name.toLocaleLowerCase() === text.trim().toLocaleLowerCase(),
+        (s) => s.kind !== 'q' && s.kind !== 'ai' && s.kind !== 'multi' && s.name.toLocaleLowerCase() === text.trim().toLocaleLowerCase(),
       );
       choose(active === 0 && exact ? exact : suggestions[active]);
     } else if (e.key === 'Escape') {
@@ -100,7 +139,7 @@
     else if (filters.persons.length) onchange({ ...filters, persons: filters.persons.slice(0, -1) });
   }
 
-  const ICONS = { q: 'search', ai: 'sparkle', persons: 'person', tags: 'tag', auto: 'sparkle' };
+  const ICONS = { q: 'search', ai: 'sparkle', persons: 'person', tags: 'tag', auto: 'sparkle', multi: 'plus' };
 
   const without = (kind, id) => onchange({ ...filters, [kind]: filters[kind].filter((f) => f.id !== id) });
 
@@ -142,7 +181,7 @@
       bind:this={input}
       bind:value={text}
       type="text"
-      placeholder={hasFilters ? '' : smart ? 'Suchen: Personen, Schlagworte, Bildinhalt …' : 'Suchen: Personen, Schlagworte, Dateiname …'}
+      placeholder={hasFilters ? 'Weiteren Filter hinzufügen …' : smart ? 'Suchen: Personen, Schlagworte, Bildinhalt … (mehrere: Fisch + Angeln)' : 'Suchen: Personen, Schlagworte, Dateiname … (mehrere: Fisch + Angeln)'}
       onkeydown={keydown}
       oninput={() => ((open = true), (active = text.trim() ? 0 : -1))}
       onfocus={() => ((open = true), (active = text.trim() ? 0 : -1))}
@@ -162,14 +201,16 @@
 
   {#if open && suggestions.length}
     <ul class="suggestions" class:browse={browsing} role="listbox">
-      {#if browsing && firstAuto !== 0}<li class="heading">Schlagworte</li>{/if}
+      {#if hasFilters && within}
+        <li class="heading narrow">Zusammen mit der Auswahl ({formatNumber(within.total)} Fotos) – jeder weitere Filter grenzt ein</li>
+      {:else if browsing && firstAuto !== 0}<li class="heading">Schlagworte</li>{/if}
       {#each suggestions as s, i}
         {#if i === firstAuto}<li class="heading" title="Noch nicht in den Fotos gespeichert – übernehmen oder ablehnen">Erkannt (Vorschläge)</li>{/if}
         <li role="option" aria-selected={i === active}>
           <button class:active={i === active} onmousedown={(e) => (e.preventDefault(), choose(s))}>
             <Icon name={ICONS[s.kind]} size={18} />
             <span class="name">
-              {s.kind === 'q' ? `Name, Schlagwort oder Kamera enthält „${s.name}“` : s.kind === 'ai' ? `Fotos von „${s.name}“` : s.name}
+              {s.kind === 'q' ? `Name, Schlagwort oder Kamera enthält „${s.name}“` : s.kind === 'ai' ? `Fotos von „${s.name}“` : s.kind === 'multi' ? `Alle zusammen: ${s.name}` : s.name}
               {#if s.kind === 'ai'}<span class="kind">Bildinhalt</span>{:else if s.kind === 'auto' && !browsing}<span class="kind">erkannt</span>{/if}
             </span>
             {#if s.count}<span class="count">{s.count}</span>{/if}
@@ -272,6 +313,10 @@
   .suggestions.browse {
     max-height: min(50vh, 420px);
     overflow-y: auto;
+  }
+  .heading.narrow {
+    text-transform: none;
+    letter-spacing: 0;
   }
   .heading {
     padding: 4px 16px 6px;

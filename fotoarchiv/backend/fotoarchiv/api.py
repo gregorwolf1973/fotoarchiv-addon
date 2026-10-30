@@ -268,14 +268,17 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         "imported": ("CAST(strftime('%s', imported_at) AS INTEGER)", "imported_at DESC, id DESC"),
     }
 
-    def index_rows(filters: AssetFilter, extra: str = "", columns: str = "", order: str = "taken"):
+    def filter_clause(filters: AssetFilter) -> tuple[str, list]:
         semantic = None
         if filters.ai.strip():
             try:
                 semantic = ctx.vision.search(filters.ai)
             except NotReady as exc:
                 raise HTTPException(503, str(exc)) from exc
-        where, params = filters.clause(semantic)
+        return filters.clause(semantic)
+
+    def index_rows(filters: AssetFilter, extra: str = "", columns: str = "", order: str = "taken"):
+        where, params = filter_clause(filters)
         ts, sort = ORDERS[order]
         return db.query(
             f"""SELECT id, {ts} AS ts, width, height, kind, rev{columns} FROM assets a
@@ -344,6 +347,28 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
             )
             result[kind] = [dict(r) for r in rows]
         result["auto"] = ctx.vision.suggestion_labels() if ctx.vision.enabled else []
+        return result
+
+    @app.get("/api/labels/counts")
+    def label_counts(filters: AssetFilter = Depends()):
+        """Wie oft jedes Schlagwort, jede Person und jeder Vorschlag unter den gefilterten Fotos vorkommt –
+        damit die Suche zeigt, womit sich die Auswahl weiter eingrenzen lässt. Schlüssel: Kennung bzw. Name."""
+        where, params = filter_clause(filters)
+        subset = f"SELECT a.id FROM assets a WHERE {where}"
+        result = {}
+        for kind, (_table, link, column) in labels.TABLES.items():
+            rows = db.query(
+                f"SELECT l.{column} AS id, COUNT(*) AS count FROM {link} l WHERE l.asset_id IN ({subset}) GROUP BY l.{column}",
+                params,
+            )
+            result[kind] = {str(r["id"]): r["count"] for r in rows}
+        rows = db.query(
+            f"""SELECT s.name, COUNT(*) AS count FROM auto_tags s
+                WHERE s.asset_id IN ({subset}) AND {VISIBLE} GROUP BY s.name""",
+            params,
+        ) if ctx.vision.enabled else []
+        result["auto"] = {r["name"]: r["count"] for r in rows}
+        result["total"] = db.one(f"SELECT COUNT(*) AS count FROM ({subset})", params)["count"]
         return result
 
     def detail(asset_id: int) -> dict:

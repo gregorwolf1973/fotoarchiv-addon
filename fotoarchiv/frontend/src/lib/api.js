@@ -64,6 +64,7 @@ export const api = {
     request(`api/largest?${new URLSearchParams({ kind, min_mb: String(minMb), order })}`),
   geo: (filters) => request(`api/geo?${filterQuery(filters)}`),
   labels: () => request('api/labels'),
+  labelCounts: (filters) => request(`api/labels/counts?${filterQuery(filters)}`),
   asset: (id) => request(`api/assets/${id}`),
   update: (id, changes) => request(`api/assets/${id}`, send('PATCH', changes)),
   rotate: (id, degrees) => request(`api/assets/${id}/rotate`, send('POST', { degrees })),

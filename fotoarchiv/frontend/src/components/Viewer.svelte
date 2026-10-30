@@ -10,6 +10,7 @@
   import FaceBoxes from './FaceBoxes.svelte';
   import LocationDialog from './LocationDialog.svelte';
   import Icon from './Icon.svelte';
+  import Weitwinkel from './Weitwinkel.svelte';
 
   let { items, index, trash = false, canEdit: allowed = true, canDelete = true, canPropose = false, canDismiss = false, canPurge = true, myName = "", labels, onclose, onnavigate, onchanged, ondelete, onrestore, onpurge } = $props();
 
@@ -39,6 +40,7 @@
   let tagInput = $state();
   let leaving = $state(null); // Aktion, die auf "Änderungen verwerfen?" wartet
   let proposing = $state(false);
+  let wide = $state(false); // Weitwinkel entzerrt ansehen
 
   // Ein .mp4 sagt nichts über den Codec darin. Kann der Browser ihn nicht dekodieren,
   // bleibt sonst nur das Vorschaubild stehen, ohne jeden Hinweis.
@@ -258,12 +260,13 @@
   });
 
   function keydown(e) {
-    if (editDate || editLocation || leaving || e.target.closest?.('input, textarea, .modal')) return;
+    if (wide || editDate || editLocation || leaving || e.target.closest?.('input, textarea, .modal')) return;
     if (e.key === 'Escape') close();
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'i') toggleInfo();
     else if (e.key === 'f' && !isVideo && !trash) showFaces = !showFaces;
+    else if (e.key === 'w' && canZoom) wide = true;
     else if (e.key === 'Delete' && !trash && canDelete) ondelete(itemId);
     else if ((e.key === '+' || e.key === '=') && canZoom) zoomTo(view.scale * 1.5, stageWidth / 2, stageHeight / 2);
     else if (e.key === '-' && canZoom) zoomTo(view.scale / 1.5, stageWidth / 2, stageHeight / 2);
@@ -446,6 +449,7 @@
         {/if}
         {#if !isVideo}
           <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title="Gesichter zeigen (f)"><Icon name="face" /></button>
+          <button class="round" disabled={!canZoom} onclick={() => (wide = true)} title="Weitwinkel entzerren (w)"><Icon name="panorama" /></button>
         {/if}
         <a class="round" href={originalUrl(item, true)} title="Original herunterladen"><Icon name="download" /></a>
         {#if canPropose && !canDelete}
@@ -629,6 +633,15 @@
 {#if editLocation && detail}
   <LocationDialog lat={location?.lat ?? null} lon={location?.lon ?? null} saveLabel="Übernehmen" onsave={setLocation}
     oncancel={() => (editLocation = false)} />
+{/if}
+
+{#if wide && !isVideo}
+  <Weitwinkel
+    src={hiresAllowed ? originalUrl(item) : previewUrl(item)}
+    assetId={itemId}
+    name={detail?.name}
+    onclose={() => (wide = false)}
+  />
 {/if}
 
 {#if proposing}

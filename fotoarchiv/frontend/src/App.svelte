@@ -1206,9 +1206,10 @@
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
   }
   .search-inline {
-    flex: 1;
-    max-width: 680px;
-    min-width: 0;
+    /* bekommt fast den ganzen freien Platz; .grow rechts daneben nur den Rest */
+    flex: 8 1 420px;
+    max-width: 960px;
+    min-width: 280px;
     margin-left: 12px;
   }
   .search-row {
@@ -1357,6 +1358,12 @@
   }
   @media (max-width: 1099px) {
     h1 {
+      display: none;
+    }
+  }
+  /* Ansichten nur als Symbole, damit die Suche breit bleibt (Namen stehen im Tooltip) */
+  @media (max-width: 1299px) {
+    .views .label {
       display: none;
     }
   }

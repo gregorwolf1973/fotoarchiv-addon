@@ -101,6 +101,13 @@ def test_edit_filter_batch_and_trash(client, make_jpeg, tmp_path):
 
     assert ids(tag=[tag["Urlaub"]["id"]]) == [b, a]
     assert ids(tag=[tag["Urlaub"]["id"], tag["Strand"]["id"]]) == [a]
+    # Was sich zur Auswahl noch dazunehmen lässt: Zahlen nur unter den gefilterten Fotos
+    counts = client.get("/api/labels/counts", params={"tag": [tag["Urlaub"]["id"]]}).json()
+    assert counts["total"] == 2
+    assert counts["tags"] == {str(tag["Urlaub"]["id"]): 2, str(tag["Strand"]["id"]): 1}
+    counts = client.get("/api/labels/counts", params={"tag": [tag["Urlaub"]["id"], tag["Strand"]["id"]]}).json()
+    assert counts["total"] == 1 and counts["tags"][str(tag["Strand"]["id"])] == 1
+    assert client.get("/api/labels/counts", params={"start": "2021-01-01"}).json() == {"tags": {}, "persons": {}, "auto": {}, "total": 1}
     assert ids(start="2019-05-12", end="2019-05-12") == [a]
     assert ids(q="stra") == [a]
     assert ids(q="c.jpg") == [c]

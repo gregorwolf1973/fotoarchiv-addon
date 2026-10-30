@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.62
+
+- **Weitwinkel und Fischauge entzerren:** Neues Panorama-Symbol in der Einzelansicht (Taste w). Das Foto erscheint entzerrt, Senkrechte stehen gerade, und man schwenkt mit Maus oder Finger durch das Bild, zoomt mit Mausrad oder zwei Fingern. Kamera-Vorgaben *Action-Kamera* (GoPro SuperView u. ä.), *Fischauge 180°* und *Normales Weitwinkel*; unter *Feineinstellung* Linse, Bildwinkel, Seitenstreckung (gleicht die gestauchte Bildmitte und gedehnten Seiten von Action-Kameras aus) und Neigung der Kamera. Die Einstellung wird je Foto gemerkt, der gezeigte Ausschnitt lässt sich als JPEG speichern. Läuft im Browser (WebGL); das Original bleibt unverändert
+- **Suche mit mehreren Filtern:** `Fisch + Angeln` eintippen und Enter setzt beide Filter auf einmal. Nach jeder Auswahl bleibt die Liste offen und zeigt nur noch Schlagworte und Personen, die zusammen mit der Auswahl vorkommen, mit der Zahl der verbleibenden Fotos
+- **Breiteres Suchfeld:** Die Suche nimmt fast die ganze Kopfzeile ein; bei schmalem Fenster stehen die Ansichten (Fotos, Karte, …) nur noch als Symbole da
+
 ## 0.61
 
 - **Gesichter: ganzes Foto vergrößern.** Bei den Vorschlägen „Ist das …?“ und im Fenster *Wer ist das?* hat jedes Gesicht eine Lupe. Sie öffnet das ganze Foto bildschirmfüllend, zum Zoomen mit Mausrad, zwei Fingern, Doppeltippen oder +/−; das Gesicht ist gelb markiert, ein Knopf zoomt direkt darauf, beim Hineinzoomen lädt das Original nach. ← und → (oder Wischen) blättern durch alle Fotos der Gruppe. Bei Vorschlägen steht zum Vergleich ein Gesicht der vorgeschlagenen Person oben, *Ja* und *Nein* direkt darunter; in *Wer ist das?* lässt sich ein Gesicht dort als „gehört nicht dazu“ markieren

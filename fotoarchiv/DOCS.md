@@ -80,6 +80,8 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Vergrößertes Foto verschieben | ziehen | mit einem Finger ziehen |
 | Infobereich ein/aus | i | ⓘ |
 | Gesichtsrahmen ein/aus | f | Gesichts-Symbol |
+| Weitwinkel entzerren | w, Panorama-Symbol; darin ziehen, Mausrad, Pfeiltasten, 0 = ganze Ansicht | Panorama-Symbol; ziehen, zwei Finger |
+| Mehrere Filter auf einmal | „Fisch + Angeln“ eintippen, Enter | wie Maus |
 | Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |
 
 ## Als App aufs Handy (Familie)
@@ -113,6 +115,22 @@ Das Handy lädt neue Fotos und Videos im WLAN in den Import-Ordner hoch, das Add
 - **Duplikate** sind byte-gleiche Kopien von etwas, das schon im Archiv oder im Papierkorb liegt, erkannt über MD5. Sie werden beim automatischen Import **gelöscht** statt nach `_duplikate` verschoben. So räumt sich der Ordner selbst auf, wenn die App ein Foto noch einmal schickt. Fotos, die du im Archiv in den Papierkorb gelegt hast, kommen dadurch nicht zurück.
 - Beschädigte Dateien landen wie gewohnt in `_defekt`. Nicht unterstützte Dateien bleiben liegen und stoßen erst wieder einen Import an, wenn sie sich ändern.
 - Der letzte Lauf steht im Import-Fenster mit dem Zusatz *automatisch*.
+
+### Suchen mit mehreren Filtern
+
+Alle Filter gelten zusammen: Mit *Fisch* und *Angeln* erscheinen nur Fotos, die beide Schlagworte haben. Nach jeder Auswahl bleibt die Liste offen und zeigt nur noch Schlagworte und Personen, die zusammen mit der bisherigen Auswahl vorkommen, mit der Zahl der Fotos, die dann übrig bleiben. Mehrere auf einmal: `Fisch + Angeln` eintippen und Enter – jeder Teil wird zum passenden Schlagwort bzw. zur passenden Person (gleicher Name zuerst, sonst der häufigste Treffer).
+
+### Weitwinkel und Fischauge entzerren
+
+Fotos von Fischaugen-, Action- oder 360°-Kameras zeigen gebogene Wände und Böden. Das Panorama-Symbol in der Einzelansicht (oder Taste w) öffnet sie entzerrt: Senkrechte stehen gerade, und man schwenkt mit der Maus bzw. dem Finger durch das Bild wie durch einen Raum. Mausrad oder zwei Finger zoomen; bei weitem Blickwinkel bleiben Senkrechte gerade (Panini-Projektion), Waagrechte biegen sich dann leicht.
+
+Unten wählt man die **Kamera**: *Action-Kamera* (Standard, vermessen an einem GoPro-SuperView-Foto: 120°, Seiten gestreckt), *Fischauge 180°* oder *Normales Weitwinkel*. Unter *Feineinstellung* lassen sich Linse, Bildwinkel, **Seitenstreckung** und **Neigung** anpassen:
+
+1. **Bildwinkel**, bis Linien in der Bildmitte gerade sind.
+2. **Seitenstreckung**, bis auch Kanten am Rand gerade sind. Viele Action-Kameras (GoPro SuperView u. ä.) stauchen die Bildmitte waagerecht und dehnen die Seiten, um ein 16:9-Bild zu füllen; ohne Ausgleich bleiben Kanten gebogen und Runde wird oval.
+3. **Neigung**, bis Senkrechte senkrecht stehen. War die Kamera nach unten gerichtet, laufen Senkrechte sonst nach unten zusammen.
+
+Die Einstellung merkt sich der Browser je Foto (die letzten 50). Der Pfeil oben rechts speichert den gezeigten Ausschnitt als JPEG; das Original bleibt unverändert. Ein Rundum-Panorama gibt es nur, wenn das Foto selbst rundum aufgenommen ist, und echtes 3D nur aus einem Stereo-Bildpaar (zwei Objektive, z. B. VR180) – aus einem einzelnen Foto lässt sich Tiefe nicht ablesen. Was außerhalb des Bildwinkels liegt, bleibt schwarz.
 
 ## Bearbeiten
 

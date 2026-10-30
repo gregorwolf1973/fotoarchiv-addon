@@ -31,7 +31,7 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 OPEN = {"auth_session", "auth_login", "auth_logout"}
 VIEW = {
-    "state", "asset_index", "asset_largest", "asset_geo", "label_list", "asset_detail", "asset_thumb", "asset_preview",
+    "state", "asset_index", "asset_largest", "asset_geo", "label_list", "label_counts", "asset_detail", "asset_thumb", "asset_preview",
     "asset_original", "task_list", "face_status", "people", "group_faces", "person_faces", "asset_faces",
     "face_crop", "favorite_list", "auth_password",  # eigenes Passwort ändern: jede angemeldete Rolle
     "download_create", "download_zip",  # Auswahl als ZIP: dieselben Originale wie asset_original
