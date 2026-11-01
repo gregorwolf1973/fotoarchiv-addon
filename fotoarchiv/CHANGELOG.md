@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.1
+
+- **So kommen Fotos ins Archiv:** Das Fenster *Importieren* erklärt oben in einem aufklappbaren Abschnitt alle Wege – Hochladen am Rechner oder im Browser des Handys, der Import-Ordner für viele Dateien, das Handy per USB am Rechner (Dateiübertragung wählen, Ordner `DCIM/Camera` in den Import-Ordner kopieren; an Home Assistant lässt sich ein Handy nicht als Laufwerk einbinden) und das Abgleichen selbst kopierter Dateien in der Bibliothek
+
 ## 0.62
 
 - **Weitwinkel und Fischauge entzerren:** Neues Panorama-Symbol in der Einzelansicht (Taste w). Das Foto erscheint entzerrt, Senkrechte stehen gerade, und man schwenkt mit Maus oder Finger durch das Bild, zoomt mit Mausrad oder zwei Fingern. Kamera-Vorgaben *Action-Kamera* (GoPro SuperView u. ä.), *Fischauge 180°* und *Normales Weitwinkel*; unter *Feineinstellung* Linse, Bildwinkel, Seitenstreckung (gleicht die gestauchte Bildmitte und gedehnten Seiten von Action-Kameras aus) und Neigung der Kamera. Die Einstellung wird je Foto gemerkt, der gezeigte Ausschnitt lässt sich als JPEG speichern. Läuft im Browser (WebGL); das Original bleibt unverändert

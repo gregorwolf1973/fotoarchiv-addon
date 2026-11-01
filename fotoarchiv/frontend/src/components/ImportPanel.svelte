@@ -81,6 +81,32 @@
       <button class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
     </header>
 
+    <details class="hilfe">
+      <summary><Icon name="info" size={18} /> So kommen Fotos ins Archiv</summary>
+      <ol>
+        <li>
+          <strong>Hochladen</strong> (Knopf oben rechts): Fotos und Videos am Rechner auswählen oder ins Fenster ziehen.
+          Das geht auch am Handy: <code>{location.host}</code> im Browser des Handys öffnen, „Hochladen“ tippen und die
+          Fotos aus der Galerie wählen. Was schon im Archiv ist, wird gar nicht erst gesendet.
+        </li>
+        <li>
+          <strong>Import-Ordner</strong> (gleich darunter): für viele Dateien auf einmal. Die Dateien über das Netzwerk
+          (Samba) in den Import-Ordner kopieren und „Import starten“ drücken. Das Archiv sortiert sie nach Aufnahmedatum
+          ein und nimmt sie aus dem Import-Ordner; Fotos, die es schon gibt, legt es dort in den Unterordner <code>_duplikate</code>.
+        </li>
+        <li>
+          <strong>Handy per USB:</strong> Das Handy an den Rechner stecken, nicht an Home Assistant. Bei Android in der
+          USB-Meldung des Handys „Dateiübertragung“ wählen, beim iPhone „Vertrauen“ tippen; ein reines Ladekabel reicht
+          nicht. Das Handy erscheint dann in der Dateiverwaltung als Gerät. Den Ordner <code>DCIM/Camera</code> in den
+          Import-Ordner kopieren und den Import starten. Handys sind keine Laufwerke, darum bindet Home Assistant sie
+          nicht ein – einen USB-Stick oder eine Speicherkarte dagegen schon.
+        </li>
+        <li>
+          <strong>Direkt in die Bibliothek:</strong> Wer Dateien selbst in die Jahres- und Monatsordner der Bibliothek
+          kopiert, nimmt sie mit „Bibliothek abgleichen“ auf, ohne dass etwas verschoben wird.
+        </li>
+      </ol>
+    </details>
     <section>
       <h3>Aus dem Import-Ordner</h3>
       <p>
@@ -320,6 +346,27 @@
     margin: 0 0 6px;
     font-size: 1rem;
     font-weight: 500;
+  }
+  .hilfe {
+    margin: 0 0 4px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .hilfe summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .hilfe summary :global(svg) {
+    vertical-align: -3px;
+    margin-right: 4px;
+  }
+  .hilfe ol {
+    margin: 10px 0 2px;
+    padding-left: 20px;
+  }
+  .hilfe li + li {
+    margin-top: 8px;
   }
   section {
     padding: 16px 0;
