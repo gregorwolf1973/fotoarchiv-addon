@@ -1,9 +1,12 @@
 <script>
   // „So kommen Fotos ins Archiv“: im Fenster Importieren und hinter dem ⓘ neben „Hochladen“.
-  // admin: Import-Ordner und Bibliotheksabgleich nur für Administratoren erklären.
-  // onclose gesetzt: als eigenes Fenster zeigen.
+  // admin: Abgleich der Bibliothek nur für Administratoren erklären. importDir: Import-Ordner (über die Internetadresse
+  // nicht bekannt, dann die Vorgabe). onclose gesetzt: als eigenes Fenster zeigen.
   import Icon from './Icon.svelte';
-  let { admin = false, onclose = null } = $props();
+  let { admin = false, importDir = null, onclose = null } = $props();
+  const ordner = $derived(/^\/(share|media)\/(.*)$/.exec(importDir || '/share/fotoarchiv-import'));
+  const windowsPfad = $derived(ordner ? `\\\\homeassistant\\${ordner[1]}\\${ordner[2].replaceAll('/', '\\')}` : null);
+  const smbPfad = $derived(ordner ? `smb://homeassistant/${ordner[1]}/${ordner[2]}` : null);
 </script>
 
 {#snippet liste()}
@@ -17,17 +20,19 @@
       <strong>Handy per USB:</strong> Das Handy an den Rechner stecken, nicht an Home Assistant. Bei Android in der
       USB-Meldung des Handys „Dateiübertragung“ wählen, beim iPhone „Vertrauen“ tippen; ein reines Ladekabel reicht nicht.
       Das Handy erscheint dann in der Dateiverwaltung als Gerät. Mit dem Knopf <em>Ordner hochladen</em> (neben
-      „Hochladen“) den Ordner <code>DCIM/Camera</code> des Handys wählen{admin ? ' oder ihn in den Import-Ordner kopieren' : ''}.
+      „Hochladen“) den Ordner <code>DCIM/Camera</code> des Handys wählen oder ihn in den Import-Ordner kopieren (siehe unten).
       Handys sind keine Laufwerke, darum bindet Home Assistant sie nicht ein – einen USB-Stick oder eine Speicherkarte
       dagegen schon.
     </li>
+    <li>
+      <strong>Import-Ordner</strong> – für viele Dateien auf einmal, im Heimnetz: Fotos und Videos über das Netzwerk in
+      den Import-Ordner kopieren{#if windowsPfad}, unter Windows <code>{windowsPfad}</code>, unter Linux und am Mac
+      <code>{smbPfad}</code>{/if}. Anmelden mit dem Samba-Konto von Home Assistant. Danach im Fenster <em>Importieren</em>
+      „Import starten“ drücken – das Fenster gibt es in Home Assistant unter <em>Fotoarchiv</em> im Seitenmenü. Das
+      Archiv sortiert die Dateien nach Aufnahmedatum ein und nimmt sie aus dem Import-Ordner; Fotos, die es schon gibt,
+      legt es dort in den Unterordner <code>_duplikate</code>.
+    </li>
     {#if admin}
-      <li>
-        <strong>Import-Ordner</strong> (im Fenster <em>Importieren</em>): für viele Dateien auf einmal. Die Dateien über
-        das Netzwerk (Samba) in den Import-Ordner kopieren und „Import starten“ drücken. Das Archiv sortiert sie nach
-        Aufnahmedatum ein und nimmt sie aus dem Import-Ordner; Fotos, die es schon gibt, legt es dort in den Unterordner
-        <code>_duplikate</code>.
-      </li>
       <li>
         <strong>Direkt in die Bibliothek:</strong> Wer Dateien selbst in die Jahres- und Monatsordner der Bibliothek
         kopiert, nimmt sie mit „Bibliothek abgleichen“ auf, ohne dass etwas verschoben wird.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.3
+
+- **Info nennt den Import-Ordner:** „So kommen Fotos ins Archiv“ zeigt jetzt allen den Import-Ordner mit seinem Netzwerkpfad (Windows `\\homeassistant\share\fotoarchiv-import`, Linux und Mac `smb://homeassistant/share/fotoarchiv-import`) und wo „Import starten“ zu finden ist
+
 ## 0.62.2
 
 - **Info neben „Hochladen“:** Das neue ⓘ öffnet „So kommen Fotos ins Archiv“ für alle, die hochladen dürfen – auch über die Internetadresse, wo das Fenster *Importieren* fehlt. Wer kein Administrator ist, sieht nur die Wege, die für ihn gehen; das Handy per USB lässt sich direkt mit *Ordner hochladen* übernehmen

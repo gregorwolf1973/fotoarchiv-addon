@@ -82,7 +82,7 @@
       <button class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
     </header>
 
-    <ImportHilfe admin />
+    <ImportHilfe admin importDir={info.import_dir} />
     <section>
       <h3>Aus dem Import-Ordner</h3>
       <p>

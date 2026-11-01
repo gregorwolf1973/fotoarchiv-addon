@@ -1045,7 +1045,7 @@
 {/if}
 
 {#if showHilfe}
-  <ImportHilfe admin={isAdmin} onclose={() => (showHilfe = false)} />
+  <ImportHilfe admin={isAdmin} importDir={info?.import_dir} onclose={() => (showHilfe = false)} />
 {/if}
 
 {#if showImport && info}
