@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.4
+
+- **Videos starten sofort:** Ein angeklicktes Video spielt gleich mit Ton ab. Blockt der Browser den Ton, startet es stumm; der Ton lässt sich im Player einschalten
+
 ## 0.62.3
 
 - **Info nennt den Import-Ordner:** „So kommen Fotos ins Archiv“ zeigt jetzt allen den Import-Ordner mit seinem Netzwerkpfad (Windows `\\homeassistant\share\fotoarchiv-import`, Linux und Mac `smb://homeassistant/share/fotoarchiv-import`) und wo „Import starten“ zu finden ist

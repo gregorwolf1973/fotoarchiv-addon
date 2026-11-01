@@ -54,6 +54,16 @@
     videoError = VIDEO_ERRORS[e.currentTarget.error?.code] ?? 'Das Video lässt sich nicht abspielen.';
   }
 
+  // Videos starten beim Öffnen sofort mit Ton. Der Klick auf das Vorschaubild erlaubt das in den
+  // Browsern meist; blockt der Browser trotzdem, startet es stumm und der Ton lässt sich im Player einschalten.
+  function autostart(video) {
+    video.play().catch((e) => {
+      if (e.name !== 'NotAllowedError') return;
+      video.muted = true;
+      video.play().catch(() => {});
+    });
+  }
+
   // Fläche, die das Bild bei object-fit: contain tatsächlich einnimmt
   const frame = $derived.by(() => {
     if (!natural.width || !stageWidth) return null;
@@ -382,8 +392,6 @@
   >
     {#key key}
       {#if isVideo}
-        <!-- Kein autoplay: Browser blocken Autostart mit Ton ohnehin, und bei Familienvideos
-             will man den Ton hören statt stumm zu starten. -->
         <!-- svelte-ignore a11y_media_has_caption -->
         <video
           src={originalUrl(item)}
@@ -391,6 +399,7 @@
           controls
           playsinline
           preload="metadata"
+          use:autostart
           onerror={videoFailed}
         ></video>
       {:else}
