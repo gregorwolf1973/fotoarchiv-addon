@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.2
+
+- **Info neben „Hochladen“:** Das neue ⓘ öffnet „So kommen Fotos ins Archiv“ für alle, die hochladen dürfen – auch über die Internetadresse, wo das Fenster *Importieren* fehlt. Wer kein Administrator ist, sieht nur die Wege, die für ihn gehen; das Handy per USB lässt sich direkt mit *Ordner hochladen* übernehmen
+
 ## 0.62.1
 
 - **So kommen Fotos ins Archiv:** Das Fenster *Importieren* erklärt oben in einem aufklappbaren Abschnitt alle Wege – Hochladen am Rechner oder im Browser des Handys, der Import-Ordner für viele Dateien, das Handy per USB am Rechner (Dateiübertragung wählen, Ordner `DCIM/Camera` in den Import-Ordner kopieren; an Home Assistant lässt sich ein Handy nicht als Laufwerk einbinden) und das Abgleichen selbst kopierter Dateien in der Bibliothek

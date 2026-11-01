@@ -18,6 +18,7 @@
   import Gallery from './components/Gallery.svelte';
   import Icon from './components/Icon.svelte';
   import ImportPanel from './components/ImportPanel.svelte';
+  import ImportHilfe from './components/ImportHilfe.svelte';
   import LabelDialog from './components/LabelDialog.svelte';
   import LocationDialog from './components/LocationDialog.svelte';
   import Login from './components/Login.svelte';
@@ -52,6 +53,7 @@
   let viewerIds = $state.raw(null); // eigene Blätter-Reihenfolge, z. B. Fotos auf der Karte
   let viewerList = $state.raw(null); // eigene Einträge, die nicht im Index stehen müssen (Duplikate)
   let showImport = $state(false);
+  let showHilfe = $state(false); // „So kommen Fotos ins Archiv“
   let searchOpen = $state(false);
   let dialog = $state(null);
   let zoom = $state(readZoom());
@@ -641,7 +643,7 @@
   }
 
   function keydown(e) {
-    if (!canEdit || openIndex >= 0 || dialog || showImport || showAccess || showPassword || showSettings || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || view === 'rotation' || folderOverview || e.target.closest?.('input, textarea')) return;
+    if (!canEdit || openIndex >= 0 || dialog || showImport || showHilfe || showAccess || showPassword || showSettings || view === 'map' || view === 'people' || view === 'duplicates' || view === 'storage' || view === 'rotation' || folderOverview || e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape' && selected.size) selected.clear();
     // Im Favoritenordner nimmt Entf das Foto nur aus dem Ordner, es bleibt im Archiv
     else if (e.key === 'Delete' && selected.size && openFolder) removeIds(openFolder, [...selected]);
@@ -828,6 +830,7 @@
           {#if canPickFolder}
             <button class="icon" onclick={() => folderInput.click()} title="Ordner hochladen (mit Unterordnern; Vorhandenes wird übersprungen)"><Icon name="folderUpload" /></button>
           {/if}
+          <button class="icon" onclick={() => (showHilfe = true)} title="So kommen Fotos ins Archiv"><Icon name="info" /></button>
         {/if}
         {#if isAdmin}
           <button onclick={() => (showImport = true)} title="Aus Ordner importieren">
@@ -1039,6 +1042,10 @@
     onrestore={restoreOne}
     onpurge={(id) => confirmPurge([id])}
   />
+{/if}
+
+{#if showHilfe}
+  <ImportHilfe admin={isAdmin} onclose={() => (showHilfe = false)} />
 {/if}
 
 {#if showImport && info}
