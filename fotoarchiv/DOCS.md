@@ -60,6 +60,7 @@ Alle ursprünglich geplanten Funktionen sind umgesetzt.
 | `public_trusted_proxies` | `127.0.0.1`, `::1`, `172.30.32.0/23` | Reverse Proxys, deren Angabe zur Besucheradresse geglaubt wird |
 | `public_cookie_secure` | `true` | Sitzungs-Cookie nur über HTTPS (nur zum Testen ausschalten) |
 | `public_session_hours` | `12` | Gültigkeit einer Anmeldung |
+| `public_home_url` | leer | Heimnetz-Adresse, auf die der Internetzugang zu Hause umleitet (siehe unten) |
 | `public_log_export_path` | – | Optionale Kopie des Zugriffsprotokolls |
 
 Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortieren ein reines Umbenennen und geht sofort.
@@ -447,6 +448,15 @@ WAF-Regeln, die Pfade mit `/login` per *Managed Challenge* schützen, blockieren
 Der Internetzugang ist im Heimnetz unter `http://<Home-Assistant-IP>:8301` erreichbar. Den Port stellst du unter *Einstellungen → Add-ons → Fotoarchiv → Konfiguration → Netzwerk* ein. Ein leeres Feld schaltet die Freigabe ab; dann erreicht ihn nur noch ein Proxy im Home-Assistant-Netz über den Add-on-Hostnamen, z. B. `http://a1b2c3d4-fotoarchiv:8301`. Zeigt dein Proxy auf die IP von Home Assistant, muss dort derselbe Port eingetragen sein, sonst meldet er 502 Bad Gateway.
 
 Anmelden lässt sich nur über HTTPS, solange `public_cookie_secure` an ist. Über `http://…:8301` im Heimnetz klappt die Anmeldung also nicht, dafür ist der Weg über den Proxy da.
+
+### Zu Hause direkt ins Heimnetz
+
+Über einen Cloudflare-Tunnel stocken große Videos (4K mit 60 Bildern pro Sekunde haben schnell 70 Mbit/s). Trägst du unter `public_home_url` die Heimnetz-Adresse ein, z. B. `http://192.168.178.37:8301`, leitet die Internetadresse dorthin um, sobald du sie von zu Hause aus öffnest. Erkannt wird das an der öffentlichen IP: Sie ist dann dieselbe wie die von Home Assistant (das Add-on fragt sie bei Cloudflare ab und prüft sie nach einer Zwangstrennung neu). Umgeleitet wird nur das Öffnen der Oberfläche, nicht die App-Schnittstelle.
+
+- Im Heimnetz meldest du dich einmal eigens an; für den Browser ist es eine andere Seite. Dafür muss `public_cookie_secure` aus sein, weil die Heimnetz-Adresse kein HTTPS hat.
+- Wer zu Hause trotzdem die Internetadresse nutzen will, hängt `?extern` an (`https://foto.example.org/?extern`); das gilt bis zum Schließen des Browsers.
+- Erkannt wird nur IPv4: Erreicht dein Rechner Cloudflare über IPv6, bleibt er auf der Internetadresse.
+- Eine installierte App (PWA) von der Internetadresse öffnet zu Hause die Heimnetz-Adresse im Browser. Wer sie zu Hause als App will, installiert sie zusätzlich von der Heimnetz-Adresse aus.
 
 ### Proxy auf einem anderen Gerät
 

@@ -11,22 +11,27 @@ import hmac
 import ipaddress
 import logging
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 from starlette.routing import Match
 
 from . import api
 from .auth import AuthError, LoginFailed, LoginLocked
 from .context import Context
+from .heimnetz import PublicAddress
 from .ratelimit import LOCK_BASE, LOCK_CAP, REQ_ANON_PER_IP, REQ_AUTH_PER_USER, SCAN_PER_IP
 
 log = logging.getLogger(__name__)
 
 COOKIE = "fotoarchiv_session"
+EXTERN_COOKIE = "fotoarchiv_extern"  # ?extern: zu Hause trotzdem über die Internetadresse bleiben
+PAGES = {"/", "/index.html"}  # nur das Öffnen der Oberfläche leitet ins Heimnetz um
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 OPEN = {"auth_session", "auth_login", "auth_logout"}
@@ -73,8 +78,9 @@ class PasswordChange(BaseModel):
     new: str = Field(max_length=256)
 
 
-def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
+def create_public_app(ctx: Context, static_dir: Path | None = None, home: PublicAddress | None = None) -> FastAPI:
     settings, auth, limiter, access = ctx.settings, ctx.auth, ctx.limiter, ctx.access
+    home = home or PublicAddress()
     app = FastAPI(title="Fotoarchiv", docs_url=None, redoc_url=None, openapi_url=None)
     api.install_common(app)
 
@@ -158,6 +164,17 @@ def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
             response.headers["Retry-After"] = str(retry)
             return secure(request, response)
 
+        # Zu Hause: über den Proxy gekommen, aber mit der eigenen öffentlichen Adresse → Heimnetz-Adresse
+        stay = False
+        peer = request.client.host if request.client else ""
+        # Zeigt die Heimnetz-Adresse versehentlich auf die Internetadresse selbst: nicht im Kreis schicken
+        if (settings.public_home_url and request.method == "GET" and request.url.path in PAGES and trusted(peer) and ip != peer
+                and urlsplit(settings.public_home_url).netloc.lower() != request.headers.get("host", "").lower()):
+            if "extern" in request.query_params:
+                stay = True
+            elif not request.cookies.get(EXTERN_COOKIE) and await run_in_threadpool(home.matches, ip):
+                return secure(request, RedirectResponse(settings.public_home_url, status_code=302))
+
         if request.url.path.startswith("/api/"):
             if name in OPEN:
                 pass
@@ -180,6 +197,8 @@ def create_public_app(ctx: Context, static_dir: Path | None = None) -> FastAPI:
                     return secure(request, reply(403, "Sicherheitsprüfung fehlgeschlagen – bitte die Seite neu laden"))
 
         response = await call_next(request)
+        if stay:
+            response.set_cookie(EXTERN_COOKIE, "1", httponly=True, secure=settings.public_cookie_secure, samesite="lax", path="/")
         # 202 = weiteres Stück eines Uploads; protokolliert wird die fertige Datei
         if session and name in EDIT and response.status_code < 400 and response.status_code != 202:
             access.log("change", ip=ip, user=session["username"], path=request.url.path, detail=request.method)

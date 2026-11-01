@@ -85,6 +85,12 @@ configuration:
   public_session_hours:
     name: Sitzungsdauer (Stunden)
     description: Nach dieser Zeit muss man sich neu anmelden.
+  public_home_url:
+    name: Heimnetz-Adresse
+    description: >-
+      Zum Beispiel http://192.168.178.37:8301. Wer die Internetadresse von zu Hause öffnet (gleiche
+      öffentliche IP wie Home Assistant), wird dorthin umgeleitet – große Videos laufen dann ohne den
+      Umweg über den Tunnel. Leer = aus. Mit ?extern hinter der Internetadresse bleibt man dort.
   public_log_export_path:
     name: Zusätzliche Protokolldatei
     description: >-

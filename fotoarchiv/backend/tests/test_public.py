@@ -415,3 +415,86 @@ def test_download_needs_csrf_and_belongs_to_its_user(admin, public, make_jpeg, t
     login(other, "andere")
     assert other.get(f"/api/downloads/{token}").status_code == 404  # fremder Token: wie nicht vorhanden
     assert visitor(public, ip="198.51.100.4").get(f"/api/downloads/{token}").status_code == 401
+
+
+class FakeAddress:
+    """Eigene öffentliche Adresse ohne Netz; zählt die Abfragen."""
+
+    def __init__(self, ip):
+        self.ip, self.calls = ip, 0
+
+    def matches(self, ip):
+        self.calls += 1
+        return ip == self.ip
+
+
+HOME_URL = "http://192.168.178.37:8301"
+
+
+def home_visitor(public_app, ip):
+    client = visitor(public_app)
+    client.headers["CF-Connecting-IP"] = ip
+    return client
+
+
+def test_home_redirect_only_from_own_address(ctx):
+    ctx.settings = dataclasses.replace(ctx.settings, public_home_url=HOME_URL)
+    home = FakeAddress("91.5.122.158")
+    app = create_public_app(ctx, home=home)
+
+    at_home = home_visitor(app, "91.5.122.158").get("/", follow_redirects=False)
+    assert at_home.status_code == 302 and at_home.headers["location"] == HOME_URL
+    assert at_home.headers["cache-control"] == "private, no-store"
+    assert home_visitor(app, "198.51.100.77").get("/", follow_redirects=False).status_code != 302
+    # nur das Öffnen der Oberfläche, nie API, Bilder oder Dateien
+    assert home_visitor(app, "91.5.122.158").get("/api/auth/session").status_code == 200
+    assert home_visitor(app, "91.5.122.158").get("/assets/x.js", follow_redirects=False).status_code != 302
+    # direkt im Heimnetz (kein Proxy): kein Kreislauf, auch mit gefälschtem Kopf
+    direct = TestClient(app, base_url=HOME_URL, client=("192.168.178.20", 50000))
+    direct.headers["CF-Connecting-IP"] = "91.5.122.158"
+    assert direct.get("/", follow_redirects=False).status_code != 302
+    # Heimnetz-Adresse versehentlich = Internetadresse: keine Schleife
+    ctx.settings = dataclasses.replace(ctx.settings, public_home_url="https://fotos.example.org/")
+    looped = create_public_app(ctx, home=home)
+    assert home_visitor(looped, "91.5.122.158").get("/", follow_redirects=False).status_code != 302
+
+
+def test_home_redirect_can_be_skipped(ctx):
+    ctx.settings = dataclasses.replace(ctx.settings, public_home_url=HOME_URL)
+    app = create_public_app(ctx, home=FakeAddress("91.5.122.158"))
+    client = home_visitor(app, "91.5.122.158")
+    first = client.get("/?extern", follow_redirects=False)
+    assert first.status_code != 302 and "fotoarchiv_extern" in first.headers.get("set-cookie", "")
+    assert client.get("/", follow_redirects=False).status_code != 302  # Cookie gilt weiter
+
+
+def test_home_redirect_off_without_setting(ctx):
+    home = FakeAddress("91.5.122.158")
+    app = create_public_app(ctx, home=home)
+    assert home_visitor(app, "91.5.122.158").get("/", follow_redirects=False).status_code != 302
+    assert home.calls == 0
+
+
+def test_public_address_cache():
+    from fotoarchiv.heimnetz import MAX_AGE, RETRY, PublicAddress
+
+    clock, answers = Clock(), ["91.5.122.158", "91.5.99.1"]
+    address = PublicAddress(fetch=lambda: answers.pop(0), clock=clock)
+    assert address.matches("91.5.122.158")
+    assert not address.matches("91.5.99.1")      # fremd, aber eben erst gefragt
+    clock.now += RETRY + 1
+    assert address.matches("91.5.99.1")          # neue Adresse nach der Zwangstrennung
+    assert not address.matches("kein-ip")
+    clock.now += MAX_AGE + 1
+
+    def broken():
+        raise OSError("kein Netz")
+
+    address._fetch = broken
+    assert address.matches("91.5.99.1")          # ohne Antwort bleibt die alte Adresse
+    calls = []
+    address._fetch = lambda: calls.append(1) or "91.5.99.2"
+    assert not address.matches("203.0.113.9")    # fremde Adresse fragt nicht sofort wieder
+    assert calls == []
+    clock.now += RETRY + 1
+    assert address.matches("91.5.99.2") and calls == [1]  # nach dem Fehler schon nach einer Minute

@@ -82,6 +82,12 @@ configuration:
   public_session_hours:
     name: Session duration (hours)
     description: After this time users have to sign in again.
+  public_home_url:
+    name: Home network address
+    description: >-
+      For example http://192.168.178.37:8301. Visitors who open the internet address from home (same
+      public IP as Home Assistant) are redirected there, so large videos skip the tunnel. Empty = off.
+      Add ?extern to the internet address to stay on it.
   public_log_export_path:
     name: Additional log file
     description: Optional copy of the access log. Not needed for CrowdSec – the setup button takes care of that.

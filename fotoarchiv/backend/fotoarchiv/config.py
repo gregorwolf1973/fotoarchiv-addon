@@ -1,6 +1,7 @@
 """Einstellungen aus /data/options.json (Home Assistant) oder Umgebungsvariablen (Entwicklung)."""
 
 import json
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -38,6 +39,7 @@ class Settings:
     public_session_hours: int = 12
     public_log_max_mb: int = 5
     public_log_export_path: str = ""
+    public_home_url: str = ""  # Heimnetz-Adresse des Internetzugangs, z. B. http://192.168.178.37:8301
     dev: bool = False  # erlaubt Zugriffe außerhalb von Ingress
 
     @property
@@ -58,6 +60,15 @@ def _bool(value, default: bool) -> bool:
     if value is None or value == "":
         return default
     return str(value).lower() not in ("false", "0", "no", "off")
+
+
+def _home_url(value) -> str:
+    """Nur http(s)-Adressen; alles andere schaltet die Umleitung ab."""
+    url = str(value or "").strip()
+    if url and not url.lower().startswith(("http://", "https://")):
+        logging.getLogger(__name__).warning("public_home_url ohne http:// oder https:// – Umleitung aus: %s", url)
+        return ""
+    return url
 
 
 def load() -> Settings:
@@ -97,5 +108,6 @@ def load() -> Settings:
         public_session_hours=int(options.get("public_session_hours") or 12),
         public_log_max_mb=int(options.get("public_log_max_mb") or 5),
         public_log_export_path=str(options.get("public_log_export_path") or "").strip(),
+        public_home_url=_home_url(os.environ.get("FOTOARCHIV_HOME_URL") or options.get("public_home_url")),
         dev=os.environ.get("FOTOARCHIV_DEV") == "1",
     )

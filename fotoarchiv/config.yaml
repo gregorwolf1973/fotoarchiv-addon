@@ -1,6 +1,6 @@
 name: "Fotoarchiv"
 description: "Foto- und Video-Datenbank: Zeitleiste, Weltkarte, Gesichtserkennung, Suche in normaler Sprache, Bearbeiten direkt in der Datei"
-version: "0.62.4"
+version: "0.63.0"
 url: "https://github.com/gregorwolf1973/fotoarchiv-addon"
 slug: "fotoarchiv"
 arch:
@@ -67,6 +67,7 @@ schema:
   public_cookie_secure: bool
   public_session_hours: int(1,720)
   public_log_export_path: str?
+  public_home_url: str?
 # Vorschaubilder und Erkennungsmodelle lassen sich jederzeit neu erzeugen bzw. laden und würden Backups aufblähen
 backup_exclude:
   - "cache"

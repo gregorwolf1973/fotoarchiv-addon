@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.0
+
+- **Zu Hause direkt ins Heimnetz:** Neue Option `public_home_url` (z. B. `http://192.168.178.37:8301`). Wer die Internetadresse von zu Hause öffnet, landet dort – große Videos laufen dann ohne den Umweg über den Cloudflare-Tunnel flüssig. Erkannt wird das an der öffentlichen IP, die das Add-on bei Cloudflare abfragt. Mit `?extern` bleibt man auf der Internetadresse
+
 ## 0.62.4
 
 - **Videos starten sofort:** Ein angeklicktes Video spielt gleich mit Ton ab. Blockt der Browser den Ton, startet es stumm; der Ton lässt sich im Player einschalten
