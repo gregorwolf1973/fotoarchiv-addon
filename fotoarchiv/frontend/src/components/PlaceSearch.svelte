@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import { searchPlaces } from '../lib/map.js';
   import Icon from './Icon.svelte';
 
@@ -16,7 +17,7 @@
     message = '';
     try {
       results = await searchPlaces(query.trim());
-      if (!results.length) message = 'Nichts gefunden';
+      if (!results.length) message = t('Nichts gefunden');
     } catch (err) {
       results = [];
       message = err.message;
@@ -35,7 +36,7 @@
 <form class="place-search" onsubmit={search}>
   <div class="box">
     <Icon name="marker" size={18} />
-    <input type="text" bind:value={query} placeholder="Ort suchen, Enter" aria-label="Ort suchen" enterkeyhint="search" />
+    <input type="text" bind:value={query} placeholder={t('Ort suchen, Enter')} aria-label={t('Ort suchen')} enterkeyhint="search" />
     {#if busy}<span class="spinner"></span>{/if}
   </div>
   {#if results.length || message}

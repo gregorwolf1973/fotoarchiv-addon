@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { originalUrl, previewUrl } from '../lib/api.js';
+  import { locale, t } from '../lib/i18n.js';
   import { clampView, MAX_SCALE, RESET, zoomAt } from '../lib/zoom.js';
   import Icon from './Icon.svelte';
 
@@ -14,7 +15,7 @@
   // Browser zeigen HEIC/TIFF nicht an; sehr große Originale lohnen das Nachladen nicht (wie in der Einzelansicht)
   const HIRES_TYPES = /^image\/(jpeg|png|webp|gif|avif)$/;
   const HIRES_MAX = 60 * 1024 * 1024;
-  const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
+  const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
 
   // Startgesicht bewusst nur einmal übernehmen, danach blättert die Lupe selbst
   // svelte-ignore state_referenced_locally
@@ -187,15 +188,15 @@
 
 <svelte:window onkeydown={keydown} />
 
-<div class="lupe" role="dialog" aria-modal="true" aria-label="Ganzes Foto">
+<div class="lupe" role="dialog" aria-modal="true" aria-label={t('Ganzes Foto')}>
   <header>
     <div class="title">
       {@render heading?.()}
-      <span class="meta">{dateFormat.format(face.taken_ts * 1000)}{#if faces.length > 1} · {i + 1} von {faces.length}{/if}</span>
+      <span class="meta">{dateFormat.format(face.taken_ts * 1000)}{#if faces.length > 1} · {t('{n} von {total}', { n: i + 1, total: faces.length })}{/if}</span>
     </div>
-    <button class="icon" onclick={zoomToFace} disabled={!frame} title="Zum Gesicht zoomen"><Icon name="face" /></button>
-    <button class="icon" onclick={() => (view = RESET)} disabled={!zoomed} title="Ganzes Foto (0)"><Icon name="images" /></button>
-    <button class="icon" onclick={onclose} title="Schließen (Esc)"><Icon name="close" /></button>
+    <button class="icon" onclick={zoomToFace} disabled={!frame} title={t('Zum Gesicht zoomen')}><Icon name="face" /></button>
+    <button class="icon" onclick={() => (view = RESET)} disabled={!zoomed} title={t('Ganzes Foto (0)')}><Icon name="images" /></button>
+    <button class="icon" onclick={onclose} title={t('Schließen (Esc)')}><Icon name="close" /></button>
   </header>
 
   <div
@@ -240,8 +241,8 @@
       </div>
     {/key}
     {#if faces.length > 1}
-      <button class="nav prev" onclick={() => go(-1)} disabled={i === 0} title="Vorheriges Gesicht (←)"><Icon name="left" /></button>
-      <button class="nav next" onclick={() => go(1)} disabled={i === faces.length - 1} title="Nächstes Gesicht (→)"><Icon name="right" /></button>
+      <button class="nav prev" onclick={() => go(-1)} disabled={i === 0} title={t('Vorheriges Gesicht (←)')}><Icon name="left" /></button>
+      <button class="nav next" onclick={() => go(1)} disabled={i === faces.length - 1} title={t('Nächstes Gesicht (→)')}><Icon name="right" /></button>
     {/if}
   </div>
 

@@ -5,6 +5,7 @@
     STRETCH_MAX, TILT_MAX, VERTEX,
   } from '../lib/weitwinkel.js';
   import Icon from './Icon.svelte';
+  import { t } from '../lib/i18n.js';
 
   // Weitwinkel- und Fischaugenfotos entzerrt ansehen: Ziehen schwenkt, Mausrad bzw. zwei Finger
   // zoomen, Pfeiltasten schwenken, +/- zoomt, 0 setzt zurück. Die Kamera (Vorgabe oder Linse,
@@ -118,10 +119,10 @@
     canvas.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       loaded = false;
-      error = 'Der Browser hat die Grafik zurückgesetzt – bitte die Ansicht schließen und neu öffnen.';
+      error = t('Der Browser hat die Grafik zurückgesetzt – bitte die Ansicht schließen und neu öffnen.');
     });
     if (!gl) {
-      error = 'Dieser Browser kann kein WebGL – die entzerrte Ansicht geht hier nicht.';
+      error = t('Dieser Browser kann kein WebGL – die entzerrte Ansicht geht hier nicht.');
       return;
     }
     try {
@@ -131,7 +132,7 @@
       gl.linkProgram(program);
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
     } catch (e) {
-      error = `Die Ansicht ließ sich nicht starten: ${e.message}`;
+      error = t('Die Ansicht ließ sich nicht starten: {message}', { message: e.message });
       return;
     }
     gl.useProgram(program);
@@ -149,7 +150,7 @@
       upload(img);
       loaded = true;
     };
-    img.onerror = () => (error = 'Das Foto ließ sich nicht laden.');
+    img.onerror = () => (error = t('Das Foto ließ sich nicht laden.'));
     img.src = src;
     return () => {
       img.onload = img.onerror = null; // nach dem Schließen nicht mehr hochladen
@@ -284,7 +285,7 @@
 
 <svelte:window onkeydown={keydown} />
 
-<div class="weitwinkel" role="dialog" aria-modal="true" aria-label="Weitwinkel entzerrt" bind:clientWidth={width} bind:clientHeight={height}>
+<div class="weitwinkel" role="dialog" aria-modal="true" aria-label={t('Weitwinkel entzerrt')} bind:clientWidth={width} bind:clientHeight={height}>
   <canvas
     bind:this={canvas}
     onpointerdown={pointerdown}
@@ -292,59 +293,59 @@
     onpointerup={pointerup}
     onpointercancel={pointerup}
     ondblclick={reset}
-    aria-label="Entzerrtes Foto: ziehen zum Schwenken, Mausrad zum Zoomen"
+    aria-label={t('Entzerrtes Foto: ziehen zum Schwenken, Mausrad zum Zoomen')}
   ></canvas>
 
   {#if error}
     <p class="message">{error}</p>
   {:else if !loaded}
-    <p class="message">Foto wird geladen …</p>
+    <p class="message">{t('Foto wird geladen …')}</p>
   {/if}
 
   <div class="bar top">
-    <button class="round" bind:this={closeButton} onclick={onclose} title="Zurück zum Foto (Esc)"><Icon name="close" /></button>
-    <span class="title">Weitwinkel entzerrt</span>
+    <button class="round" bind:this={closeButton} onclick={onclose} title={t('Zurück zum Foto (Esc)')}><Icon name="close" /></button>
+    <span class="title">{t('Weitwinkel entzerrt')}</span>
     <span class="spacer"></span>
-    <button class="round" onclick={reset} disabled={!loaded} title="Ganze Ansicht (0, Doppelklick)"><Icon name="restore" /></button>
-    <button class="round" onclick={save} disabled={!loaded} title="Ausschnitt als Bild speichern"><Icon name="download" /></button>
+    <button class="round" onclick={reset} disabled={!loaded} title={t('Ganze Ansicht (0, Doppelklick)')}><Icon name="restore" /></button>
+    <button class="round" onclick={save} disabled={!loaded} title={t('Ausschnitt als Bild speichern')}><Icon name="download" /></button>
   </div>
 
   <div class="bar bottom">
     <label>
-      Kamera
+      {t('Kamera')}
       <select value={settings.preset} onchange={(e) => choosePreset(e.currentTarget.value)}>
-        {#each Object.entries(PRESETS) as [id, p] (id)}<option value={id}>{p.label}</option>{/each}
-        <option value="custom">Eigene Einstellung</option>
+        {#each Object.entries(PRESETS) as [id, p] (id)}<option value={id}>{t(p.label)}</option>{/each}
+        <option value="custom">{t('Eigene Einstellung')}</option>
       </select>
     </label>
-    <button class="link" onclick={() => (fine = !fine)} aria-expanded={fine}>{fine ? 'Weniger' : 'Feineinstellung'}</button>
+    <button class="link" onclick={() => (fine = !fine)} aria-expanded={fine}>{fine ? t('Weniger') : t('Feineinstellung')}</button>
     {#if fine}
       <div class="fine">
         <label>
-          Linse
+          {t('Linse')}
           <select value={settings.model} onchange={(e) => change({ model: e.currentTarget.value })}>
-            {#each MODEL_IDS as id (id)}<option value={id}>{MODELS[id].label}</option>{/each}
+            {#each MODEL_IDS as id (id)}<option value={id}>{t(MODELS[id].label)}</option>{/each}
           </select>
         </label>
-        <label class="slider" title="Bildwinkel von links nach rechts">
-          Bildwinkel
+        <label class="slider" title={t('Bildwinkel von links nach rechts')}>
+          {t('Bildwinkel')}
           <input type="range" min={limits.min} max={limits.max} step="1" value={settings.fov}
             oninput={(e) => change({ fov: +e.currentTarget.value })} />
           <output>{settings.fov}°</output>
         </label>
-        <label class="slider" title="Action-Kameras stauchen die Bildmitte und dehnen die Seiten (z. B. GoPro SuperView)">
-          Seitenstreckung
+        <label class="slider" title={t('Action-Kameras stauchen die Bildmitte und dehnen die Seiten (z. B. GoPro SuperView)')}>
+          {t('Seitenstreckung')}
           <input type="range" min="0" max={STRETCH_MAX} step="0.01" value={settings.stretch}
             oninput={(e) => change({ stretch: +e.currentTarget.value })} />
           <output>{Math.round(settings.stretch * 100)} %</output>
         </label>
-        <label class="slider" title="Wie stark die Kamera nach unten (positiv) oder oben geneigt war">
-          Neigung
+        <label class="slider" title={t('Wie stark die Kamera nach unten (positiv) oder oben geneigt war')}>
+          {t('Neigung')}
           <input type="range" min={-TILT_MAX} max={TILT_MAX} step="1" value={settings.tilt}
             oninput={(e) => change({ tilt: +e.currentTarget.value })} />
           <output>{settings.tilt}°</output>
         </label>
-        <span class="hint">Erst den Bildwinkel einstellen, bis Linien in der Mitte gerade sind, dann die Seitenstreckung für die Ränder, zuletzt die Neigung, bis Senkrechte senkrecht stehen.</span>
+        <span class="hint">{t('Erst den Bildwinkel einstellen, bis Linien in der Mitte gerade sind, dann die Seitenstreckung für die Ränder, zuletzt die Neigung, bis Senkrechte senkrecht stehen.')}</span>
       </div>
     {/if}
   </div>

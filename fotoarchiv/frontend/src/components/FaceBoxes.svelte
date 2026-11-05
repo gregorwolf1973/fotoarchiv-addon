@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import { api } from '../lib/api.js';
   import { notifyError } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
@@ -64,9 +65,9 @@
       style:height="{face.h * 100}%"
       onclick={(e) => (e.stopPropagation(), editable && edit(face))}
       onpointerdown={(e) => e.stopPropagation()}
-      title={face.name ?? (editable ? 'Unbekannt – antippen zum Benennen' : 'Unbekannt')}
+      title={face.name ?? (editable ? t('Unbekannt – antippen zum Benennen') : t('Unbekannt'))}
     >
-      <span class="label">{face.name ?? '?'}{#if face.name && !face.confirmed}<small>&nbsp;auto</small>{/if}</span>
+      <span class="label">{face.name ?? '?'}{#if face.name && !face.confirmed}<small>&nbsp;{t('auto')}</small>{/if}</span>
     </button>
   {/each}
 
@@ -79,17 +80,17 @@
       onpointerdown={(e) => e.stopPropagation()}
     >
       <!-- svelte-ignore a11y_autofocus -->
-      <input type="text" bind:value={name} list={listId} placeholder="Name" autofocus />
+      <input type="text" bind:value={name} list={listId} placeholder={t('Name')} autofocus />
       <datalist id={listId}>{#each persons as person}<option value={person.name}></option>{/each}</datalist>
       <div class="actions">
-        <button type="submit" class="primary" disabled={busy || !name.trim()}>Speichern</button>
+        <button type="submit" class="primary" disabled={busy || !name.trim()}>{t('Speichern')}</button>
         {#if editing.group_id}
           <button type="button" disabled={busy} onclick={() => run(() => api.removeFace(editing.id))}
-            title={editing.name ? `Nicht ${editing.name}` : 'Aus der Gruppe ähnlicher Gesichter lösen'}>
-            {editing.name ? `Nicht ${editing.name}` : 'Nicht zuordnen'}
+            title={editing.name ? t('Nicht {name}', { name: editing.name }) : t('Aus der Gruppe ähnlicher Gesichter lösen')}>
+            {editing.name ? t('Nicht {name}', { name: editing.name }) : t('Nicht zuordnen')}
           </button>
         {/if}
-        <button type="button" class="icon small" onclick={() => (editing = null)} title="Abbrechen"><Icon name="close" size={18} /></button>
+        <button type="button" class="icon small" onclick={() => (editing = null)} title={t('Abbrechen')}><Icon name="close" size={18} /></button>
       </div>
     </form>
   {/if}

@@ -1,6 +1,7 @@
 <script>
   import { SvelteSet } from 'svelte/reactivity';
   import { api, cropUrl, thumbUrl } from '../lib/api.js';
+  import { locale, t } from '../lib/i18n.js';
   import { notifyError } from '../lib/notices.svelte.js';
   import FotoLupe from './FotoLupe.svelte';
   import Icon from './Icon.svelte';
@@ -8,7 +9,7 @@
   // group: { id, count } aus /api/people; persons: bekannte Personen für die Namensvorschläge
   let { group, persons, onclose, onchanged } = $props();
 
-  const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
+  const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
   const listId = `persons-${Math.random().toString(36).slice(2)}`;
   const PHOTOS_KEY = 'fotoarchiv.groupphotos';
 
@@ -83,16 +84,15 @@
   <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="group-title">
     <form onsubmit={save}>
       <header>
-        <h2 id="group-title">Wer ist das?</h2>
+        <h2 id="group-title">{t('Wer ist das?')}</h2>
         <button type="button" class="icon view-toggle" class:on={showPhotos} onclick={togglePhotos}
-          title={showPhotos ? 'Nur die Gesichter zeigen' : 'Ganze Fotos zeigen'}>
+          title={showPhotos ? t('Nur die Gesichter zeigen') : t('Ganze Fotos zeigen')}>
           <Icon name={showPhotos ? 'face' : 'images'} />
         </button>
-        <button type="button" class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
+        <button type="button" class="icon" onclick={onclose} title={t('Schließen')}><Icon name="close" /></button>
       </header>
       <p>
-        {faces.length} ähnliche Gesichter. Tippe Gesichter an, die <strong>nicht</strong> zu dieser Person gehören.
-        Die Lupe zeigt das ganze Foto zum Vergrößern. Der Name wird in alle übrigen Fotos geschrieben.
+        {t('{n} ähnliche Gesichter. Tippe Gesichter an, die', { n: faces.length })} <strong>{t('nicht')}</strong> {t('zu dieser Person gehören. Die Lupe zeigt das ganze Foto zum Vergrößern. Der Name wird in alle übrigen Fotos geschrieben.')}
       </p>
       <div class="faces" class:photos={showPhotos}>
         {#each faces as face, n (face.id)}
@@ -109,25 +109,25 @@
             {/if}
             {#if excluded.has(face.id)}<span class="mark"><Icon name="close" size={28} /></span>{/if}
           </button>
-          <button type="button" class="icon zoom" onclick={() => (lupe = n)} title="Ganzes Foto vergrößern"><Icon name="zoom" size={18} /></button>
+          <button type="button" class="icon zoom" onclick={() => (lupe = n)} title={t('Ganzes Foto vergrößern')}><Icon name="zoom" size={18} /></button>
           </div>
         {/each}
       </div>
       <label class="field">
-        Name
+        {t('Name')}
         <!-- svelte-ignore a11y_autofocus -->
-        <input type="text" bind:value={name} list={listId} placeholder="z. B. Anna Müller" autofocus required />
+        <input type="text" bind:value={name} list={listId} placeholder={t('z. B. Anna Müller')} autofocus required />
         <datalist id={listId}>{#each persons as person}<option value={person.name}></option>{/each}</datalist>
-        <small>Gibt es die Person schon, werden die Gesichter ihr hinzugefügt.</small>
+        <small>{t('Gibt es die Person schon, werden die Gesichter ihr hinzugefügt.')}</small>
       </label>
       <footer>
-        <button type="button" onclick={hide} disabled={busy} title="Unbekannte Person nicht mehr vorschlagen">
-          <Icon name="hide" size={18} /> Ausblenden
+        <button type="button" onclick={hide} disabled={busy} title={t('Unbekannte Person nicht mehr vorschlagen')}>
+          <Icon name="hide" size={18} /> {t('Ausblenden')}
         </button>
         <span class="grow"></span>
-        <button type="button" onclick={onclose}>Abbrechen</button>
+        <button type="button" onclick={onclose}>{t('Abbrechen')}</button>
         <button type="submit" class="primary" disabled={busy || !name.trim() || excluded.size === faces.length}>
-          {busy ? 'Wird gespeichert …' : 'Speichern'}
+          {busy ? t('Wird gespeichert …') : t('Speichern')}
         </button>
       </footer>
     </form>
@@ -136,13 +136,13 @@
 
 {#if lupe !== null}
   <FotoLupe {faces} index={lupe} onclose={() => (lupe = null)}>
-    {#snippet heading()}<strong>Wer ist das?</strong>{/snippet}
+    {#snippet heading()}<strong>{t('Wer ist das?')}</strong>{/snippet}
     {#snippet actions(face)}
       {#if excluded.has(face.id)}
-        <span class="out">Gehört nicht dazu</span>
-        <button type="button" onclick={() => toggle(face.id)}>Doch dazu</button>
+        <span class="out">{t('Gehört nicht dazu')}</span>
+        <button type="button" onclick={() => toggle(face.id)}>{t('Doch dazu')}</button>
       {:else}
-        <button type="button" onclick={() => toggle(face.id)}><Icon name="close" size={18} /> Gehört nicht dazu</button>
+        <button type="button" onclick={() => toggle(face.id)}><Icon name="close" size={18} /> {t('Gehört nicht dazu')}</button>
       {/if}
     {/snippet}
   </FotoLupe>

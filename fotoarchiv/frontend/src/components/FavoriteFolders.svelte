@@ -2,6 +2,7 @@
   import { thumbUrl } from '../lib/api.js';
   import { isPhotoDrag, readPhotoIds } from '../lib/dragphotos.js';
   import { formatNumber } from '../lib/format.js';
+  import { t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // Favoritenordner als Seitenleiste neben der Galerie (side) oder als eigene Übersicht (page).
@@ -71,12 +72,12 @@
   {#if mode === 'side'}
     <header>
       <Icon name="star" size={18} />
-      <strong>Favoriten</strong>
+      <strong>{t('Favoriten')}</strong>
       <span class="grow"></span>
       {#if canEdit}
-        <button class="icon small" onclick={() => startEdit(null)} title="Neuer Ordner"><Icon name="folderPlus" size={20} /></button>
+        <button class="icon small" onclick={() => startEdit(null)} title={t('Neuer Ordner')}><Icon name="folderPlus" size={20} /></button>
       {/if}
-      <button class="icon small" onclick={onhide} title="Leiste ausblenden"><Icon name="left" size={20} /></button>
+      <button class="icon small" onclick={onhide} title={t('Leiste ausblenden')}><Icon name="left" size={20} /></button>
     </header>
   {/if}
 
@@ -93,7 +94,7 @@
         {#if editing === folder.id}
           <div class="row">
             <span class="cover"><Icon name="folderStar" size={mode === 'page' ? 40 : 22} /></span>
-            <input type="text" bind:value={draft} maxlength="100" disabled={saving} onkeydown={keydown} onblur={save} use:focus aria-label="Ordnername" />
+            <input type="text" bind:value={draft} maxlength="100" disabled={saving} onkeydown={keydown} onblur={save} use:focus aria-label={t('Ordnername')} />
           </div>
         {:else}
           <button class="row" onclick={() => onopen(folder)} ondblclick={() => canEdit && startEdit(folder)} title={folder.name}>
@@ -102,11 +103,11 @@
             </span>
             <span class="text">
               <span class="name">{folder.name}</span>
-              <span class="count">{folder.count === 1 ? '1 Foto' : `${formatNumber(folder.count)} Fotos`}</span>
+              <span class="count">{folder.count === 1 ? t('1 Foto') : t('{n} Fotos', { n: formatNumber(folder.count) })}</span>
             </span>
           </button>
           {#if canEdit}
-            <button class="icon small rename" onclick={() => startEdit(folder)} title="Umbenennen"><Icon name="pencil" size={16} /></button>
+            <button class="icon small rename" onclick={() => startEdit(folder)} title={t('Umbenennen')}><Icon name="pencil" size={16} /></button>
           {/if}
         {/if}
       </li>
@@ -115,14 +116,14 @@
       <li>
         <div class="row">
           <span class="cover"><Icon name="folderStar" size={mode === 'page' ? 40 : 22} /></span>
-          <input type="text" bind:value={draft} maxlength="100" disabled={saving} placeholder="Name des Ordners" onkeydown={keydown} onblur={save} use:focus aria-label="Name des neuen Ordners" />
+          <input type="text" bind:value={draft} maxlength="100" disabled={saving} placeholder={t('Name des Ordners')} onkeydown={keydown} onblur={save} use:focus aria-label={t('Name des neuen Ordners')} />
         </div>
       </li>
     {:else if mode === 'page' && canEdit}
       <li class="add">
         <button class="row" onclick={() => startEdit(null)}>
           <span class="cover"><Icon name="folderPlus" size={40} /></span>
-          <span class="text"><span class="name">Neuer Ordner</span></span>
+          <span class="text"><span class="name">{t('Neuer Ordner')}</span></span>
         </button>
       </li>
     {/if}
@@ -131,14 +132,13 @@
   {#if !folders.length && editing !== 'new'}
     <p class="hint">
       {#if canEdit}
-        Noch keine Ordner. {mode === 'side' ? 'Mit dem Ordner-Knopf oben einen anlegen,' : 'Einen anlegen,'} dann Fotos hineinziehen
-        oder auswählen und auf <Icon name="star" size={14} /> tippen.
+        {t('Noch keine Ordner.')} {mode === 'side' ? t('Mit dem Ordner-Knopf oben einen anlegen,') : t('Einen anlegen,')} {t('dann Fotos hineinziehen oder auswählen und auf')} <Icon name="star" size={14} /> {t('tippen.')}
       {:else}
-        Noch keine Favoritenordner.
+        {t('Noch keine Favoritenordner.')}
       {/if}
     </p>
   {:else if mode === 'side' && canEdit}
-    <p class="hint">Fotos aus der Galerie auf einen Ordner ziehen. Doppelklick benennt um.</p>
+    <p class="hint">{t('Fotos aus der Galerie auf einen Ordner ziehen. Doppelklick benennt um.')}</p>
   {/if}
 </aside>
 

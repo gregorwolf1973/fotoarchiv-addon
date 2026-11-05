@@ -1,4 +1,5 @@
 <script>
+  import { t, tServer } from '../lib/i18n.js';
   import { api } from '../lib/api.js';
   import { formatBytes, formatNumber } from '../lib/format.js';
   import Icon from './Icon.svelte';
@@ -40,19 +41,19 @@
     <Icon name={status.status === 'error' ? 'alert' : 'face'} size={20} />
     <div class="text">
       {#if !status.enabled}
-        Die Gesichtserkennung ist in den Add-on-Einstellungen ausgeschaltet (<code>face_recognition</code>).
+        {t('Die Gesichtserkennung ist in den Add-on-Einstellungen ausgeschaltet')} (<code>face_recognition</code>).
       {:else if status.status === 'error'}
-        Gesichtserkennung gestört: {status.message}
+        {t('Gesichtserkennung gestört: {message}', { message: tServer(status.message) })}
       {:else if status.status === 'downloading'}
-        Erkennungsmodelle werden heruntergeladen: {formatBytes(status.download_done)} von {formatBytes(status.download_total)}
+        {t('Erkennungsmodelle werden heruntergeladen: {done} von {total}', { done: formatBytes(status.download_done), total: formatBytes(status.download_total) })}
       {:else if status.status === 'starting' || status.status === 'loading'}
-        Gesichtserkennung startet …
+        {t('Gesichtserkennung startet …')}
       {:else if status.scanned < status.images}
-        {formatNumber(status.scanned)} von {formatNumber(status.images)} Fotos nach Gesichtern durchsucht
-        <span class="muted">· läuft im Hintergrund, dauert auf dem Raspberry Pi etwa 1 Sekunde pro Foto</span>
+        {t('{scanned} von {images} Fotos nach Gesichtern durchsucht', { scanned: formatNumber(status.scanned), images: formatNumber(status.images) })}
+        <span class="muted">· {t('läuft im Hintergrund, dauert auf dem Raspberry Pi etwa 1 Sekunde pro Foto')}</span>
       {:else}
-        Alle {formatNumber(status.images)} Fotos durchsucht · {formatNumber(status.faces)} Gesichter
-        {#if status.pending_files}<span class="muted">· {formatNumber(status.pending_files)} Fotos warten aufs Beschriften</span>{/if}
+        {t('Alle {images} Fotos durchsucht · {faces} Gesichter', { images: formatNumber(status.images), faces: formatNumber(status.faces) })}
+        {#if status.pending_files}<span class="muted">· {t('{n} Fotos warten aufs Beschriften', { n: formatNumber(status.pending_files) })}</span>{/if}
       {/if}
       {#if busy || (status.enabled && status.scanned < status.images && status.status !== 'error')}
         <div class="bar"><div style:width="{percent}%"></div></div>

@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js';
+  import { LANGUAGES, language, setLanguage, t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // cookieBlocked: sicheres Cookie über http – der Browser würde die Anmeldung verwerfen
@@ -36,28 +37,46 @@
     {#if cookieBlocked}
       <p class="warning">
         <Icon name="alert" size={18} />
-        Diese Seite ist nicht über HTTPS aufgerufen. Die Anmeldung funktioniert nur über den Reverse Proxy mit TLS –
-        oder, nur zum Testen im eigenen Netz, mit <code>public_cookie_secure: false</code>.
+        {t('Diese Seite ist nicht über HTTPS aufgerufen. Die Anmeldung funktioniert nur über den Reverse Proxy mit TLS – oder, nur zum Testen im eigenen Netz, mit')} <code>public_cookie_secure: false</code>.
       </p>
     {/if}
     <label class="field">
-      Benutzername
+      {t('Benutzername')}
       <!-- svelte-ignore a11y_autofocus -->
       <input type="text" bind:value={username} autocomplete="username" autocapitalize="none" autocorrect="off" required autofocus />
     </label>
     <label class="field">
-      Passwort
+      {t('Passwort')}
       <input type="password" bind:value={password} autocomplete="current-password" required />
     </label>
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     <button type="submit" class="primary" disabled={busy || !username.trim() || !password}>
       <Icon name="lock" size={18} />
-      {busy ? 'Anmelden …' : 'Anmelden'}
+      {busy ? t('Anmelden …') : t('Anmelden')}
     </button>
   </form>
+  <label class="language">
+    {t('Sprache')}
+    <select value={language} onchange={(e) => setLanguage(e.currentTarget.value)}>
+      {#each LANGUAGES as l}<option value={l.code}>{l.label}</option>{/each}
+    </select>
+  </label>
 </div>
 
 <style>
+  .language {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--muted, inherit);
+  }
+  .login {
+    grid-auto-flow: row;
+    align-content: center;
+    justify-items: center;
+  }
   .login {
     min-height: 100vh;
     min-height: 100dvh;

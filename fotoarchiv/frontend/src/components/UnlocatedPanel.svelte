@@ -2,6 +2,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { thumbUrl } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { locale, t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // items: Bilder ohne Ort. ondragmove(x, y) -> liegt der Punkt über der Karte? ondrop(ids, x, y)
@@ -9,7 +10,7 @@
 
   const GAP = 4;
   const LONG_PRESS = 350;
-  const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
+  const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
 
   const selected = new SvelteSet();
   let grid = $state();
@@ -116,9 +117,9 @@
 
 <aside class="panel" class:collapsed>
   <header>
-    <button class="toggle" onclick={ontoggle} title={collapsed ? 'Fenster öffnen' : 'Fenster schließen'}>
+    <button class="toggle" onclick={ontoggle} title={collapsed ? t('Fenster öffnen') : t('Fenster schließen')}>
       <Icon name="marker" size={20} />
-      <strong>Ohne Ort</strong>
+      <strong>{t('Ohne Ort')}</strong>
       <span class="count">{formatNumber(items.length)}</span>
       <span class="grow"></span>
       <Icon name={collapsed ? 'left' : 'right'} size={20} />
@@ -129,14 +130,14 @@
     {#if items.length}
       <div class="bar">
         {#if selected.size}
-          <span>{formatNumber(selected.size)} ausgewählt</span>
-          <button class="link" onclick={() => selected.clear()}>Aufheben</button>
+          <span>{t('{n} ausgewählt', { n: formatNumber(selected.size) })}</span>
+          <button class="link" onclick={() => selected.clear()}>{t('Aufheben')}</button>
         {:else}
-          <span class="muted">Fotos auf die Karte ziehen. Klick wählt aus, Shift+Klick einen Bereich.</span>
+          <span class="muted">{t('Fotos auf die Karte ziehen. Klick wählt aus, Shift+Klick einen Bereich.')}</span>
         {/if}
         <span class="grow"></span>
         {#if selected.size < items.length}
-          <button class="link" onclick={() => items.forEach((i) => selected.add(i[0]))}>Alle</button>
+          <button class="link" onclick={() => items.forEach((i) => selected.add(i[0]))}>{t('Alle')}</button>
         {/if}
       </div>
       <div class="grid" bind:this={grid} bind:clientWidth={width} bind:clientHeight={height} onscroll={() => (scrollTop = grid.scrollTop)}>
@@ -163,7 +164,7 @@
         </div>
       </div>
     {:else}
-      <p class="done">Alle bearbeitbaren Fotos haben einen Aufnahmeort.</p>
+      <p class="done">{t('Alle bearbeitbaren Fotos haben einen Aufnahmeort.')}</p>
     {/if}
   {/if}
 </aside>

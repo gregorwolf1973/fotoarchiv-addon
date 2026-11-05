@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import { onMount } from 'svelte';
   import { createMap, L, pinIcon } from '../lib/map.js';
   import Icon from './Icon.svelte';
@@ -8,7 +9,7 @@
   // count > 1: der Ort gilt für eine Mehrfachauswahl
   // saveLabel: in der Einzelansicht "Übernehmen", gespeichert wird dort erst mit dem Speichern-Button
   // hint: eigener Erklärtext (z. B. Gruppe verschieben) statt des Standards
-  let { lat = null, lon = null, count = 1, saveLabel = 'Speichern', hint = '', onsave, oncancel } = $props();
+  let { lat = null, lon = null, count = 1, saveLabel = t('Speichern'), hint = '', onsave, oncancel } = $props();
 
   let container = $state();
   // svelte-ignore state_referenced_locally
@@ -47,25 +48,25 @@
 <div class="modal-backdrop" onclick={(e) => e.target === e.currentTarget && oncancel()} role="presentation">
   <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="location-title">
     <header>
-      <h2 id="location-title">Aufnahmeort</h2>
-      <button class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
+      <h2 id="location-title">{t('Aufnahmeort')}</h2>
+      <button class="icon" onclick={oncancel} title={t('Schließen')}><Icon name="close" /></button>
     </header>
     {#if hint}
       <p>{hint}</p>
     {:else if count > 1}
-      <p>Alle <strong>{count}</strong> ausgewählten Dateien bekommen genau diesen Ort. In die Karte tippen oder die Stecknadel verschieben.</p>
+      <p>{t('Alle {count} ausgewählten Dateien bekommen genau diesen Ort. In die Karte tippen oder die Stecknadel verschieben.', { count })}</p>
     {:else}
-      <p>In die Karte tippen oder die Stecknadel verschieben. Mit der Suche springst du schnell zu einem Ort.</p>
+      <p>{t('In die Karte tippen oder die Stecknadel verschieben. Mit der Suche springst du schnell zu einem Ort.')}</p>
     {/if}
     <div class="map-box">
       <div class="map" bind:this={container}></div>
       <div class="search"><PlaceSearch onselect={goTo} /></div>
     </div>
     <div class="coords">
-      {#if position}{position.lat.toFixed(5)}, {position.lon.toFixed(5)}{:else}Noch kein Ort gewählt{/if}
+      {#if position}{position.lat.toFixed(5)}, {position.lon.toFixed(5)}{:else}{t('Noch kein Ort gewählt')}{/if}
     </div>
     <footer>
-      <button onclick={oncancel}>Abbrechen</button>
+      <button onclick={oncancel}>{t('Abbrechen')}</button>
       <button class="primary" disabled={!position} onclick={() => onsave(position)}>{saveLabel}</button>
     </footer>
   </div>

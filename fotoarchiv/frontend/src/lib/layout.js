@@ -1,12 +1,13 @@
 // Galerie-Layout: Bilder je Tag gruppiert, Zeilen im Blocksatz (wie Google Fotos).
 // Ein Eintrag ist [id, ts, breite, höhe, video, rev]; ts = Ortszeit als Sekunden (UTC gerechnet).
+import { locale } from './i18n.js';
 
 const DAY = 86400;
 
-const dayFormat = new Intl.DateTimeFormat('de-DE', {
+const dayFormat = new Intl.DateTimeFormat(locale, {
   weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
 });
-const monthFormat = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const monthFormat = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 export const dayLabel = (ts) => dayFormat.format(ts * 1000);
 export const monthLabel = (ts) => monthFormat.format(ts * 1000);

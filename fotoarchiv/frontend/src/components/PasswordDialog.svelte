@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import { api } from '../lib/api.js';
   import { notify } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
@@ -14,7 +15,7 @@
   let error = $state('');
 
   const problem = $derived(
-    !next ? '' : next.length < MIN ? `mindestens ${MIN} Zeichen` : repeat && repeat !== next ? 'Wiederholung stimmt nicht überein' : '',
+    !next ? '' : next.length < MIN ? t('mindestens {n} Zeichen', { n: MIN }) : repeat && repeat !== next ? t('Wiederholung stimmt nicht überein') : '',
   );
   const valid = $derived(current && next.length >= MIN && next === repeat);
 
@@ -24,7 +25,7 @@
     error = '';
     try {
       await api.changePassword(current, next);
-      notify('Passwort geändert. Andere Geräte wurden abgemeldet.');
+      notify(t('Passwort geändert. Andere Geräte wurden abgemeldet.'));
       onclose();
     } catch (e) {
       error = e.message;
@@ -40,28 +41,28 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="password-title">
     <form onsubmit={(e) => (e.preventDefault(), save())}>
       <header>
-        <h2 id="password-title">Passwort ändern</h2>
-        <button type="button" class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
+        <h2 id="password-title">{t('Passwort ändern')}</h2>
+        <button type="button" class="icon" onclick={onclose} title={t('Schließen')}><Icon name="close" /></button>
       </header>
-      <p>Danach bleibst du hier angemeldet, auf allen anderen Geräten musst du dich neu anmelden.</p>
+      <p>{t('Danach bleibst du hier angemeldet, auf allen anderen Geräten musst du dich neu anmelden.')}</p>
       <label class="field">
-        Bisheriges Passwort
+        {t('Bisheriges Passwort')}
         <!-- svelte-ignore a11y_autofocus -->
         <input type="password" bind:value={current} autocomplete="current-password" required autofocus />
       </label>
       <label class="field">
-        Neues Passwort (mind. {MIN} Zeichen)
+        {t('Neues Passwort (mind. {n} Zeichen)', { n: MIN })}
         <input type="password" bind:value={next} autocomplete="new-password" minlength={MIN} required />
       </label>
       <label class="field">
-        Neues Passwort wiederholen
+        {t('Neues Passwort wiederholen')}
         <input type="password" bind:value={repeat} autocomplete="new-password" required />
       </label>
       {#if problem}<p class="hint">{problem}</p>{/if}
       {#if error}<p class="error">{error}</p>{/if}
       <footer>
-        <button type="button" onclick={onclose}>Abbrechen</button>
-        <button type="submit" class="primary" disabled={!valid || busy}>Ändern</button>
+        <button type="button" onclick={onclose}>{t('Abbrechen')}</button>
+        <button type="submit" class="primary" disabled={!valid || busy}>{t('Ändern')}</button>
       </footer>
     </form>
   </div>

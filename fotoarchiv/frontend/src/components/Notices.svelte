@@ -1,4 +1,5 @@
 <script>
+  import { t, tServer } from '../lib/i18n.js';
   import { dismiss, notices } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
 
@@ -10,7 +11,7 @@
   {#each tasks as task (task.id)}
     <div class="notice">
       <span class="spinner"></span>
-      <span class="text">{task.label}</span>
+      <span class="text">{tServer(task.label)}</span>
       <span class="progress">{task.done} / {task.total}</span>
     </div>
   {/each}
@@ -21,7 +22,7 @@
       {#if notice.action}
         <button class="action" onclick={() => (notice.action(), dismiss(notice.id))}>{notice.actionLabel}</button>
       {/if}
-      <button class="icon small" onclick={() => dismiss(notice.id)} title="Schließen"><Icon name="close" size={16} /></button>
+      <button class="icon small" onclick={() => dismiss(notice.id)} title={t('Schließen')}><Icon name="close" size={16} /></button>
     </div>
   {/each}
 </div>

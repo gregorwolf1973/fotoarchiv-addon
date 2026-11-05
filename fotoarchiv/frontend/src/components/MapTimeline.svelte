@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import { formatNumber } from '../lib/format.js';
   import Icon from './Icon.svelte';
 
@@ -15,12 +16,12 @@
 
 <div class="timeline" class:on={period.on}>
   <button class="toggle" class:active={period.on} onclick={() => set({ on: !period.on })}
-    title={period.on ? 'Alle Jahre zeigen' : 'Nur Fotos aus einem Zeitraum zeigen'}>
+    title={period.on ? t('Alle Jahre zeigen') : t('Nur Fotos aus einem Zeitraum zeigen')}>
     <Icon name="calendar" size={18} />
-    <span>{period.on ? label : 'Zeitraum'}</span>
+    <span>{period.on ? label : t('Zeitraum')}</span>
   </button>
   {#if period.on}
-    <button class="icon small" disabled={period.start <= minYear} onclick={() => move(-1)} title="Ein Jahr früher">
+    <button class="icon small" disabled={period.start <= minYear} onclick={() => move(-1)} title={t('Ein Jahr früher')}>
       <Icon name="left" size={20} />
     </button>
     <input
@@ -30,15 +31,15 @@
       step="1"
       value={period.start}
       oninput={(e) => set({ start: Number(e.currentTarget.value) })}
-      aria-label="Startjahr"
+      aria-label={t('Startjahr')}
     />
-    <button class="icon small" disabled={period.start >= maxYear} onclick={() => move(1)} title="Ein Jahr später">
+    <button class="icon small" disabled={period.start >= maxYear} onclick={() => move(1)} title={t('Ein Jahr später')}>
       <Icon name="right" size={20} />
     </button>
-    <select value={period.span} onchange={(e) => set({ span: Number(e.currentTarget.value) })} aria-label="Länge des Zeitraums">
-      {#each SPANS as span}<option value={span}>{span === 1 ? '1 Jahr' : `${span} Jahre`}</option>{/each}
+    <select value={period.span} onchange={(e) => set({ span: Number(e.currentTarget.value) })} aria-label={t('Länge des Zeitraums')}>
+      {#each SPANS as span}<option value={span}>{span === 1 ? t('1 Jahr') : t('{n} Jahre', { n: span })}</option>{/each}
     </select>
-    <span class="count">{formatNumber(count)} {count === 1 ? 'Foto' : 'Fotos'}</span>
+    <span class="count">{count === 1 ? t('{n} Foto', { n: formatNumber(count) }) : t('{n} Fotos', { n: formatNumber(count) })}</span>
   {/if}
 </div>
 

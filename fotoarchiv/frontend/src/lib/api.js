@@ -1,4 +1,5 @@
 // Alle Pfade relativ, damit die Oberfläche hinter dem Ingress-Präfix funktioniert.
+import { t, tServer } from './i18n.js';
 
 // Internetzugang: CSRF-Token der Sitzung für alle ändernden Anfragen; 401 meldet die Abmeldung an die App
 export const auth = { csrf: null, onUnauthorized: () => {} };
@@ -13,8 +14,9 @@ async function request(path, options = {}) {
   // ganzen Seite lösen, nicht bei einer Anfrage im Hintergrund – sonst käme nur "Forbidden"
   if (response.headers.get('cf-mitigated') === 'challenge') {
     throw new Error(
-      'Cloudflare hat die Anfrage mit einer Sicherheitsabfrage abgefangen. Eine WAF-Regel oder der Bot-Schutz ' +
-        `trifft diesen Pfad (${path.split('?')[0]}); er muss dort ausgenommen werden.`,
+      t('Cloudflare hat die Anfrage mit einer Sicherheitsabfrage abgefangen. Eine WAF-Regel oder der Bot-Schutz trifft diesen Pfad ({path}); er muss dort ausgenommen werden.', {
+        path: path.split('?')[0],
+      }),
     );
   }
   if (response.status === 401 && !path.startsWith('api/auth/')) auth.onUnauthorized();
@@ -23,11 +25,11 @@ async function request(path, options = {}) {
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
-    if (!response.ok) throw new Error(response.statusText || `Fehler ${response.status}`);
+    if (!response.ok) throw new Error(response.statusText || t('Fehler {status}', { status: response.status }));
   }
   if (!response.ok) {
     const detail = body?.detail;
-    throw new Error(Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : detail || response.statusText);
+    throw new Error(Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : detail ? tServer(detail) : response.statusText);
   }
   return body;
 }
@@ -148,7 +150,7 @@ const CHUNK = 32 * 1024 * 1024;
 const RETRIES = 6;
 const RETRY_STATUS = new Set([0, 408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 
-const CANCELLED = { status: 'cancelled', message: 'abgebrochen' };
+const CANCELLED = { status: 'cancelled', message: t('abgebrochen') };
 
 /** Upload mit Fortschritt; löst immer auf, Fehler stehen im Ergebnis. signal: AbortSignal zum Abbrechen. */
 export function upload(file, onprogress, signal) {
@@ -157,10 +159,10 @@ export function upload(file, onprogress, signal) {
 
 function put(url, body, onprogress, signal) {
   return new Promise((resolve) => {
-    if (signal?.aborted) return resolve({ status: -1, json: null, text: 'abgebrochen' });
+    if (signal?.aborted) return resolve({ status: -1, json: null, text: t('abgebrochen') });
     const xhr = new XMLHttpRequest();
     signal?.addEventListener('abort', () => xhr.abort(), { once: true });
-    xhr.onabort = () => resolve({ status: -1, json: null, text: 'abgebrochen' });
+    xhr.onabort = () => resolve({ status: -1, json: null, text: t('abgebrochen') });
     xhr.open('PUT', url);
     if (auth.csrf) xhr.setRequestHeader('X-CSRF-Token', auth.csrf);
     xhr.upload.onprogress = (e) => e.lengthComputable && onprogress(e.loaded);
@@ -174,7 +176,7 @@ function put(url, body, onprogress, signal) {
       if (xhr.status === 401) auth.onUnauthorized();
       resolve({ status: xhr.status, json, text: xhr.statusText });
     };
-    xhr.onerror = () => resolve({ status: 0, json: null, text: 'Netzwerkfehler' });
+    xhr.onerror = () => resolve({ status: 0, json: null, text: t('Netzwerkfehler') });
     xhr.send(body);
   });
 }
@@ -183,11 +185,11 @@ function put(url, body, onprogress, signal) {
 const failed = (r) => ({
   status: 'error',
   message:
-    r.json?.detail ||
-    (r.status === 413 ? 'Datei zu groß für den Proxy'
-    : r.status === 403 ? 'Zugriff verweigert (403) – Sperre durch CrowdSec oder Cloudflare?'
-    : r.status > 0 ? `Fehler ${r.status}${r.text ? ` (${r.text})` : ''}`
-    : 'Netzwerkfehler – Verbindung abgebrochen'),
+    (r.json?.detail ? tServer(r.json.detail) : '') ||
+    (r.status === 413 ? t('Datei zu groß für den Proxy')
+    : r.status === 403 ? t('Zugriff verweigert (403) – Sperre durch CrowdSec oder Cloudflare?')
+    : r.status > 0 ? t('Fehler {status}', { status: r.status }) + (r.text ? ` (${r.text})` : '')
+    : t('Netzwerkfehler – Verbindung abgebrochen')),
 });
 
 async function uploadWhole(file, onprogress, signal) {
@@ -237,7 +239,7 @@ async function uploadChunked(file, onprogress, signal) {
       return r.json && !r.json.detail ? r.json : failed(r); // letztes Stück: Ergebnis des Imports
     }
   }
-  return { status: 'error', message: 'Upload unvollständig' };
+  return { status: 'error', message: t('Upload unvollständig') };
 }
 
 export const SUPPORTED = /\.(jpe?g|png|gif|webp|tiff?|hei[cf]|avif|mp4|m4v|mov|3gp|mkv|webm|avi|m2?ts|mpe?g|wmv)$/i;

@@ -2,6 +2,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { api, thumbUrl } from '../lib/api.js';
   import { formatBytes, formatDuration, formatNumber } from '../lib/format.js';
+  import { locale, t, tServer } from '../lib/i18n.js';
   import { notifyError } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
 
@@ -11,15 +12,15 @@
   let { revision, canEdit = true, onopen, onbatch, onconvert = null } = $props();
 
   const KINDS = [
-    ['all', 'Alle'],
-    ['video', 'Videos'],
-    ['image', 'Fotos'],
-    ['damaged', 'Beschädigt'],
+    ['all', t('Alle')],
+    ['video', t('Videos')],
+    ['image', t('Fotos')],
+    ['damaged', t('Beschädigt')],
   ];
   const SIZES = [0, 10, 50, 100, 500, 1000];
   const ORDERS = [
-    ['desc', 'Größte zuerst'],
-    ['asc', 'Kleinste zuerst'],
+    ['desc', t('Größte zuerst')],
+    ['asc', t('Kleinste zuerst')],
   ];
 
   let kind = $state('all');
@@ -67,7 +68,7 @@
     lastIndex = null;
   }
 
-  const date = (ts) => new Date(ts * 1000).toLocaleDateString('de-DE', { dateStyle: 'medium', timeZone: 'UTC' });
+  const date = (ts) => new Date(ts * 1000).toLocaleDateString(locale, { dateStyle: 'medium', timeZone: 'UTC' });
   const details = (item) =>
     [date(item[1]), item[4] && item[8] ? formatDuration(item[8]) : '', item[2] && item[3] ? `${item[2]} × ${item[3]}` : '']
       .filter(Boolean)
@@ -76,21 +77,21 @@
 
 <div class="storage">
   <div class="controls">
-    <div class="segmented" role="group" aria-label="Art">
+    <div class="segmented" role="group" aria-label={t('Art')}>
       {#each KINDS as [value, label] (value)}
         <button class:active={kind === value} onclick={() => ((kind = value), (lastIndex = null))}>{label}</button>
       {/each}
     </div>
     <label>
-      Größe
+      {t('Größe')}
       <select bind:value={minMb} onchange={() => (lastIndex = null)}>
         {#each SIZES as size (size)}
-          <option value={size}>{size ? `ab ${size >= 1000 ? `${size / 1000} GB` : `${size} MB`}` : 'alle'}</option>
+          <option value={size}>{size ? t('ab {size}', { size: size >= 1000 ? `${size / 1000} GB` : `${size} MB` }) : t('alle')}</option>
         {/each}
       </select>
     </label>
     <label>
-      Reihenfolge
+      {t('Reihenfolge')}
       <select bind:value={order} onchange={() => (lastIndex = null)}>
         {#each ORDERS as [value, label] (value)}
           <option {value}>{label}</option>
@@ -99,25 +100,24 @@
     </label>
     {#if kind === 'damaged'}
       <p class="hint">
-        Dateien, aus denen sich kein Vorschaubild erzeugen ließ – meist abgebrochen kopiert oder hochgeladen. Gibt es das
-        Original noch, diese Einträge löschen und das Original neu importieren.
+        {t('Dateien, aus denen sich kein Vorschaubild erzeugen ließ – meist abgebrochen kopiert oder hochgeladen. Gibt es das Original noch, diese Einträge löschen und das Original neu importieren.')}
       </p>
     {/if}
     {#if data}
-      <span class="sum">{formatNumber(data.count)} Dateien · zusammen <strong>{formatBytes(data.bytes)}</strong></span>
+      <span class="sum">{t('{n} Dateien · zusammen', { n: formatNumber(data.count) })} <strong>{formatBytes(data.bytes)}</strong></span>
     {/if}
   </div>
 
   {#if selected.size}
     <div class="selbar">
-      <strong>{formatNumber(selected.size)} ausgewählt · {formatBytes(selectedBytes)}</strong>
+      <strong>{t('{n} ausgewählt', { n: formatNumber(selected.size) })} · {formatBytes(selectedBytes)}</strong>
       <span class="grow"></span>
-      <button onclick={() => (selected.clear(), (lastIndex = null))}>Aufheben</button>
+      <button onclick={() => (selected.clear(), (lastIndex = null))}>{t('Aufheben')}</button>
       {#if onconvert}
         <button onclick={() => onconvert([...selected], () => (selected.clear(), (lastIndex = null)))}
-          title="HEIC → JPEG, nicht abspielbare Videos → MP4"><Icon name="convert" size={18} /> Umwandeln</button>
+          title={t('HEIC → JPEG, nicht abspielbare Videos → MP4')}><Icon name="convert" size={18} /> {t('Umwandeln')}</button>
       {/if}
-      <button class="danger" onclick={trash}><Icon name="delete" size={18} /> In den Papierkorb</button>
+      <button class="danger" onclick={trash}><Icon name="delete" size={18} /> {t('In den Papierkorb')}</button>
     </div>
   {/if}
 
@@ -125,12 +125,12 @@
     {#each items as item, index (item[0])}
       <li class:on={selected.has(item[0])}>
         {#if canEdit}
-          <button class="check" onclick={(e) => toggle(index, e)} title="Auswählen (Shift + Klick wählt einen Bereich)"
+          <button class="check" onclick={(e) => toggle(index, e)} title={t('Auswählen (Shift + Klick wählt einen Bereich)')}
             aria-pressed={selected.has(item[0])}>
             {#if selected.has(item[0])}<Icon name="checkCircle" size={22} />{:else}<span class="ring"></span>{/if}
           </button>
         {/if}
-        <button class="open" onclick={() => onopen(items, item[0])} title="Öffnen">
+        <button class="open" onclick={() => onopen(items, item[0])} title={t('Öffnen')}>
           <img src={thumbUrl(item, true)} alt="" loading="lazy" />
           {#if item[4]}<span class="play"><Icon name="play" size={16} /></span>{/if}
         </button>
@@ -138,20 +138,21 @@
           <span class="name" title={item[7]}>{item[7]}</span>
           <small>{details(item)}</small>
           {#if kind === 'damaged'}
-            <small class="reason">{item[9] ?? 'Vorschaubild ließ sich nicht erzeugen'}</small>
+            <small class="reason">{tServer(item[9]) ?? t('Vorschaubild ließ sich nicht erzeugen')}</small>
           {/if}
           <span class="bar"><span style:width="{Math.max(1, (item[6] / largest) * 100)}%"></span></span>
         </div>
         <strong class="size">{formatBytes(item[6])}</strong>
       </li>
     {:else}
-      {#if data}<li class="empty">Keine Dateien in dieser Auswahl.</li>{/if}
+      {#if data}<li class="empty">{t('Keine Dateien in dieser Auswahl.')}</li>{/if}
     {/each}
   </ul>
   {#if data && data.count > items.length}
     <p class="more">
-      Gezeigt werden die {formatNumber(items.length)}
-      {order === 'asc' ? 'kleinsten' : 'größten'} von {formatNumber(data.count)} Dateien.
+      {order === 'asc'
+        ? t('Gezeigt werden die {n} kleinsten von {total} Dateien.', { n: formatNumber(items.length), total: formatNumber(data.count) })
+        : t('Gezeigt werden die {n} größten von {total} Dateien.', { n: formatNumber(items.length), total: formatNumber(data.count) })}
     </p>
   {/if}
 </div>

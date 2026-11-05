@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   let { title, text, confirmLabel = 'OK', danger = false, onconfirm, oncancel } = $props();
 </script>
 
@@ -9,7 +10,7 @@
     <header><h2 id="confirm-title">{title}</h2></header>
     <p>{text}</p>
     <footer>
-      <button onclick={oncancel}>Abbrechen</button>
+      <button onclick={oncancel}>{t('Abbrechen')}</button>
       <!-- svelte-ignore a11y_autofocus -->
       <button class={danger ? 'danger' : 'primary'} onclick={onconfirm} autofocus>{confirmLabel}</button>
     </footer>

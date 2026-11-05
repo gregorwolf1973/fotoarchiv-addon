@@ -1,21 +1,22 @@
 <script>
   import { api, SUPPORTED, upload } from '../lib/api.js';
   import Icon from './Icon.svelte';
+  import { t, tServer } from '../lib/i18n.js';
 
   let { enabled = true, onchanged } = $props();
 
   const PARALLEL = 2;
   const CHECK_BATCH = 1000;
   const LABELS = {
-    checking: 'prüft',
-    waiting: 'wartet',
-    uploading: 'lädt hoch',
-    imported: 'importiert',
-    duplicate: 'schon da',
-    damaged: 'beschädigt',
-    skipped: 'übersprungen',
-    cancelled: 'abgebrochen',
-    error: 'Fehler',
+    checking: t('prüft'),
+    waiting: t('wartet'),
+    uploading: t('lädt hoch'),
+    imported: t('importiert'),
+    duplicate: t('schon da'),
+    damaged: t('beschädigt'),
+    skipped: t('übersprungen'),
+    cancelled: t('abgebrochen'),
+    error: t('Fehler'),
   };
   const OPEN = ['checking', 'waiting', 'uploading'];
   const FAILED = ['error', 'damaged', 'skipped'];
@@ -58,9 +59,9 @@
     const elapsed = (now - startedAt) / 1000;
     if (!running || !startedAt || elapsed < 5 || !bytes.sent) return '';
     const seconds = ((bytes.total - bytes.sent) / bytes.sent) * elapsed;
-    if (seconds < 60) return 'noch unter 1 Min.';
+    if (seconds < 60) return t('noch unter 1 Min.');
     const minutes = Math.round(seconds / 60);
-    return minutes < 60 ? `noch ca. ${minutes} Min.` : `noch ca. ${Math.floor(minutes / 60)} Std. ${minutes % 60} Min.`;
+    return minutes < 60 ? t('noch ca. {minutes} Min.', { minutes }) : t('noch ca. {hours} Std. {minutes} Min.', { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
   });
 
   /** Dateien oder (per Drag & Drop) ganze Ordner hinzufügen. */
@@ -73,7 +74,7 @@
         name: file.name,
         size: file.size,
         status: supported ? 'checking' : 'skipped',
-        message: supported ? '' : 'Dateityp wird nicht unterstützt',
+        message: supported ? '' : t('Dateityp wird nicht unterstützt'),
         progress: 0,
         transfer: false, // wird wirklich übertragen (nicht vorab als vorhanden erkannt)
         controller: null,
@@ -97,7 +98,7 @@
         if (entry.status !== 'checking') return; // inzwischen abgebrochen
         if (known[j]) {
           entry.status = 'duplicate';
-          entry.message = 'schon im Archiv – nicht erneut hochgeladen';
+          entry.message = t('schon im Archiv – nicht erneut hochgeladen');
           entry.file = null;
         } else {
           entry.status = 'waiting';
@@ -121,9 +122,9 @@
         entry.status = result.status;
         entry.similar = Boolean(result.similar);
         entry.message =
-          result.status === 'duplicate' ? `schon vorhanden: ${result.existing}`
-          : result.similar ? `sehr ähnlich zu: ${result.similar}`
-          : result.message;
+          result.status === 'duplicate' ? t('schon vorhanden: {name}', { name: result.existing })
+          : result.similar ? t('sehr ähnlich zu: {name}', { name: result.similar })
+          : tServer(result.message);
         // Bei einem Fehler die Datei behalten: "Erneut versuchen" schickt sie noch einmal
         if (result.status !== 'error') entry.file = null;
         entry.controller = null;
@@ -251,8 +252,8 @@
   <div class="dropzone">
     <div>
       <Icon name="upload" size={56} />
-      <p>Zum Hochladen loslassen</p>
-      <small>Fotos, Videos oder ganze Ordner – Duplikate werden erkannt</small>
+      <p>{t('Zum Hochladen loslassen')}</p>
+      <small>{t('Fotos, Videos oder ganze Ordner – Duplikate werden erkannt')}</small>
     </div>
   </div>
 {/if}
@@ -260,30 +261,30 @@
 {#if queue.length}
   <div class="toast" class:collapsed role="status">
     <header>
-      <button class="head" onclick={() => (collapsed = !collapsed)} title={collapsed ? 'Liste zeigen' : 'Liste ausblenden'}>
-        <strong>Hochladen · {done} / {queue.length}</strong>
+      <button class="head" onclick={() => (collapsed = !collapsed)} title={collapsed ? t('Liste zeigen') : t('Liste ausblenden')}>
+        <strong>{t('Hochladen · {done} / {total}', { done, total: queue.length })}</strong>
         <span class="meta">
           {#if running}
             {percent} %{#if remaining} · {remaining}{/if}
           {:else}
-            fertig
+            {t('fertig')}
           {/if}
         </span>
       </button>
       {#if running}
-        <button class="text" onclick={cancel}>Abbrechen</button>
+        <button class="text" onclick={cancel}>{t('Abbrechen')}</button>
       {:else}
         {#if retryable}
-          <button class="text" onclick={retry} title="Fehlgeschlagene Dateien noch einmal hochladen">Erneut versuchen</button>
+          <button class="text" onclick={retry} title={t('Fehlgeschlagene Dateien noch einmal hochladen')}>{t('Erneut versuchen')}</button>
         {/if}
-        <button class="icon small" onclick={clear} title="Schließen"><Icon name="close" size={18} /></button>
+        <button class="icon small" onclick={clear} title={t('Schließen')}><Icon name="close" size={18} /></button>
       {/if}
     </header>
     {#if running}
       <div class="total"><span style:width="{percent}%"></span></div>
     {:else}
       <p class="summary">
-        {summary.imported} importiert{#if summary.similar} ({summary.similar} sehr ähnlich zu vorhandenen){/if}{#if summary.duplicate}, {summary.duplicate} schon vorhanden{/if}{#if summary.cancelled}, {summary.cancelled} abgebrochen{/if}{#if summary.failed}, {summary.failed} nicht importiert{/if}
+        {t('{n} importiert', { n: summary.imported })}{#if summary.similar} ({t('{n} sehr ähnlich zu vorhandenen', { n: summary.similar })}){/if}{#if summary.duplicate}, {t('{n} schon vorhanden', { n: summary.duplicate })}{/if}{#if summary.cancelled}, {t('{n} abgebrochen', { n: summary.cancelled })}{/if}{#if summary.failed}, {t('{n} nicht importiert', { n: summary.failed })}{/if}
       </p>
     {/if}
     {#if !collapsed}
@@ -294,7 +295,7 @@
             {#if entry.status === 'uploading'}
               <span class="bar"><span style:width="{Math.round(entry.progress * 100)}%"></span></span>
             {:else}
-              <span class="state" title={entry.message}>{entry.similar ? 'ähnlich' : (LABELS[entry.status] ?? entry.status)}</span>
+              <span class="state" title={entry.message}>{entry.similar ? t('ähnlich') : (LABELS[entry.status] ?? entry.status)}</span>
             {/if}
             {#if entry.message && FAILED.includes(entry.status)}
               <!-- Am Handy gibt es keinen Tooltip: den Grund direkt zeigen -->

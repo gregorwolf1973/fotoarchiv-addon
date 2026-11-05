@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // values: Liste von Namen; Enter fügt hinzu (Komma nicht, Namen wie "Müller, Hans" sind erlaubt)
@@ -41,7 +42,7 @@
       <Icon name={icon} size={14} />
       {value}
       {#if !disabled}
-        <button type="button" onclick={() => onchange(values.filter((v) => v !== value))} title="Entfernen">
+        <button type="button" onclick={() => onchange(values.filter((v) => v !== value))} title={t('Entfernen')}>
           <Icon name="close" size={14} />
         </button>
       {/if}

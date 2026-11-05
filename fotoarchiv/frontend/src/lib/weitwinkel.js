@@ -6,15 +6,17 @@
 // ungleichmäßig gestreckt sind: in der Mitte gestaucht, zum Rand hin gedehnt. Das bildet stretch ab;
 // ohne es bleiben Kanten auch mit dem richtigen Bildwinkel gebogen. tilt gleicht eine nach unten
 // (positiv) bzw. oben geneigte Kamera aus, damit Senkrechte bei waagrechtem Blick senkrecht stehen.
+import { t } from './i18n.js';
+
 
 const DEG = Math.PI / 180;
 
 /** Linsenmodelle: Abstand r vom Bildmittelpunkt bei Winkel θ zur Achse, Brennweite f = 1. */
 export const MODELS = {
-  equidistant: { label: 'Fischauge (winkeltreu)', r: (t) => t, theta: (r) => r },
-  equisolid: { label: 'Fischauge (flächentreu)', r: (t) => 2 * Math.sin(t / 2), theta: (r) => 2 * Math.asin(Math.min(1, r / 2)) },
-  stereographic: { label: 'Fischauge (stereografisch)', r: (t) => 2 * Math.tan(t / 2), theta: (r) => 2 * Math.atan(r / 2) },
-  rectilinear: { label: 'Normales Weitwinkel', r: (t) => Math.tan(t), theta: (r) => Math.atan(r) },
+  equidistant: { label: t('Fischauge (winkeltreu)'), r: (t) => t, theta: (r) => r },
+  equisolid: { label: t('Fischauge (flächentreu)'), r: (t) => 2 * Math.sin(t / 2), theta: (r) => 2 * Math.asin(Math.min(1, r / 2)) },
+  stereographic: { label: t('Fischauge (stereografisch)'), r: (t) => 2 * Math.tan(t / 2), theta: (r) => 2 * Math.atan(r / 2) },
+  rectilinear: { label: t('Normales Weitwinkel'), r: (t) => Math.tan(t), theta: (r) => Math.atan(r) },
 };
 export const MODEL_IDS = Object.keys(MODELS);
 export const MODEL_INDEX = Object.fromEntries(MODEL_IDS.map((id, i) => [id, i]));
@@ -28,9 +30,9 @@ export const TILT_MAX = 45;
 
 /** Kamera-Vorgaben; „Action-Kamera“ ist an einem GoPro-SuperView-Foto vermessen. */
 export const PRESETS = {
-  action: { label: 'Action-Kamera (GoPro SuperView u. ä.)', model: 'equidistant', fov: 120, stretch: 0.2, tilt: 0 },
-  fisheye: { label: 'Fischauge 180°', model: 'equidistant', fov: 180, stretch: 0, tilt: 0 },
-  wide: { label: 'Normales Weitwinkel', model: 'rectilinear', fov: 100, stretch: 0, tilt: 0 },
+  action: { label: t('Action-Kamera (GoPro SuperView u. ä.)'), model: 'equidistant', fov: 120, stretch: 0.2, tilt: 0 },
+  fisheye: { label: t('Fischauge 180°'), model: 'equidistant', fov: 180, stretch: 0, tilt: 0 },
+  wide: { label: t('Normales Weitwinkel'), model: 'rectilinear', fov: 100, stretch: 0, tilt: 0 },
 };
 const { label: _label, ...ACTION } = PRESETS.action;
 export const DEFAULTS = { preset: 'action', ...ACTION };

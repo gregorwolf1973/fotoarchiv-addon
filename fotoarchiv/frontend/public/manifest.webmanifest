@@ -3,7 +3,6 @@
   "name": "Fotoarchiv",
   "short_name": "Fotoarchiv",
   "description": "Familienfotos ansehen und hochladen",
-  "lang": "de",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

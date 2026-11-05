@@ -85,6 +85,10 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 | Mehrere Filter auf einmal | „Fisch + Angeln“ eintippen, Enter | wie Maus |
 | Vorschau größer/kleiner | Strg + Mausrad, Touchpad-Geste oder − / + unten links | zwei Finger zusammenziehen oder auseinanderziehen |
 
+## Sprache
+
+Die Oberfläche gibt es auf Deutsch, Englisch und Italienisch. Sie richtet sich nach der Browsersprache; passt keine, erscheint Englisch. Ändern lässt sie sich unter **Einstellungen** und auf der Anmeldeseite, die Wahl gilt für das jeweilige Gerät. Schlagworte aus der Bilderkennung bleiben auf Deutsch, weil sie in den Fotos stehen und danach gesucht wird. Die Add-on-Option `map_language` steuert nur die Kartenbeschriftung.
+
 ## Als App aufs Handy (Familie)
 
 Über den Internetzugang lässt sich das Fotoarchiv wie eine App installieren, ganz ohne App-Store. Jede Person bekommt ein eigenes Konto, zum Hochladen mit der Rolle **Hochladen + Bearbeiten (ohne Löschen)**.

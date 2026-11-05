@@ -1,23 +1,24 @@
 <script>
   import { api } from '../lib/api.js';
+  import { locale, t } from '../lib/i18n.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import Confirm from './Confirm.svelte';
   import Icon from './Icon.svelte';
 
   let { onclose } = $props();
 
-  const ROLES = { viewer: 'Ansehen', uploader: 'Hochladen + Bearbeiten (ohne Löschen)', editor: 'Bearbeiten' };
+  const ROLES = { viewer: t('Ansehen'), uploader: t('Hochladen + Bearbeiten (ohne Löschen)'), editor: t('Bearbeiten') };
   const EVENTS = {
-    auth_ok: 'Anmeldung',
-    auth_fail: 'Fehlversuch',
-    logout: 'Abmeldung',
-    rate_limited: 'Gesperrt',
-    unauthorized: 'Ohne Anmeldung',
-    forbidden: 'Keine Berechtigung',
-    not_found: 'Unbekannter Pfad',
-    change: 'Änderung',
+    auth_ok: t('Anmeldung'),
+    auth_fail: t('Fehlversuch'),
+    logout: t('Abmeldung'),
+    rate_limited: t('Gesperrt'),
+    unauthorized: t('Ohne Anmeldung'),
+    forbidden: t('Keine Berechtigung'),
+    not_found: t('Unbekannter Pfad'),
+    change: t('Änderung'),
   };
-  const dateTime = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' });
 
   let tab = $state('users');
   let access = $state(null);
@@ -80,10 +81,10 @@
     run(async () => {
       await api.admin.createUser(user);
       form = { username: '', display_name: '', password: '', role: 'viewer' };
-    }, `Konto „${user.username}“ angelegt`);
+    }, t('Konto „{name}“ angelegt', { name: user.username }));
   };
 
-  const duration = (seconds) => (seconds >= 3600 ? `${Math.round(seconds / 360) / 10} h` : `${Math.ceil(seconds / 60)} min`);
+  const duration = (seconds) => (seconds >= 3600 ? t('{n} h', { n: Math.round(seconds / 360) / 10 }) : t('{n} min', { n: Math.ceil(seconds / 60) }));
   const when = (value) => (value ? dateTime.format(typeof value === 'number' ? value * 1000 : new Date(value)) : '–');
 </script>
 
@@ -92,53 +93,50 @@
 <div class="modal-backdrop" onclick={(e) => e.target === e.currentTarget && onclose()} role="presentation">
   <div class="modal panel" role="dialog" aria-modal="true" aria-labelledby="access-title">
     <header>
-      <h2 id="access-title"><Icon name="shield" size={22} /> Zugang übers Internet</h2>
-      <button class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
+      <h2 id="access-title"><Icon name="shield" size={22} /> {t('Zugang übers Internet')}</h2>
+      <button class="icon" onclick={onclose} title={t('Schließen')}><Icon name="close" /></button>
     </header>
 
     {#if access}
       <div class="status" class:off={!access.enabled}>
         {#if access.enabled}
-          <strong>Internetzugang aktiv</strong> auf Port {access.port} des Add-ons. Veröffentliche ihn nur über einen Reverse
-          Proxy mit TLS (z. B. Nginx Proxy Manager oder Cloudflare Tunnel).
+          <strong>{t('Internetzugang aktiv')}</strong> {t('auf Port {port} des Add-ons. Veröffentliche ihn nur über einen Reverse Proxy mit TLS (z. B. Nginx Proxy Manager oder Cloudflare Tunnel).', { port: access.port })}
           <div class="muted">
-            Vertrauenswürdige Proxys: {access.trusted_proxies.join(', ')} · Sitzung {access.session_hours} h ·
-            Cookie {access.cookie_secure ? 'nur über HTTPS' : 'auch über HTTP (nur zum Testen!)'}
+            {t('Vertrauenswürdige Proxys: {proxies} · Sitzung {hours} h · Cookie {cookie}', { proxies: access.trusted_proxies.join(', '), hours: access.session_hours, cookie: access.cookie_secure ? t('nur über HTTPS') : t('auch über HTTP (nur zum Testen!)') })}
           </div>
         {:else}
-          <strong>Internetzugang ist ausgeschaltet.</strong> Konten lassen sich schon anlegen; aktiviert wird er in den
-          Add-on-Einstellungen mit <code>public_enabled: true</code>.
+          <strong>{t('Internetzugang ist ausgeschaltet.')}</strong> {t('Konten lassen sich schon anlegen; aktiviert wird er in den Add-on-Einstellungen mit')} <code>public_enabled: true</code>.
         {/if}
       </div>
     {/if}
 
     <nav class="tabs">
-      {#each [['users', 'Konten'], ['locks', 'Sitzungen & Sperren'], ['log', 'Protokoll'], ['crowdsec', 'CrowdSec']] as [id, label]}
+      {#each [['users', t('Konten')], ['locks', t('Sitzungen & Sperren')], ['log', t('Protokoll')], ['crowdsec', 'CrowdSec']] as [id, label]}
         <button class:active={tab === id} onclick={() => (tab = id)}>{label}</button>
       {/each}
     </nav>
 
     {#if tab === 'users'}
       <table>
-        <thead><tr><th>Konto</th><th>Rolle</th><th>Aktiv</th><th>Zuletzt angemeldet</th><th></th></tr></thead>
+        <thead><tr><th>{t('Konto')}</th><th>{t('Rolle')}</th><th>{t('Aktiv')}</th><th>{t('Zuletzt angemeldet')}</th><th></th></tr></thead>
         <tbody>
           {#each users as user (user.id)}
             <tr class:disabled={!user.enabled}>
               <td><strong>{user.username}</strong>{#if user.display_name}<div class="muted">{user.display_name}</div>{/if}</td>
               <td>
-                <select value={user.role} disabled={busy} onchange={(e) => run(() => api.admin.updateUser(user.id, { role: e.currentTarget.value }), 'Rolle geändert')}>
+                <select value={user.role} disabled={busy} onchange={(e) => run(() => api.admin.updateUser(user.id, { role: e.currentTarget.value }), t('Rolle geändert'))}>
                   {#each Object.entries(ROLES) as [value, label]}<option {value}>{label}</option>{/each}
                 </select>
               </td>
               <td>
-                <input type="checkbox" checked={user.enabled} disabled={busy} title={user.enabled ? 'Sperren' : 'Freigeben'}
+                <input type="checkbox" checked={user.enabled} disabled={busy} title={user.enabled ? t('Sperren') : t('Freigeben')}
                   onchange={(e) => run(() => api.admin.updateUser(user.id, { enabled: e.currentTarget.checked }))} />
               </td>
-              <td>{when(user.last_login)}{#if user.sessions}<div class="muted">{user.sessions} aktive Sitzung{user.sessions > 1 ? 'en' : ''}</div>{/if}</td>
+              <td>{when(user.last_login)}{#if user.sessions}<div class="muted">{user.sessions > 1 ? t('{n} aktive Sitzungen', { n: user.sessions }) : t('{n} aktive Sitzung', { n: user.sessions })}</div>{/if}</td>
               <td class="actions">
-                <button class="small" onclick={() => ((passwordFor = user), (newPassword = generate()))}>Passwort</button>
-                <button class="icon small" title="Konto löschen"
-                  onclick={() => (confirm = { title: `Konto „${user.username}“ löschen?`, text: 'Alle Sitzungen dieses Kontos werden beendet.', action: () => run(() => api.admin.deleteUser(user.id), 'Konto gelöscht') })}>
+                <button class="small" onclick={() => ((passwordFor = user), (newPassword = generate()))}>{t('Passwort')}</button>
+                <button class="icon small" title={t('Konto löschen')}
+                  onclick={() => (confirm = { title: t('Konto „{name}“ löschen?', { name: user.username }), text: t('Alle Sitzungen dieses Kontos werden beendet.'), action: () => run(() => api.admin.deleteUser(user.id), t('Konto gelöscht')) })}>
                   <Icon name="delete" size={18} />
                 </button>
               </td>
@@ -146,48 +144,48 @@
             {#if passwordFor?.id === user.id}
               <tr class="inline">
                 <td colspan="5">
-                  <form onsubmit={(e) => (e.preventDefault(), run(() => api.admin.updateUser(user.id, { password: newPassword }), 'Passwort geändert – alle Sitzungen beendet').then(() => (passwordFor = null)))}>
+                  <form onsubmit={(e) => (e.preventDefault(), run(() => api.admin.updateUser(user.id, { password: newPassword }), t('Passwort geändert – alle Sitzungen beendet')).then(() => (passwordFor = null)))}>
                     <input type="text" bind:value={newPassword} minlength={access?.password_min ?? 10} required autocomplete="off" />
-                    <button type="button" class="small" onclick={() => (newPassword = generate())}>Neu erzeugen</button>
-                    <button type="submit" class="small primary" disabled={busy}>Speichern</button>
+                    <button type="button" class="small" onclick={() => (newPassword = generate())}>{t('Neu erzeugen')}</button>
+                    <button type="submit" class="small primary" disabled={busy}>{t('Speichern')}</button>
                     <button type="button" class="icon small" onclick={() => (passwordFor = null)}><Icon name="close" size={16} /></button>
                   </form>
                 </td>
               </tr>
             {/if}
           {:else}
-            <tr><td colspan="5" class="muted">Noch keine Konten.</td></tr>
+            <tr><td colspan="5" class="muted">{t('Noch keine Konten.')}</td></tr>
           {/each}
         </tbody>
       </table>
 
       <form class="create" onsubmit={createUser}>
-        <h3>Neues Konto</h3>
-        <label class="field">Benutzername<input type="text" bind:value={form.username} required pattern="[a-zA-Z0-9._@\-]{'{2,64}'}" autocomplete="off" /></label>
-        <label class="field">Anzeigename<input type="text" bind:value={form.display_name} maxlength="80" autocomplete="off" /></label>
+        <h3>{t('Neues Konto')}</h3>
+        <label class="field">{t('Benutzername')}<input type="text" bind:value={form.username} required pattern="[a-zA-Z0-9._@\-]{'{2,64}'}" autocomplete="off" /></label>
+        <label class="field">{t('Anzeigename')}<input type="text" bind:value={form.display_name} maxlength="80" autocomplete="off" /></label>
         <label class="field">
-          Passwort (mind. {access?.password_min ?? 10} Zeichen)
+          {t('Passwort (mind. {n} Zeichen)', { n: access?.password_min ?? 10 })}
           <span class="row">
             <input type="text" bind:value={form.password} minlength={access?.password_min ?? 10} required autocomplete="off" />
-            <button type="button" class="small" onclick={() => (form.password = generate())}>Erzeugen</button>
+            <button type="button" class="small" onclick={() => (form.password = generate())}>{t('Erzeugen')}</button>
           </span>
         </label>
         <label class="field">
-          Rolle
+          {t('Rolle')}
           <select bind:value={form.role}>{#each Object.entries(ROLES) as [value, label]}<option {value}>{label}</option>{/each}</select>
         </label>
         <p class="muted hint">
-          <strong>Ansehen:</strong> Fotos, Karte und Personen ansehen und herunterladen.
-          <strong>Hochladen + Bearbeiten (ohne Löschen):</strong> zusätzlich hochladen, Schlagworte, Personen, Orte und Datum ändern, drehen und Gesichter benennen – aber keine Bilder löschen.
-          <strong>Bearbeiten:</strong> zusätzlich hochladen, beschriften, drehen, in den Papierkorb legen und Gesichter benennen.
-          Import, Abgleich und endgültiges Löschen gibt es nur hier in Home Assistant.
+          <strong>{t('Ansehen:')}</strong> {t('Fotos, Karte und Personen ansehen und herunterladen.')}
+          <strong>{t('Hochladen + Bearbeiten (ohne Löschen):')}</strong> {t('zusätzlich hochladen, Schlagworte, Personen, Orte und Datum ändern, drehen und Gesichter benennen – aber keine Bilder löschen.')}
+          <strong>{t('Bearbeiten:')}</strong> {t('zusätzlich hochladen, beschriften, drehen, in den Papierkorb legen und Gesichter benennen.')}
+          {t('Import, Abgleich und endgültiges Löschen gibt es nur hier in Home Assistant.')}
         </p>
-        <button type="submit" class="primary" disabled={busy}><Icon name="plus" size={18} /> Konto anlegen</button>
+        <button type="submit" class="primary" disabled={busy}><Icon name="plus" size={18} /> {t('Konto anlegen')}</button>
       </form>
     {:else if tab === 'locks'}
-      <h3>Aktive Sitzungen</h3>
+      <h3>{t('Aktive Sitzungen')}</h3>
       <table>
-        <thead><tr><th>Konto</th><th>Adresse</th><th>Zuletzt aktiv</th><th>Gültig bis</th><th></th></tr></thead>
+        <thead><tr><th>{t('Konto')}</th><th>{t('Adresse')}</th><th>{t('Zuletzt aktiv')}</th><th>{t('Gültig bis')}</th><th></th></tr></thead>
         <tbody>
           {#each sessions as session (session.id)}
             <tr>
@@ -195,43 +193,42 @@
               <td>{session.ip}<div class="muted ua" title={session.user_agent}>{session.user_agent}</div></td>
               <td>{when(session.last_seen)}</td>
               <td>{when(session.expires_at)}</td>
-              <td class="actions"><button class="small" onclick={() => run(() => api.admin.revokeSession(session.id), 'Sitzung beendet')}>Beenden</button></td>
+              <td class="actions"><button class="small" onclick={() => run(() => api.admin.revokeSession(session.id), t('Sitzung beendet'))}>{t('Beenden')}</button></td>
             </tr>
           {:else}
-            <tr><td colspan="5" class="muted">Niemand angemeldet.</td></tr>
+            <tr><td colspan="5" class="muted">{t('Niemand angemeldet.')}</td></tr>
           {/each}
         </tbody>
       </table>
 
-      <h3>Sperren</h3>
+      <h3>{t('Sperren')}</h3>
       <p class="muted hint">
-        Nach 10 Fehlversuchen in 15 Minuten wird das Konto gesperrt, nach 30 die Adresse (zu Hause teilt sich die Familie
-        eine): zuerst 15 Minuten, bei Wiederholung doppelt so lange, höchstens 24 Stunden. Wer ohne Anmeldung wiederholt die API abtastet, wird ebenfalls gesperrt.
+        {t('Nach 10 Fehlversuchen in 15 Minuten wird das Konto gesperrt, nach 30 die Adresse (zu Hause teilt sich die Familie eine): zuerst 15 Minuten, bei Wiederholung doppelt so lange, höchstens 24 Stunden. Wer ohne Anmeldung wiederholt die API abtastet, wird ebenfalls gesperrt.')}
       </p>
       <table>
-        <thead><tr><th>Art</th><th>Ziel</th><th>Noch</th><th>Sperren</th><th></th></tr></thead>
+        <thead><tr><th>{t('Art')}</th><th>{t('Ziel')}</th><th>{t('Noch')}</th><th>{t('Sperren')}</th><th></th></tr></thead>
         <tbody>
           {#each locks.locks as lock (lock.key)}
             <tr>
-              <td>{{ ip: 'Adresse', user: 'Konto', ban: 'Scanner' }[lock.kind] ?? lock.kind}</td>
+              <td>{{ ip: t('Adresse'), user: t('Konto'), ban: t('Scanner') }[lock.kind] ?? lock.kind}</td>
               <td>{lock.target}</td>
               <td>{duration(lock.remaining)}</td>
               <td>{lock.strikes}×</td>
-              <td class="actions"><button class="small" onclick={() => run(() => api.admin.unlock(lock.key), 'Sperre aufgehoben')}>Aufheben</button></td>
+              <td class="actions"><button class="small" onclick={() => run(() => api.admin.unlock(lock.key), t('Sperre aufgehoben'))}>{t('Aufheben')}</button></td>
             </tr>
           {:else}
-            <tr><td colspan="5" class="muted">Keine aktiven Sperren.</td></tr>
+            <tr><td colspan="5" class="muted">{t('Keine aktiven Sperren.')}</td></tr>
           {/each}
         </tbody>
       </table>
       {#if locks.counters.length}
-        <h3>Fehlversuche (letzte 15 Minuten)</h3>
+        <h3>{t('Fehlversuche (letzte 15 Minuten)')}</h3>
         <table>
           <tbody>
             {#each locks.counters as counter (counter.key)}
               <tr>
-                <td>{counter.kind === 'ip' ? 'Adresse' : 'Konto'}</td><td>{counter.target}</td><td>{counter.count} von 10</td>
-                <td class="actions"><button class="small" onclick={() => run(() => api.admin.unlock(counter.key), 'Zähler zurückgesetzt')}>Zurücksetzen</button></td>
+                <td>{counter.kind === 'ip' ? t('Adresse') : t('Konto')}</td><td>{counter.target}</td><td>{t('{n} von 10', { n: counter.count })}</td>
+                <td class="actions"><button class="small" onclick={() => run(() => api.admin.unlock(counter.key), t('Zähler zurückgesetzt'))}>{t('Zurücksetzen')}</button></td>
               </tr>
             {/each}
           </tbody>
@@ -240,14 +237,14 @@
     {:else if tab === 'log'}
       <div class="toolbar">
         <select bind:value={eventFilter}>
-          <option value="">Alle Ereignisse</option>
+          <option value="">{t('Alle Ereignisse')}</option>
           {#each Object.entries(EVENTS) as [value, label]}<option {value}>{label}</option>{/each}
         </select>
         <span class="grow"></span>
-        <button class="small" onclick={() => (confirm = { title: 'Protokoll leeren?', text: 'Alle Einträge werden gelöscht.', action: () => run(() => api.admin.clearLog(), 'Protokoll geleert') })}>Leeren</button>
+        <button class="small" onclick={() => (confirm = { title: t('Protokoll leeren?'), text: t('Alle Einträge werden gelöscht.'), action: () => run(() => api.admin.clearLog(), t('Protokoll geleert')) })}>{t('Leeren')}</button>
       </div>
       <table class="log">
-        <thead><tr><th>Zeit</th><th>Ereignis</th><th>Adresse</th><th>Konto</th><th>Details</th></tr></thead>
+        <thead><tr><th>{t('Zeit')}</th><th>{t('Ereignis')}</th><th>{t('Adresse')}</th><th>{t('Konto')}</th><th>{t('Details')}</th></tr></thead>
         <tbody>
           {#each entries as entry, i (i)}
             <tr class={entry.event}>
@@ -258,24 +255,22 @@
               <td class="detail" title={entry.ua ?? ''}>{[entry.detail, entry.path].filter(Boolean).join(' ')}</td>
             </tr>
           {:else}
-            <tr><td colspan="5" class="muted">Keine Einträge.</td></tr>
+            <tr><td colspan="5" class="muted">{t('Keine Einträge.')}</td></tr>
           {/each}
         </tbody>
       </table>
     {:else if tab === 'crowdsec' && crowdsec}
       <p>
-        Mit dem CrowdSec-Add-on werden Angreifer nicht nur hier, sondern schon an der Firewall bzw. bei Cloudflare
-        gesperrt. Die Einrichtung kopiert Parser, Szenarien und die Log-Quelle in dessen Konfiguration; das
-        Zugriffsprotokoll wird dafür zusätzlich nach <code>{crowdsec.export_path}</code> geschrieben.
+        {t('Mit dem CrowdSec-Add-on werden Angreifer nicht nur hier, sondern schon an der Firewall bzw. bei Cloudflare gesperrt. Die Einrichtung kopiert Parser, Szenarien und die Log-Quelle in dessen Konfiguration; das Zugriffsprotokoll wird dafür zusätzlich nach')} <code>{crowdsec.export_path}</code> {t('geschrieben.')}
       </p>
       <ul class="checks">
-        <li class:ok={crowdsec.config_found}>CrowdSec-Konfiguration {crowdsec.config_found ? 'gefunden' : 'nicht gefunden'} <span class="muted">({crowdsec.config_dir})</span></li>
+        <li class:ok={crowdsec.config_found}>{t('CrowdSec-Konfiguration')} {crowdsec.config_found ? t('gefunden') : t('nicht gefunden')} <span class="muted">({crowdsec.config_dir})</span></li>
         {#each Object.entries(crowdsec.installed) as [file, ok]}<li class:ok>{file}</li>{/each}
-        <li class:ok={crowdsec.export_active}>Protokoll-Export {crowdsec.export_active ? 'aktiv' : 'inaktiv'}</li>
+        <li class:ok={crowdsec.export_active}>{t('Protokoll-Export')} {crowdsec.export_active ? t('aktiv') : t('inaktiv')}</li>
       </ul>
       <button class="primary" disabled={busy || !crowdsec.config_found}
-        onclick={() => run(() => api.admin.installCrowdsec(), 'Eingerichtet – bitte das CrowdSec-Add-on neu starten')}>
-        <Icon name="shield" size={18} /> {crowdsec.all_installed ? 'Erneut einrichten' : 'In CrowdSec einrichten'}
+        onclick={() => run(() => api.admin.installCrowdsec(), t('Eingerichtet – bitte das CrowdSec-Add-on neu starten'))}>
+        <Icon name="shield" size={18} /> {crowdsec.all_installed ? t('Erneut einrichten') : t('In CrowdSec einrichten')}
       </button>
     {/if}
   </div>

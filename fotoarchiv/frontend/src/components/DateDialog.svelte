@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // value: "YYYY-MM-DDTHH:MM:SS" (Ortszeit ohne Zone)
@@ -20,22 +21,22 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="date-title">
     <form onsubmit={(e) => (e.preventDefault(), save())}>
       <header>
-        <h2 id="date-title">Aufnahmedatum</h2>
-        <button type="button" class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
+        <h2 id="date-title">{t('Aufnahmedatum')}</h2>
+        <button type="button" class="icon" onclick={oncancel} title={t('Schließen')}><Icon name="close" /></button>
       </header>
       {#if count > 1}
-        <p>Alle <strong>{count}</strong> ausgewählten Dateien bekommen genau dieses Datum und diese Uhrzeit.</p>
+        <p>{t('Alle {count} ausgewählten Dateien bekommen genau dieses Datum und diese Uhrzeit.', { count })}</p>
       {:else}
-        <p>Das Datum wird in die Datei geschrieben. Die Datei wird danach in den passenden Monatsordner verschoben.</p>
+        <p>{t('Das Datum wird in die Datei geschrieben. Die Datei wird danach in den passenden Monatsordner verschoben.')}</p>
       {/if}
       <label class="field">
-        Datum und Uhrzeit
+        {t('Datum und Uhrzeit')}
         <!-- svelte-ignore a11y_autofocus -->
         <input type="datetime-local" step="1" bind:value={input} required autofocus />
       </label>
       <footer>
-        <button type="button" onclick={oncancel}>Abbrechen</button>
-        <button type="submit" class="primary" disabled={!valid}>Speichern</button>
+        <button type="button" onclick={oncancel}>{t('Abbrechen')}</button>
+        <button type="submit" class="primary" disabled={!valid}>{t('Speichern')}</button>
       </footer>
     </form>
   </div>

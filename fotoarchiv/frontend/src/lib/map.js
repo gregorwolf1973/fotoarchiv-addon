@@ -1,5 +1,5 @@
 // Gemeinsames für Karten: Leaflet mit OpenStreetMap oder Satellitenbild, Stecknadel, Ortssuche (Nominatim).
-
+import { language, t } from './i18n.js';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -53,12 +53,12 @@ export function createMap(element, options = {}) {
   // Umschalter oben rechts; die Wahl gilt für alle Karten auf diesem Gerät
   const control = L.control({ position: 'topright' });
   let button;
-  const label = () => (button.textContent = onSatellite ? 'Karte' : 'Satellit');
+  const label = () => (button.textContent = onSatellite ? t('Karte') : t('Satellit'));
   control.onAdd = () => {
     const box = L.DomUtil.create('div', 'leaflet-bar layer-toggle');
     button = L.DomUtil.create('button', '', box);
     button.type = 'button';
-    button.title = 'Zwischen Karte und Satellitenbild wechseln';
+    button.title = t('Zwischen Karte und Satellitenbild wechseln');
     label();
     L.DomEvent.disableClickPropagation(box);
     L.DomEvent.on(button, 'click', () => map.setSatellite(!onSatellite));
@@ -91,9 +91,9 @@ export const pinIcon = () =>
 
 /** Ortssuche über OpenStreetMap Nominatim (nur auf ausdrücklichen Wunsch, keine Autovervollständigung). */
 export async function searchPlaces(query) {
-  const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '6', 'accept-language': 'de' });
+  const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '6', 'accept-language': language });
   const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { referrerPolicy: REFERRER_POLICY });
-  if (!response.ok) throw new Error('Ortssuche nicht erreichbar');
+  if (!response.ok) throw new Error(t('Ortssuche nicht erreichbar'));
   const results = await response.json();
   return results.map((r) => ({
     name: r.display_name,

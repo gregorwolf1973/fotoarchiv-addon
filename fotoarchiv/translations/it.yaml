@@ -1,0 +1,97 @@
+configuration:
+  library_folder:
+    name: Libreria
+    description: >-
+      Cartella che contiene l'archivio. I nuovi file vengono ordinati in sottocartelle AAAA/MM in base alla data di scatto.
+      Deve trovarsi sotto /media o /share.
+  import_folder:
+    name: Cartella di importazione
+    description: >-
+      Cartella di ingresso, ad es. raggiungibile via Samba come \\homeassistant\share\fotoarchiv-import.
+      I file importati vengono spostati da qui nella libreria.
+  face_recognition:
+    name: Riconoscimento dei volti
+    description: >-
+      Cerca i volti nelle foto in background e raggruppa quelli simili. Al primo avvio scarica i modelli InsightFace
+      (circa 280 MB, solo per uso non commerciale). Circa 1 secondo per foto su un Raspberry Pi 5.
+  face_threads:
+    name: Core per il riconoscimento dei volti
+    description: >-
+      Quanti core del processore può usare il riconoscimento dei volti. Con più core le foto vengono elaborate più
+      in fretta, ma il Pi è più carico. Su un Raspberry Pi 5 (4 core) 3 è un buon valore se Home Assistant deve
+      restare reattivo. Ha effetto dopo il riavvio dell'add-on.
+  image_recognition:
+    name: Riconoscimento delle immagini
+    description: >-
+      Ricerca in linguaggio naturale ("cane sulla spiaggia"), proposte di tag e rilevamento delle foto ruotate male.
+      Al primo avvio scarica i modelli (circa 1,6 GB), poi analizza tutte le foto. Le proposte restano nel database
+      finché qualcuno non le accetta. Usa tanti core quanti il riconoscimento dei volti.
+  auto_rotate:
+    name: Ruota automaticamente le foto chiaramente ruotate male
+    description: >-
+      Solo se il modello è sicuro e un volto conferma il nuovo orientamento; si può annullare in "Controlla rotazione". Se disattivato, tutti i casi sospetti finiscono soltanto in quell'elenco.
+  duplicate_detection:
+    name: Rileva foto doppie
+    description: >-
+      Confronta le foto in background per trovare versioni doppie (ridimensionate, risalvate, in altro formato) e
+      serie di scatti simili. Durante l'importazione segnala le foto molto simili già presenti. Molto veloce, pochi
+      millisecondi per foto.
+  duplicate_bits:
+    name: Severità per i doppioni
+    description: >-
+      Quanti dei 64 bit dell'impronta dell'immagine possono differire perché due foto contino come doppioni.
+      Meno è più severo: 6 è il valore predefinito e trova anche versioni schiarite o modificate, 4 tiene quasi
+      solo le vere copie, 7 è l'impostazione più permissiva. Se nell'elenco compaiono troppe foto solo simili,
+      abbassa il valore. Ha effetto dopo il riavvio dell'add-on.
+  series_bits:
+    name: Severità per le serie
+    description: >-
+      Quanti dei 64 bit possono differire perché due foto scattate a non più di 30 secondi di distanza contino come
+      serie. Predefinito 12. Meno è più severo, di più raggruppa anche scatti con più movimento. Ha effetto dopo il
+      riavvio dell'add-on.
+  convert_on_import:
+    name: Converti durante l'importazione
+    description: >-
+      Le foto HEIC diventano JPEG, i video che il browser non riproduce (ad es. H.265/HEVC) diventano MP4 H.264. I
+      file MOV H.264 vengono solo riconfezionati senza perdite. L'originale finisce nel cestino. Su un Raspberry Pi
+      un video richiede circa quanto la sua durata. I file già presenti si convertono tramite la selezione.
+  auto_import:
+    name: Importa automaticamente
+    description: >-
+      Controlla ogni minuto la cartella di importazione e importa da solo i file nuovi e copiati per intero, ad es.
+      da un telefono che carica sulla condivisione Samba con FolderSync o PhotoSync via Wi-Fi. In una sola direzione:
+      sul telefono non viene mai scritto nulla. I file già presenti nell'archivio o nel cestino vengono eliminati
+      invece di essere spostati in _duplikate.
+  map_language:
+    name: Etichette della mappa
+    description: >-
+      de: stile cartografico tedesco (openstreetmap.de), paesi e luoghi in tedesco, nomi locali tra parentesi.
+      local: openstreetmap.org, ogni paese nella propria lingua e scrittura. Ha effetto dopo aver ricaricato la pagina.
+  public_enabled:
+    name: Accesso da Internet
+    description: >-
+      Avvia l'accesso da Internet sulla porta 8301 con login (account in Fotoarchiv → icona dello scudo).
+      Non esporlo mai direttamente; pubblicalo solo tramite un reverse proxy con TLS (Nginx Proxy Manager, Cloudflare Tunnel).
+  public_trusted_proxies:
+    name: Proxy attendibili
+    description: >-
+      Indirizzi/reti dei tuoi reverse proxy. Solo le loro intestazioni con l'indirizzo del client (X-Forwarded-For,
+      CF-Connecting-IP) sono considerate attendibili. 172.30.32.0/23 è la rete interna di Home Assistant.
+  public_cookie_secure:
+    name: Cookie di sessione solo via HTTPS
+    description: Disattivalo solo per fare prove nella rete locale senza TLS.
+  public_session_hours:
+    name: Durata della sessione (ore)
+    description: Trascorso questo tempo gli utenti devono accedere di nuovo.
+  public_home_url:
+    name: Indirizzo nella rete di casa
+    description: >-
+      Ad esempio http://192.168.178.37:8301. Chi apre l'indirizzo Internet da casa (stesso IP pubblico di Home
+      Assistant) viene reindirizzato lì, così i video grandi non passano dal tunnel. Vuoto = disattivato.
+      Aggiungi ?extern all'indirizzo Internet per restarci.
+  public_log_export_path:
+    name: File di log aggiuntivo
+    description: Copia facoltativa del registro degli accessi. Non serve per CrowdSec, se ne occupa il pulsante di configurazione.
+  trash_days:
+    name: Cestino (giorni)
+    description: I file eliminati restano nel cestino per questo numero di giorni, poi vengono rimossi definitivamente dal disco.

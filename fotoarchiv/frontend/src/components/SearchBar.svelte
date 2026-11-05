@@ -1,6 +1,7 @@
 <script>
   import { api } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { locale, t, tServer } from '../lib/i18n.js';
   import { matchAll, splitPlus } from '../lib/suche.js';
   import Icon from './Icon.svelte';
 
@@ -26,9 +27,9 @@
   const progress = $derived.by(() => {
     if (!vision?.enabled) return '';
     if (vision.status === 'downloading' && vision.download_total)
-      return `Bildsuche wird eingerichtet: Modelle ${Math.round((vision.download_done / vision.download_total) * 100)} % geladen`;
-    if (!vision.search) return vision.status === 'error' ? `Bildsuche gestört: ${vision.message}` : 'Bildsuche wird eingerichtet …';
-    if (vision.done < vision.total) return `Bildinhalt: ${formatNumber(vision.done)} von ${formatNumber(vision.total)} analysiert`;
+      return t('Bildsuche wird eingerichtet: Modelle {n} % geladen', { n: Math.round((vision.download_done / vision.download_total) * 100) });
+    if (!vision.search) return vision.status === 'error' ? t('Bildsuche gestört: {message}', { message: tServer(vision.message) }) : t('Bildsuche wird eingerichtet …');
+    if (vision.done < vision.total) return t('Bildinhalt: {done} von {total} analysiert', { done: formatNumber(vision.done), total: formatNumber(vision.total) });
     return '';
   });
 
@@ -63,7 +64,7 @@
 
   const suggestions = $derived.by(() => {
     const needle = text.trim().toLocaleLowerCase();
-    const byCount = (a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name, 'de');
+    const byCount = (a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name, locale);
     const [[, persons], [, tags], [, auto]] = lists;
     const unchosen = (list, kind) => list.filter((l) => !filters[kind].some((f) => f.id === l.id));
     if (plusParts) {
@@ -146,8 +147,8 @@
   const dateLabel = $derived.by(() => {
     const fmt = (d) => d.split('-').reverse().join('.');
     if (filters.start && filters.end) return filters.start === filters.end ? fmt(filters.start) : `${fmt(filters.start)} – ${fmt(filters.end)}`;
-    if (filters.start) return `ab ${fmt(filters.start)}`;
-    if (filters.end) return `bis ${fmt(filters.end)}`;
+    if (filters.start) return t('ab {date}', { date: fmt(filters.start) });
+    if (filters.end) return t('bis {date}', { date: fmt(filters.end) });
     return '';
   });
 
@@ -160,41 +161,41 @@
   <Icon name="search" size={20} />
   <div class="chips">
     {#each filters.persons as p (p.id)}
-      <span class="chip"><Icon name="person" size={14} />{p.name}<button onclick={() => without('persons', p.id)} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+      <span class="chip"><Icon name="person" size={14} />{p.name}<button onclick={() => without('persons', p.id)} title={t('Filter entfernen')}><Icon name="close" size={14} /></button></span>
     {/each}
-    {#each filters.tags as t (t.id)}
-      <span class="chip"><Icon name="tag" size={14} />{t.name}<button onclick={() => without('tags', t.id)} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+    {#each filters.tags as tag (tag.id)}
+      <span class="chip"><Icon name="tag" size={14} />{tag.name}<button onclick={() => without('tags', tag.id)} title={t('Filter entfernen')}><Icon name="close" size={14} /></button></span>
     {/each}
-    {#each filters.auto ?? [] as t (t.id)}
-      <span class="chip" title="Von der Bilderkennung vorgeschlagen, noch nicht übernommen"><Icon name="sparkle" size={14} />{t.name}<button onclick={() => without('auto', t.id)} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+    {#each filters.auto ?? [] as tag (tag.id)}
+      <span class="chip" title={t('Von der Bilderkennung vorgeschlagen, noch nicht übernommen')}><Icon name="sparkle" size={14} />{tag.name}<button onclick={() => without('auto', tag.id)} title={t('Filter entfernen')}><Icon name="close" size={14} /></button></span>
     {/each}
     {#if filters.ai}
-      <span class="chip" title="Bildinhalt"><Icon name="sparkle" size={14} />„{filters.ai}“<button onclick={() => onchange({ ...filters, ai: '' })} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+      <span class="chip" title={t('Bildinhalt')}><Icon name="sparkle" size={14} />„{filters.ai}“<button onclick={() => onchange({ ...filters, ai: '' })} title={t('Filter entfernen')}><Icon name="close" size={14} /></button></span>
     {/if}
     {#if dateLabel}
-      <span class="chip"><Icon name="calendar" size={14} />{dateLabel}<button onclick={() => onchange({ ...filters, start: '', end: '' })} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+      <span class="chip"><Icon name="calendar" size={14} />{dateLabel}<button onclick={() => onchange({ ...filters, start: '', end: '' })} title={t('Filter entfernen')}><Icon name="close" size={14} /></button></span>
     {/if}
     {#if filters.q}
-      <span class="chip"><Icon name="search" size={14} />„{filters.q}“<button onclick={() => onchange({ ...filters, q: '' })} title="Filter entfernen"><Icon name="close" size={14} /></button></span>
+      <span class="chip"><Icon name="search" size={14} />„{filters.q}“<button onclick={() => onchange({ ...filters, q: '' })} title={t('Filter entfernen')}><Icon name="close" size={14} /></button></span>
     {/if}
     <input
       bind:this={input}
       bind:value={text}
       type="text"
-      placeholder={hasFilters ? 'Weiteren Filter hinzufügen …' : smart ? 'Suchen: Personen, Schlagworte, Bildinhalt … (mehrere: Fisch + Angeln)' : 'Suchen: Personen, Schlagworte, Dateiname … (mehrere: Fisch + Angeln)'}
+      placeholder={hasFilters ? t('Weiteren Filter hinzufügen …') : smart ? t('Suchen: Personen, Schlagworte, Bildinhalt … (mehrere: Fisch + Angeln)') : t('Suchen: Personen, Schlagworte, Dateiname … (mehrere: Fisch + Angeln)')}
       onkeydown={keydown}
       oninput={() => ((open = true), (active = text.trim() ? 0 : -1))}
       onfocus={() => ((open = true), (active = text.trim() ? 0 : -1))}
       onblur={() => setTimeout(() => (open = false), 150)}
       enterkeyhint="search"
-      aria-label="Suchen"
+      aria-label={t('Suchen')}
     />
   </div>
-  <button class="icon small" class:on={showDates} onclick={() => (showDates = !showDates)} title="Zeitraum">
+  <button class="icon small" class:on={showDates} onclick={() => (showDates = !showDates)} title={t('Zeitraum')}>
     <Icon name="calendar" size={18} />
   </button>
   {#if hasFilters}
-    <button class="icon small" onclick={() => onchange(NONE)} title="Alle Filter entfernen">
+    <button class="icon small" onclick={() => onchange(NONE)} title={t('Alle Filter entfernen')}>
       <Icon name="close" size={18} />
     </button>
   {/if}
@@ -202,16 +203,16 @@
   {#if open && suggestions.length}
     <ul class="suggestions" class:browse={browsing} role="listbox">
       {#if hasFilters && within}
-        <li class="heading narrow">Zusammen mit der Auswahl ({formatNumber(within.total)} Fotos) – jeder weitere Filter grenzt ein</li>
-      {:else if browsing && firstAuto !== 0}<li class="heading">Schlagworte</li>{/if}
+        <li class="heading narrow">{t('Zusammen mit der Auswahl ({n} Fotos) – jeder weitere Filter grenzt ein', { n: formatNumber(within.total) })}</li>
+      {:else if browsing && firstAuto !== 0}<li class="heading">{t('Schlagworte')}</li>{/if}
       {#each suggestions as s, i}
-        {#if i === firstAuto}<li class="heading" title="Noch nicht in den Fotos gespeichert – übernehmen oder ablehnen">Erkannt (Vorschläge)</li>{/if}
+        {#if i === firstAuto}<li class="heading" title={t('Noch nicht in den Fotos gespeichert – übernehmen oder ablehnen')}>{t('Erkannt (Vorschläge)')}</li>{/if}
         <li role="option" aria-selected={i === active}>
           <button class:active={i === active} onmousedown={(e) => (e.preventDefault(), choose(s))}>
             <Icon name={ICONS[s.kind]} size={18} />
             <span class="name">
-              {s.kind === 'q' ? `Name, Schlagwort oder Kamera enthält „${s.name}“` : s.kind === 'ai' ? `Fotos von „${s.name}“` : s.kind === 'multi' ? `Alle zusammen: ${s.name}` : s.name}
-              {#if s.kind === 'ai'}<span class="kind">Bildinhalt</span>{:else if s.kind === 'auto' && !browsing}<span class="kind">erkannt</span>{/if}
+              {s.kind === 'q' ? t('Name, Schlagwort oder Kamera enthält „{name}“', { name: s.name }) : s.kind === 'ai' ? t('Fotos von „{name}“', { name: s.name }) : s.kind === 'multi' ? t('Alle zusammen: {name}', { name: s.name }) : s.name}
+              {#if s.kind === 'ai'}<span class="kind">{t('Bildinhalt')}</span>{:else if s.kind === 'auto' && !browsing}<span class="kind">{t('erkannt')}</span>{/if}
             </span>
             {#if s.count}<span class="count">{s.count}</span>{/if}
           </button>
@@ -225,13 +226,13 @@
 
   {#if showDates}
     <div class="dates">
-      <label class="field">Von<input type="date" value={filters.start} onchange={(e) => onchange({ ...filters, start: e.currentTarget.value })} /></label>
-      <label class="field">Bis<input type="date" value={filters.end} onchange={(e) => onchange({ ...filters, end: e.currentTarget.value })} /></label>
+      <label class="field">{t('Von')}<input type="date" value={filters.start} onchange={(e) => onchange({ ...filters, start: e.currentTarget.value })} /></label>
+      <label class="field">{t('Bis')}<input type="date" value={filters.end} onchange={(e) => onchange({ ...filters, end: e.currentTarget.value })} /></label>
       <label class="field">
-        Ganzes Jahr
-        <input type="number" min="1800" max="2100" placeholder="z. B. 2019" onchange={(e) => e.currentTarget.value && setYear(e.currentTarget.value)} />
+        {t('Ganzes Jahr')}
+        <input type="number" min="1800" max="2100" placeholder={t('z. B. 2019')} onchange={(e) => e.currentTarget.value && setYear(e.currentTarget.value)} />
       </label>
-      <button class="icon small close" onclick={() => (showDates = false)} title="Schließen"><Icon name="close" size={18} /></button>
+      <button class="icon small close" onclick={() => (showDates = false)} title={t('Schließen')}><Icon name="close" size={18} /></button>
     </div>
   {/if}
 </div>

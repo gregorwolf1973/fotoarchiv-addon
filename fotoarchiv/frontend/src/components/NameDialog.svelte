@@ -1,8 +1,9 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // Einen Namen eingeben oder ändern; onsave liefert ein Promise, bei Fehlern bleibt der Dialog offen
-  let { title, value = '', label = 'Name', saveLabel = 'Speichern', onsave, oncancel } = $props();
+  let { title, value = '', label = t('Name'), saveLabel = t('Speichern'), onsave, oncancel } = $props();
 
   // svelte-ignore state_referenced_locally
   let name = $state(value);
@@ -29,12 +30,12 @@
   <form onsubmit={submit}>
     <header>
       <h2 id="name-title">{title}</h2>
-      <button type="button" class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
+      <button type="button" class="icon" onclick={oncancel} title={t('Schließen')}><Icon name="close" /></button>
     </header>
     <!-- svelte-ignore a11y_autofocus -->
     <input type="text" bind:value={name} maxlength="100" aria-label={label} autofocus />
     <footer>
-      <button type="button" onclick={oncancel}>Abbrechen</button>
+      <button type="button" onclick={oncancel}>{t('Abbrechen')}</button>
       <button class="primary" type="submit" disabled={!name.trim() || saving}>{saveLabel}</button>
     </footer>
   </form>

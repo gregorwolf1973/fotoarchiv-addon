@@ -1,5 +1,7 @@
 // Fotos aus der Galerie per Drag & Drop in einen Favoritenordner ziehen.
 // Eigener Datentyp: Der Upload-Bereich reagiert nur auf "Files" und bleibt so unbeteiligt.
+import { t } from './i18n.js';
+
 export const PHOTO_IDS = 'application/x-fotoarchiv-ids';
 
 // Ziehen nur mit Maus/Touchpad; am Touchscreen startet langes Drücken die Auswahl
@@ -22,7 +24,7 @@ export function startPhotoDrag(e, ids) {
   if (ids.length > 1) {
     // Statt eines einzelnen Vorschaubilds anzeigen, wie viele Fotos mitkommen
     const ghost = document.createElement('div');
-    ghost.textContent = `${ids.length} Fotos`;
+    ghost.textContent = t('{n} Fotos', { n: ids.length });
     ghost.style.cssText =
       'position:fixed;top:-100px;left:0;padding:6px 12px;border-radius:14px;background:#03a9f4;color:#fff;font:500 14px system-ui';
     document.body.append(ghost);

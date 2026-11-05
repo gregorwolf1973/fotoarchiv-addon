@@ -1,10 +1,11 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import ChipInput from './ChipInput.svelte';
   import Icon from './Icon.svelte';
 
   let { kind, count, suggestions, onsave, oncancel } = $props();
 
-  const title = $derived(kind === 'tags' ? 'Schlagworte ändern' : 'Personen ändern');
+  const title = $derived(kind === 'tags' ? t('Schlagworte ändern') : t('Personen ändern'));
   const icon = $derived(kind === 'tags' ? 'tag' : 'person');
   let add = $state([]);
   let remove = $state([]);
@@ -16,21 +17,21 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="label-title">
     <header>
       <h2 id="label-title">{title}</h2>
-      <button class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
+      <button class="icon" onclick={oncancel} title={t('Schließen')}><Icon name="close" /></button>
     </header>
-    <p>Gilt für <strong>{count}</strong> ausgewählte Dateien. Andere vorhandene Einträge bleiben erhalten.</p>
+    <p>{t('Gilt für {count} ausgewählte Dateien. Andere vorhandene Einträge bleiben erhalten.', { count })}</p>
     <div class="field">
-      <span>Hinzufügen</span>
-      <ChipInput values={add} {suggestions} {icon} placeholder="Name eingeben, Enter" onchange={(v) => (add = v)} />
+      <span>{t('Hinzufügen')}</span>
+      <ChipInput values={add} {suggestions} {icon} placeholder={t('Name eingeben, Enter')} onchange={(v) => (add = v)} />
     </div>
     <div class="field">
-      <span>Entfernen</span>
-      <ChipInput values={remove} {suggestions} {icon} placeholder="Name eingeben, Enter" onchange={(v) => (remove = v)} />
+      <span>{t('Entfernen')}</span>
+      <ChipInput values={remove} {suggestions} {icon} placeholder={t('Name eingeben, Enter')} onchange={(v) => (remove = v)} />
     </div>
     <footer>
-      <button onclick={oncancel}>Abbrechen</button>
+      <button onclick={oncancel}>{t('Abbrechen')}</button>
       <button class="primary" disabled={!add.length && !remove.length} onclick={() => onsave(add, remove)}>
-        Übernehmen
+        {t('Übernehmen')}
       </button>
     </footer>
   </div>

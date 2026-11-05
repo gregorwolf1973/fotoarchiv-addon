@@ -1,6 +1,7 @@
 <script>
   import { api, cropUrl } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { locale, t } from '../lib/i18n.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import FaceStatus from './FaceStatus.svelte';
   import FotoLupe from './FotoLupe.svelte';
@@ -20,7 +21,7 @@
   let answering = $state(new Set());
   let lupe = $state(null); // { entry, faces, index }: ganze Fotos eines Vorschlags, vergrößerbar
 
-  const matches = (name) => !query.trim() || name.toLocaleLowerCase('de').includes(query.trim().toLocaleLowerCase('de'));
+  const matches = (name) => !query.trim() || name.toLocaleLowerCase(locale).includes(query.trim().toLocaleLowerCase(locale));
   let persons = $derived(people.persons.filter((p) => matches(p.name)));
   let shownSuggestions = $derived(suggestions.filter((s) => matches(s.name)));
 
@@ -95,8 +96,10 @@
       const result = await api.compareFaces();
       notify(
         result.merged || result.learned
-          ? `${formatNumber(result.merged)} ähnliche Gruppen zusammengeführt${result.learned ? ', bekannte Personen zugeordnet' : ''}.`
-          : 'Keine weiteren Übereinstimmungen gefunden.',
+          ? result.learned
+            ? t('{n} ähnliche Gruppen zusammengeführt, bekannte Personen zugeordnet.', { n: formatNumber(result.merged) })
+            : t('{n} ähnliche Gruppen zusammengeführt.', { n: formatNumber(result.merged) })
+          : t('Keine weiteren Übereinstimmungen gefunden.'),
       );
       changed();
     } catch (e) {
@@ -111,18 +114,18 @@
   {#if canEdit}<FaceStatus {revision} />{/if}
 
   <div class="toolbar">
-    <input type="search" class="find" placeholder="Name suchen …" aria-label="Personen nach Namen suchen" bind:value={query} />
+    <input type="search" class="find" placeholder={t('Name suchen …')} aria-label={t('Personen nach Namen suchen')} bind:value={query} />
     {#if canEdit}
-      <button onclick={compare} disabled={comparing} title="Alle unbekannten Gesichter erneut miteinander und mit den benannten Personen vergleichen">
-        <Icon name="face" size={18} /> {comparing ? 'Vergleiche …' : 'Gesichter vergleichen'}
+      <button onclick={compare} disabled={comparing} title={t('Alle unbekannten Gesichter erneut miteinander und mit den benannten Personen vergleichen')}>
+        <Icon name="face" size={18} /> {comparing ? t('Vergleiche …') : t('Gesichter vergleichen')}
       </button>
     {/if}
   </div>
 
   {#if canEdit && shownSuggestions.length}
   <section>
-    <h2>Vorschläge <span class="count">{formatNumber(shownSuggestions.length)}</span></h2>
-    <p class="hint">Diese Gesichter ähneln einer bekannten Person. Antippen zeigt alle Gesichter der Gruppe, die Lupe die ganzen Fotos zum Vergrößern.</p>
+    <h2>{t('Vorschläge')} <span class="count">{formatNumber(shownSuggestions.length)}</span></h2>
+    <p class="hint">{t('Diese Gesichter ähneln einer bekannten Person. Antippen zeigt alle Gesichter der Gruppe, die Lupe die ganzen Fotos zum Vergrößern.')}</p>
     <div class="grid">
       {#each shownSuggestions as entry (entry.group_id)}
         <div class="card suggestion">
@@ -130,13 +133,13 @@
             <button class="face" onclick={() => (group = { id: entry.group_id, count: entry.count, face_id: entry.face_id })}>
               <img class="avatar" src={cropUrl(entry.face_id)} alt="" loading="lazy" />
             </button>
-            <button class="icon zoom" onclick={() => openLupe(entry)} title="Ganze Fotos vergrößert ansehen"><Icon name="zoom" size={18} /></button>
+            <button class="icon zoom" onclick={() => openLupe(entry)} title={t('Ganze Fotos vergrößert ansehen')}><Icon name="zoom" size={18} /></button>
           </span>
-          <span class="name">Ist das {entry.name}?</span>
-          <span class="meta">{Math.round(entry.similarity * 100)} % ähnlich · {formatNumber(entry.count)} {entry.count === 1 ? 'Gesicht' : 'Gesichter'}</span>
+          <span class="name">{t('Ist das {name}?', { name: entry.name })}</span>
+          <span class="meta">{t('{n} % ähnlich', { n: Math.round(entry.similarity * 100) })} · {entry.count === 1 ? t('{n} Gesicht', { n: formatNumber(entry.count) }) : t('{n} Gesichter', { n: formatNumber(entry.count) })}</span>
           <span class="answers">
-            <button class="primary" disabled={answering.has(entry.group_id)} onclick={() => answer(entry, true)}>Ja</button>
-            <button disabled={answering.has(entry.group_id)} onclick={() => answer(entry, false)}>Nein</button>
+            <button class="primary" disabled={answering.has(entry.group_id)} onclick={() => answer(entry, true)}>{t('Ja')}</button>
+            <button disabled={answering.has(entry.group_id)} onclick={() => answer(entry, false)}>{t('Nein')}</button>
           </span>
         </div>
       {/each}
@@ -145,7 +148,7 @@
   {/if}
 
   <section>
-    <h2>Personen <span class="count">{formatNumber(persons.length)}</span></h2>
+    <h2>{t('Personen')} <span class="count">{formatNumber(persons.length)}</span></h2>
     {#if persons.length}
       <div class="grid">
         {#each persons as entry (entry.id)}
@@ -156,33 +159,33 @@
               <span class="avatar initials">{initials(entry.name)}</span>
             {/if}
             <span class="name">{entry.name}</span>
-            <span class="meta">{formatNumber(entry.count)} {entry.count === 1 ? 'Foto' : 'Fotos'}</span>
+            <span class="meta">{entry.count === 1 ? t('{n} Foto', { n: formatNumber(entry.count) }) : t('{n} Fotos', { n: formatNumber(entry.count) })}</span>
           </button>
         {/each}
       </div>
     {:else if loaded && query.trim()}
-      <p class="empty">Keine Person mit „{query.trim()}“.</p>
+      <p class="empty">{t('Keine Person mit „{query}“.', { query: query.trim() })}</p>
     {:else if loaded}
-      <p class="empty">Noch keine Personen. Benenne unten eine Gruppe unbekannter Gesichter.</p>
+      <p class="empty">{t('Noch keine Personen. Benenne unten eine Gruppe unbekannter Gesichter.')}</p>
     {/if}
   </section>
 
   {#if canEdit}
   <section>
-    <h2>Unbekannte Gesichter <span class="count">{formatNumber(people.groups.length)}</span></h2>
+    <h2>{t('Unbekannte Gesichter')} <span class="count">{formatNumber(people.groups.length)}</span></h2>
     {#if people.groups.length}
-      <p class="hint">Ähnliche Gesichter sind zu Gruppen zusammengefasst. Antippen, um der Gruppe einen Namen zu geben.</p>
+      <p class="hint">{t('Ähnliche Gesichter sind zu Gruppen zusammengefasst. Antippen, um der Gruppe einen Namen zu geben.')}</p>
       <div class="grid">
         {#each people.groups as entry (entry.id)}
           <button class="card" onclick={() => (group = entry)}>
             <img class="avatar" src={cropUrl(entry.face_id)} alt="" loading="lazy" />
-            <span class="name unknown"><Icon name="plus" size={16} /> Namen geben</span>
-            <span class="meta">{formatNumber(entry.count)} Gesichter</span>
+            <span class="name unknown"><Icon name="plus" size={16} /> {t('Namen geben')}</span>
+            <span class="meta">{t('{n} Gesichter', { n: formatNumber(entry.count) })}</span>
           </button>
         {/each}
       </div>
     {:else if loaded}
-      <p class="empty">Keine unbekannten Gesichtergruppen.</p>
+      <p class="empty">{t('Keine unbekannten Gesichtergruppen.')}</p>
     {/if}
   </section>
   {/if}
@@ -192,13 +195,13 @@
   <FotoLupe faces={lupe.faces} index={lupe.index} onclose={() => (lupe = null)}>
     {#snippet heading()}
       {#if personFace(lupe.entry.person_id)}
-        <img class="ref" src={cropUrl(personFace(lupe.entry.person_id))} alt="" title="{lupe.entry.name} auf einem bestätigten Foto" />
+        <img class="ref" src={cropUrl(personFace(lupe.entry.person_id))} alt="" title={t('{name} auf einem bestätigten Foto', { name: lupe.entry.name })} />
       {/if}
-      <strong>Ist das {lupe.entry.name}?</strong>
+      <strong>{t('Ist das {name}?', { name: lupe.entry.name })}</strong>
     {/snippet}
     {#snippet actions()}
-      <button class="primary" disabled={answering.has(lupe.entry.group_id)} onclick={() => answerInLupe(true)}>Ja, das ist {lupe.entry.name}</button>
-      <button disabled={answering.has(lupe.entry.group_id)} onclick={() => answerInLupe(false)}>Nein</button>
+      <button class="primary" disabled={answering.has(lupe.entry.group_id)} onclick={() => answerInLupe(true)}>{t('Ja, das ist {name}', { name: lupe.entry.name })}</button>
+      <button disabled={answering.has(lupe.entry.group_id)} onclick={() => answerInLupe(false)}>{t('Nein')}</button>
     {/snippet}
   </FotoLupe>
 {/if}

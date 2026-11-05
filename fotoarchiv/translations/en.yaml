@@ -30,7 +30,7 @@ configuration:
     name: Rotate clearly mis-rotated photos automatically
     description: >-
       Only when the model is certain and a face confirms the new orientation; can be undone under
-      "Drehen prüfen". When off, all suspects only go to that review list.
+      "Check rotation". When off, all suspects only go to that review list.
   duplicate_detection:
     name: Detect duplicate photos
     description: >-

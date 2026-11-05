@@ -3,6 +3,7 @@
   import { DATE_SOURCES, formatBytes, formatDuration, formatTaken } from '../lib/format.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import { clampView, RESET, zoomAt } from '../lib/zoom.js';
+  import { locale, t } from '../lib/i18n.js';
   import ChipInput from './ChipInput.svelte';
   import Confirm from './Confirm.svelte';
   import ProposeDeleteDialog from './ProposeDeleteDialog.svelte';
@@ -45,13 +46,13 @@
   // Ein .mp4 sagt nichts über den Codec darin. Kann der Browser ihn nicht dekodieren,
   // bleibt sonst nur das Vorschaubild stehen, ohne jeden Hinweis.
   const VIDEO_ERRORS = {
-    1: 'Die Wiedergabe wurde abgebrochen.',
-    2: 'Das Video konnte nicht vollständig geladen werden (Netzwerkfehler).',
-    3: 'Der Browser kann dieses Video nicht dekodieren. Meist steckt H.265/HEVC darin, das nur wenige Browser abspielen. Abhilfe: in der Galerie auswählen und „Umwandeln“.',
-    4: 'Dieses Videoformat unterstützt der Browser nicht. Die Datei selbst ist in Ordnung – nur der Codec darin passt nicht. Abhilfe: in der Galerie auswählen und „Umwandeln“.',
+    1: t('Die Wiedergabe wurde abgebrochen.'),
+    2: t('Das Video konnte nicht vollständig geladen werden (Netzwerkfehler).'),
+    3: t('Der Browser kann dieses Video nicht dekodieren. Meist steckt H.265/HEVC darin, das nur wenige Browser abspielen. Abhilfe: in der Galerie auswählen und „Umwandeln“.'),
+    4: t('Dieses Videoformat unterstützt der Browser nicht. Die Datei selbst ist in Ordnung – nur der Codec darin passt nicht. Abhilfe: in der Galerie auswählen und „Umwandeln“.'),
   };
   function videoFailed(e) {
-    videoError = VIDEO_ERRORS[e.currentTarget.error?.code] ?? 'Das Video lässt sich nicht abspielen.';
+    videoError = VIDEO_ERRORS[e.currentTarget.error?.code] ?? t('Das Video lässt sich nicht abspielen.');
   }
 
   // Videos starten beim Öffnen sofort mit Ton. Der Klick auf das Vorschaubild erlaubt das in den
@@ -107,7 +108,7 @@
     tagInput?.commit();
     const body = changes;
     if (!Object.keys(body).length) return discard();
-    if (await save(() => api.update(itemId, body), 'Gespeichert')) discard();
+    if (await save(() => api.update(itemId, body), t('Gespeichert'))) discard();
   }
 
   /** Blättern oder Schließen: bei ungespeicherten Änderungen erst nachfragen. */
@@ -217,12 +218,12 @@
   async function propose(reason) {
     proposing = false;
     if (await save(async () => (await api.requestDelete([itemId], reason), api.asset(itemId)))) {
-      notify('Löschen vorgeschlagen – der Admin entscheidet');
+      notify(t('Löschen vorgeschlagen – der Admin entscheidet'));
     }
   }
   async function dismissProposal() {
     if (await save(async () => (await api.dismissDeleteRequests([itemId]), api.asset(itemId)))) {
-      notify('Vorschlag abgelehnt – das Foto bleibt');
+      notify(t('Vorschlag abgelehnt – das Foto bleibt'));
     }
   }
   const mine = $derived(detail?.delete_requests?.some((r) => r.username === myName) ?? false);
@@ -230,20 +231,20 @@
   // ── Bilderkennung ──────────────────────────────────────────────
   // Vorschläge, die nicht schon (auch im ungespeicherten Entwurf) als Schlagwort dastehen
   const suggested = $derived(
-    (detail?.suggestions ?? []).filter((s) => !tags.some((t) => t.toLocaleLowerCase() === s.name.toLocaleLowerCase())),
+    (detail?.suggestions ?? []).filter((s) => !tags.some((x) => x.toLocaleLowerCase() === s.name.toLocaleLowerCase())),
   );
   const takeSuggestion = (name) => (draft.tags = [...tags, name]); // gespeichert wird mit "Speichern"
   const dismissSuggestion = (name) => save(async () => (await api.dismissSuggestion(name, [itemId]), api.asset(itemId)));
-  const turn = (degrees) => (degrees === 90 ? 'um 90° nach rechts' : degrees === 270 ? 'um 90° nach links' : 'um 180°');
+  const turn = (degrees) => (degrees === 90 ? t('um 90° nach rechts') : degrees === 270 ? t('um 90° nach links') : t('um 180°'));
   function decideOrientation(accept) {
     const auto = detail.orientation.status === 'auto';
-    const message = accept ? (auto ? 'Drehung bestätigt' : 'Gedreht') : auto ? 'Zurückgedreht' : 'Vorschlag verworfen';
+    const message = accept ? (auto ? t('Drehung bestätigt') : t('Gedreht')) : auto ? t('Zurückgedreht') : t('Vorschlag verworfen');
     save(() => api.decideOrientation(itemId, accept), message);
   }
   const setLabels = (kind, values) => (draft[kind] = values);
   function setDate(value) {
     editDate = false;
-    save(() => api.update(itemId, { taken_at: value }), 'Datum gespeichert');
+    save(() => api.update(itemId, { taken_at: value }), t('Datum gespeichert'));
   }
   function setLocation(position) {
     editLocation = false;
@@ -370,12 +371,12 @@
   }
 
   const mapLink = (d) => `https://www.openstreetmap.org/?mlat=${d.lat}&mlon=${d.lon}#map=15/${d.lat}/${d.lon}`;
-  const expires = (d) => new Date(d.expires_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+  const expires = (d) => new Date(d.expires_at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 </script>
 
 <svelte:window onkeydown={keydown} />
 
-<div class="viewer" role="dialog" aria-modal="true" aria-label="Einzelansicht">
+<div class="viewer" role="dialog" aria-modal="true" aria-label={t('Einzelansicht')}>
   <div
     class="stage"
     class:zoomable={!isVideo}
@@ -440,61 +441,61 @@
       <div class="video-error">
         <Icon name="alert" size={22} />
         <p>{videoError}</p>
-        <a class="download" href={originalUrl(item, true)}><Icon name="download" size={18} /> Original herunterladen</a>
+        <a class="download" href={originalUrl(item, true)}><Icon name="download" size={18} /> {t('Original herunterladen')}</a>
       </div>
     {/if}
 
     <div class="toolbar">
-      <button class="round" onclick={close} title="Schließen (Esc)"><Icon name="close" /></button>
+      <button class="round" onclick={close} title={t('Schließen (Esc)')}><Icon name="close" /></button>
       <span class="spacer"></span>
-      {#if busy}<span class="spinner" title="Wird gespeichert"></span>{/if}
+      {#if busy}<span class="spinner" title={t('Wird gespeichert')}></span>{/if}
       {#if trash}
-        {#if canDelete}<button class="round" onclick={() => onrestore(itemId)} title="Wiederherstellen"><Icon name="restore" /></button>{/if}
-        {#if canPurge}<button class="round" onclick={() => onpurge(itemId)} title="Endgültig löschen"><Icon name="deleteForever" /></button>{/if}
+        {#if canDelete}<button class="round" onclick={() => onrestore(itemId)} title={t('Wiederherstellen')}><Icon name="restore" /></button>{/if}
+        {#if canPurge}<button class="round" onclick={() => onpurge(itemId)} title={t('Endgültig löschen')}><Icon name="deleteForever" /></button>{/if}
       {:else}
         {#if detail?.rotatable && allowed}
-          <button class="round" disabled={busy} onclick={() => rotate(270)} title="Nach links drehen"><Icon name="rotate" /></button>
-          <button class="round" disabled={busy} onclick={() => rotate(90)} title="Nach rechts drehen"><Icon name="rotate" flip /></button>
+          <button class="round" disabled={busy} onclick={() => rotate(270)} title={t('Nach links drehen')}><Icon name="rotate" /></button>
+          <button class="round" disabled={busy} onclick={() => rotate(90)} title={t('Nach rechts drehen')}><Icon name="rotate" flip /></button>
         {/if}
         {#if !isVideo}
-          <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title="Gesichter zeigen (f)"><Icon name="face" /></button>
-          <button class="round" disabled={!canZoom} onclick={() => (wide = true)} title="Weitwinkel entzerren (w)"><Icon name="panorama" /></button>
+          <button class="round" class:on={showFaces} onclick={() => (showFaces = !showFaces)} title={t('Gesichter zeigen (f)')}><Icon name="face" /></button>
+          <button class="round" disabled={!canZoom} onclick={() => (wide = true)} title={t('Weitwinkel entzerren (w)')}><Icon name="panorama" /></button>
         {/if}
-        <a class="round" href={originalUrl(item, true)} title="Original herunterladen"><Icon name="download" /></a>
+        <a class="round" href={originalUrl(item, true)} title={t('Original herunterladen')}><Icon name="download" /></a>
         {#if canPropose && !canDelete}
           <button class="round" class:on={mine} disabled={busy || mine} onclick={() => (proposing = true)}
-            title={mine ? 'Löschen schon vorgeschlagen' : 'Dem Admin zum Löschen vorschlagen'}><Icon name="delete" /></button>
+            title={mine ? t('Löschen schon vorgeschlagen') : t('Dem Admin zum Löschen vorschlagen')}><Icon name="delete" /></button>
         {/if}
-        {#if canDelete}<button class="round" disabled={busy} onclick={() => ondelete(itemId)} title="In den Papierkorb (Entf)"><Icon name="delete" /></button>{/if}
+        {#if canDelete}<button class="round" disabled={busy} onclick={() => ondelete(itemId)} title={t('In den Papierkorb (Entf)')}><Icon name="delete" /></button>{/if}
       {/if}
-      <button class="round" class:on={showInfo} onclick={toggleInfo} title="Informationen (i)"><Icon name="info" /></button>
+      <button class="round" class:on={showInfo} onclick={toggleInfo} title={t('Informationen (i)')}><Icon name="info" /></button>
     </div>
     {#if index > 0}
-      <button class="nav prev" onclick={() => go(-1)} title="Neuer (←)"><Icon name="left" size={36} /></button>
+      <button class="nav prev" onclick={() => go(-1)} title={t('Neuer (←)')}><Icon name="left" size={36} /></button>
     {/if}
     {#if index < items.length - 1}
-      <button class="nav next" onclick={() => go(1)} title="Älter (→)"><Icon name="right" size={36} /></button>
+      <button class="nav next" onclick={() => go(1)} title={t('Älter (→)')}><Icon name="right" size={36} /></button>
     {/if}
   </div>
 
   {#if showInfo}
     <aside class="info">
-      <h3>Informationen</h3>
+      <h3>{t('Informationen')}</h3>
       {#if error}
         <p class="error">{error}</p>
       {:else if !detail}
-        <p class="muted">Wird geladen …</p>
+        <p class="muted">{t('Wird geladen …')}</p>
       {:else}
         {#if detail.delete_requests?.length && !trash}
           <div class="notice proposal">
             <Icon name="delete" size={16} />
             <div>
-              Löschen vorgeschlagen von
+              {t('Löschen vorgeschlagen von')}
               {#each detail.delete_requests as r, i}{i ? ', ' : ' '}<strong>{r.display_name}</strong>{#if r.reason} („{r.reason}“){/if}{/each}
               {#if canDismiss}
                 <div class="proposal-actions">
-                  <button disabled={busy} onclick={dismissProposal}>Ablehnen</button>
-                  <button class="danger" disabled={busy} onclick={() => ondelete(itemId)}>In den Papierkorb</button>
+                  <button disabled={busy} onclick={dismissProposal}>{t('Ablehnen')}</button>
+                  <button class="danger" disabled={busy} onclick={() => ondelete(itemId)}>{t('In den Papierkorb')}</button>
                 </div>
               {/if}
             </div>
@@ -505,29 +506,29 @@
             <Icon name="rotate" size={16} />
             <div>
               {#if detail.orientation.status === 'auto'}
-                Von der Bilderkennung automatisch {turn(detail.orientation.degrees)} gedreht.
+                {t('Von der Bilderkennung automatisch {turn} gedreht.', { turn: turn(detail.orientation.degrees) })}
               {:else}
-                Vielleicht falsch gedreht. Vorschlag der Bilderkennung: {turn(detail.orientation.degrees)} drehen.
+                {t('Vielleicht falsch gedreht. Vorschlag der Bilderkennung: {turn} drehen.', { turn: turn(detail.orientation.degrees) })}
               {/if}
               <div class="proposal-actions">
                 {#if detail.orientation.status === 'auto'}
-                  <button disabled={busy} onclick={() => decideOrientation(false)}>Rückgängig</button>
-                  <button class="primary" disabled={busy} onclick={() => decideOrientation(true)}>Stimmt</button>
+                  <button disabled={busy} onclick={() => decideOrientation(false)}>{t('Rückgängig')}</button>
+                  <button class="primary" disabled={busy} onclick={() => decideOrientation(true)}>{t('Stimmt')}</button>
                 {:else}
-                  <button disabled={busy} onclick={() => decideOrientation(false)}>Passt so</button>
-                  <button class="primary" disabled={busy} onclick={() => decideOrientation(true)}>Drehen</button>
+                  <button disabled={busy} onclick={() => decideOrientation(false)}>{t('Passt so')}</button>
+                  <button class="primary" disabled={busy} onclick={() => decideOrientation(true)}>{t('Drehen')}</button>
                 {/if}
               </div>
             </div>
           </div>
         {/if}
         {#if trash}
-          <p class="notice"><Icon name="delete" size={16} /> Im Papierkorb – wird am {expires(detail)} endgültig gelöscht.</p>
+          <p class="notice"><Icon name="delete" size={16} /> {t('Im Papierkorb – wird am {date} endgültig gelöscht.', { date: expires(detail) })}</p>
         {:else if !detail.editable && allowed}
-          <p class="notice"><Icon name="alert" size={16} /> Dieses Dateiformat kann keine Metadaten speichern und ist daher nicht bearbeitbar.</p>
+          <p class="notice"><Icon name="alert" size={16} /> {t('Dieses Dateiformat kann keine Metadaten speichern und ist daher nicht bearbeitbar.')}</p>
         {/if}
         <dl>
-          <dt>Aufnahme</dt>
+          <dt>{t('Aufnahme')}</dt>
           <dd class="row">
             <div>
               {formatTaken(detail.taken_at)}
@@ -537,30 +538,30 @@
               {/if}
             </div>
             {#if canEdit}
-              <button class="icon small" disabled={busy} onclick={() => (editDate = true)} title="Datum ändern"><Icon name="pencil" size={18} /></button>
+              <button class="icon small" disabled={busy} onclick={() => (editDate = true)} title={t('Datum ändern')}><Icon name="pencil" size={18} /></button>
             {/if}
           </dd>
 
-          <dt>Ort</dt>
+          <dt>{t('Ort')}</dt>
           <dd class="row">
             {#if location}
               <a href={mapLink(location)} target="_blank" rel="noopener">{location.lat.toFixed(5)}, {location.lon.toFixed(5)}</a>
             {:else}
-              <span class="muted">Kein Aufnahmeort</span>
+              <span class="muted">{t('Kein Aufnahmeort')}</span>
             {/if}
             {#if canEdit}
               <span class="buttons">
-                <button class="icon small" disabled={busy} onclick={() => (editLocation = true)} title={location ? 'Ort ändern' : 'Ort setzen'}>
+                <button class="icon small" disabled={busy} onclick={() => (editLocation = true)} title={location ? t('Ort ändern') : t('Ort setzen')}>
                   <Icon name="pencil" size={18} />
                 </button>
                 {#if location}
-                  <button class="icon small" disabled={busy} onclick={removeLocation} title="Ort entfernen"><Icon name="close" size={18} /></button>
+                  <button class="icon small" disabled={busy} onclick={removeLocation} title={t('Ort entfernen')}><Icon name="close" size={18} /></button>
                 {/if}
               </span>
             {/if}
           </dd>
 
-          <dt>Personen</dt>
+          <dt>{t('Personen')}</dt>
           <dd>
             {#if canEdit || persons.length}
               <ChipInput
@@ -569,41 +570,41 @@
                 values={persons}
                 suggestions={labels.persons.map((p) => p.name)}
                 icon="person"
-                placeholder="Person hinzufügen"
+                placeholder={t('Person hinzufügen')}
                 disabled={!canEdit || busy}
                 onchange={(v) => setLabels('persons', v)}
               />
             {:else}
-              <span class="muted">Keine</span>
+              <span class="muted">{t('Keine')}</span>
             {/if}
           </dd>
 
-          <dt>Schlagworte</dt>
+          <dt>{t('Schlagworte')}</dt>
           <dd>
             {#if canEdit || tags.length}
               <ChipInput
                 bind:this={tagInput}
                 bind:text={tagText}
                 values={tags}
-                suggestions={labels.tags.map((t) => t.name)}
+                suggestions={labels.tags.map((x) => x.name)}
                 icon="tag"
-                placeholder="Schlagwort hinzufügen"
+                placeholder={t('Schlagwort hinzufügen')}
                 disabled={!canEdit || busy}
                 onchange={(v) => setLabels('tags', v)}
               />
             {:else}
-              <span class="muted">Keine</span>
+              <span class="muted">{t('Keine')}</span>
             {/if}
             {#if canEdit && suggested.length}
-              <div class="suggested" title="Von der Bilderkennung erkannt, noch nicht im Foto gespeichert">
-                <span class="muted"><Icon name="sparkle" size={14} /> Erkannt:</span>
+              <div class="suggested" title={t('Von der Bilderkennung erkannt, noch nicht im Foto gespeichert')}>
+                <span class="muted"><Icon name="sparkle" size={14} /> {t('Erkannt:')}</span>
                 {#each suggested as s (s.name)}
                   <span class="suggestion">
                     {s.name}
-                    <button class="icon small" disabled={busy} onclick={() => takeSuggestion(s.name)} title="Als Schlagwort übernehmen">
+                    <button class="icon small" disabled={busy} onclick={() => takeSuggestion(s.name)} title={t('Als Schlagwort übernehmen')}>
                       <Icon name="check" size={16} />
                     </button>
-                    <button class="icon small" disabled={busy} onclick={() => dismissSuggestion(s.name)} title="Passt nicht – nicht mehr vorschlagen">
+                    <button class="icon small" disabled={busy} onclick={() => dismissSuggestion(s.name)} title={t('Passt nicht – nicht mehr vorschlagen')}>
                       <Icon name="close" size={16} />
                     </button>
                   </span>
@@ -613,11 +614,11 @@
           </dd>
 
           {#if detail.camera}
-            <dt>Kamera</dt>
+            <dt>{t('Kamera')}</dt>
             <dd>{detail.camera}</dd>
           {/if}
 
-          <dt>Datei</dt>
+          <dt>{t('Datei')}</dt>
           <dd>
             <div class="path">{detail.orig_path ?? detail.path}</div>
             <div class="muted">
@@ -629,9 +630,9 @@
         </dl>
         {#if canEdit && dirty}
           <div class="draft-bar">
-            <span class="muted">Nicht gespeichert</span>
-            <button disabled={busy} onclick={discard}>Verwerfen</button>
-            <button class="primary" disabled={busy} onclick={saveDraft}>Speichern</button>
+            <span class="muted">{t('Nicht gespeichert')}</span>
+            <button disabled={busy} onclick={discard}>{t('Verwerfen')}</button>
+            <button class="primary" disabled={busy} onclick={saveDraft}>{t('Speichern')}</button>
           </div>
         {/if}
       {/if}
@@ -640,7 +641,7 @@
 </div>
 
 {#if editLocation && detail}
-  <LocationDialog lat={location?.lat ?? null} lon={location?.lon ?? null} saveLabel="Übernehmen" onsave={setLocation}
+  <LocationDialog lat={location?.lat ?? null} lon={location?.lon ?? null} saveLabel={t('Übernehmen')} onsave={setLocation}
     oncancel={() => (editLocation = false)} />
 {/if}
 
@@ -659,9 +660,9 @@
 
 {#if leaving}
   <Confirm
-    title="Änderungen verwerfen?"
-    text="Personen, Schlagworte oder Ort sind geändert, aber noch nicht gespeichert."
-    confirmLabel="Verwerfen"
+    title={t('Änderungen verwerfen?')}
+    text={t('Personen, Schlagworte oder Ort sind geändert, aber noch nicht gespeichert.')}
+    confirmLabel={t('Verwerfen')}
     danger
     onconfirm={() => {
       const action = leaving;

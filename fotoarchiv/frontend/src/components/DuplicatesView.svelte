@@ -1,6 +1,7 @@
 <script>
   import { api, thumbUrl } from '../lib/api.js';
   import { formatBytes, formatDuration, formatNumber } from '../lib/format.js';
+  import { locale, t } from '../lib/i18n.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import Confirm from './Confirm.svelte';
   import Icon from './Icon.svelte';
@@ -8,7 +9,7 @@
   let { revision, onopen, ontask, onchanged } = $props();
 
   const PAGE = 40;
-  const SOURCES = { exif: 'Datum aus Kamera', filename: 'Datum aus Dateiname', mtime: 'Datum geschätzt' };
+  const SOURCES = { exif: t('Datum aus Kamera'), filename: t('Datum aus Dateiname'), mtime: t('Datum geschätzt') };
 
   let data = $state.raw(null);
   let tab = $state('duplicates'); // duplicates | series
@@ -48,11 +49,11 @@
 
   // Viewer-Eintrag wie im Index: [id, ts, w, h, video, rev]
   const asItem = (i) => [i.id, i.taken_ts, i.width || 1, i.height || 1, i.kind === 'video' ? 1 : 0, i.rev];
-  const what = (group) => (group.items[0].kind === 'video' ? 'Videos' : 'Fotos');
+  const what = (group) => (group.items[0].kind === 'video' ? t('{n} Videos', { n: group.items.length }) : t('{n} Fotos', { n: group.items.length }));
   const analysing = $derived(data ? data.hashed < data.images || data.videos_hashed < data.videos : false);
 
   const date = (ts) =>
-    new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
+    new Date(ts * 1000).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
 
   function plan(group) {
     const keep = kept(group);
@@ -79,7 +80,7 @@
     try {
       await api.ignoreDuplicates(group.items.map((i) => i.id));
       done = new Set([...done, group.key]);
-      notify('Als „keine Duplikate“ gemerkt');
+      notify(t('Als „keine Duplikate“ gemerkt'));
       onchanged();
     } catch (e) {
       notifyError(e);
@@ -96,50 +97,47 @@
   {#if data && !data.enabled}
     <div class="empty">
       <Icon name="duplicate" size={64} />
-      <h2>Doppelten-Erkennung ist ausgeschaltet</h2>
-      <p>Einschalten in Home Assistant unter Einstellungen → Add-ons → Fotoarchiv → Konfiguration.</p>
+      <h2>{t('Doppelten-Erkennung ist ausgeschaltet')}</h2>
+      <p>{t('Einschalten in Home Assistant unter Einstellungen → Add-ons → Fotoarchiv → Konfiguration.')}</p>
     </div>
   {:else if data}
     <div class="head">
       <nav class="tabs">
         <button class:active={tab === 'duplicates'} onclick={() => setTab('duplicates')}>
-          Doppelt <span class="count">{formatNumber(counts.duplicates)}</span>
+          {t('Doppelt')} <span class="count">{formatNumber(counts.duplicates)}</span>
         </button>
         <button class:active={tab === 'series'} onclick={() => setTab('series')}>
-          Serien <span class="count">{formatNumber(counts.series)}</span>
+          {t('Serien')} <span class="count">{formatNumber(counts.series)}</span>
         </button>
       </nav>
       <span class="grow"></span>
       {#if analysing}
         <span class="progress muted"><span class="spinner"></span>
-          {#if data.hashed < data.images}{formatNumber(data.hashed)} von {formatNumber(data.images)} Fotos analysiert
-          {:else}{formatNumber(data.videos_hashed)} von {formatNumber(data.videos)} Videos analysiert{/if}
+          {#if data.hashed < data.images}{t('{done} von {total} Fotos analysiert', { done: formatNumber(data.hashed), total: formatNumber(data.images) })}
+          {:else}{t('{done} von {total} Videos analysiert', { done: formatNumber(data.videos_hashed), total: formatNumber(data.videos) })}{/if}
         </span>
       {/if}
     </div>
 
     <p class="hint">
       {#if tab === 'duplicates'}
-        Gleiches Motiv – z. B. verkleinerte Kopie, anderes Format oder erneut gespeichert. Auch Videos, die es zusätzlich
-        als verkleinerte Kopie gibt (Google Fotos, WhatsApp). Vorgeschlagen wird die beste Fassung (Auflösung, Datum,
-        Metadaten, bei gleicher Auflösung die größere Datei).
+        {t('Gleiches Motiv – z. B. verkleinerte Kopie, anderes Format oder erneut gespeichert. Auch Videos, die es zusätzlich als verkleinerte Kopie gibt (Google Fotos, WhatsApp). Vorgeschlagen wird die beste Fassung (Auflösung, Datum, Metadaten, bei gleicher Auflösung die größere Datei).')}
       {:else}
-        Sehr ähnliche Fotos, die innerhalb von 30 Sekunden aufgenommen wurden. Vorgeschlagen wird die größte Datei – meist
-        die schärfste. Bitte selbst prüfen.
+        {t('Sehr ähnliche Fotos, die innerhalb von 30 Sekunden aufgenommen wurden. Vorgeschlagen wird die größte Datei – meist die schärfste. Bitte selbst prüfen.')}
       {/if}
-      Antippen des Schalters ändert, was behalten wird.
+      {t('Antippen des Schalters ändert, was behalten wird.')}
     </p>
 
     {#if groups.length}
       <div class="toolbar">
         <label class="check">
           <input type="checkbox" bind:checked={transfer} />
-          Schlagworte, Personen, Ort und Datum aufs behaltene Foto übertragen
+          {t('Schlagworte, Personen, Ort und Datum aufs behaltene Foto übertragen')}
         </label>
         <span class="grow"></span>
         {#if tab === 'duplicates'}
           <button class="primary" disabled={busy} onclick={() => (confirmAll = true)}>
-            <Icon name="checkCircle" size={18} /> Alle Vorschläge übernehmen
+            <Icon name="checkCircle" size={18} /> {t('Alle Vorschläge übernehmen')}
           </button>
         {/if}
       </div>
@@ -150,42 +148,42 @@
           <header>
             <strong>{date(group.items[0].taken_ts)}</strong>
             <span class="muted">
-              {group.items.length} {what(group)}{#if group.kind === 'series' && group.span} · innerhalb von {group.span} s{/if}
+              {what(group)}{#if group.kind === 'series' && group.span} · {t('innerhalb von {n} s', { n: group.span })}{/if}
             </span>
             <span class="grow"></span>
-            <button onclick={() => ignore(group)} title="Diese Dateien nicht mehr als Duplikate vorschlagen">
-              <Icon name="hide" size={18} /><span class="label">Keine Duplikate</span>
+            <button onclick={() => ignore(group)} title={t('Diese Dateien nicht mehr als Duplikate vorschlagen')}>
+              <Icon name="hide" size={18} /><span class="label">{t('Keine Duplikate')}</span>
             </button>
             <button
               class="primary"
               disabled={busy || !keep.length || keep.length === group.items.length}
               onclick={() => resolve([group])}
-              title={keep.length ? '' : 'Mindestens eine Datei behalten'}
+              title={keep.length ? '' : t('Mindestens eine Datei behalten')}
             >
               <Icon name="delete" size={18} />
-              {group.items.length - keep.length} löschen
+              {t('{n} löschen', { n: group.items.length - keep.length })}
             </button>
           </header>
           <div class="items">
             {#each group.items as item (item.id)}
               {@const on = keep.includes(item.id)}
               <figure class:remove={!on}>
-                <button class="thumb" onclick={() => onopen(group.items.map(asItem), item.id)} title="Groß ansehen">
+                <button class="thumb" onclick={() => onopen(group.items.map(asItem), item.id)} title={t('Groß ansehen')}>
                   <img src={thumbUrl(asItem(item))} alt={item.name} loading="lazy" />
                 </button>
                 <button class="keep" class:on onclick={() => toggleKeep(group, item.id)}>
                   <Icon name={on ? 'checkCircle' : 'delete'} size={18} />
-                  {on ? 'Behalten' : 'Löschen'}
-                  {#if item.id === group.keep}<span class="tip" title="Empfehlung">★</span>{/if}
+                  {on ? t('Behalten') : t('Löschen')}
+                  {#if item.id === group.keep}<span class="tip" title={t('Empfehlung')}>★</span>{/if}
                 </button>
                 <figcaption>
                   <span class="name" title={item.path}>{item.name}</span>
                   <span>{item.width && item.height ? `${item.width} × ${item.height}` : '–'} · {formatBytes(item.size)} · {item.format}{#if item.kind === 'video' && item.duration} · {formatDuration(item.duration)}{/if}</span>
                   <span class="muted">{SOURCES[item.date_source] ?? item.date_source}{#if item.camera} · {item.camera}{/if}</span>
                   <span class="labels muted">
-                    {#if item.tags}<span title="Schlagworte"><Icon name="tag" size={14} />{item.tags}</span>{/if}
-                    {#if item.persons}<span title="Personen"><Icon name="person" size={14} />{item.persons}</span>{/if}
-                    {#if item.has_location}<span title="Aufnahmeort"><Icon name="marker" size={14} /></span>{/if}
+                    {#if item.tags}<span title={t('Schlagworte')}><Icon name="tag" size={14} />{item.tags}</span>{/if}
+                    {#if item.persons}<span title={t('Personen')}><Icon name="person" size={14} />{item.persons}</span>{/if}
+                    {#if item.has_location}<span title={t('Aufnahmeort')}><Icon name="marker" size={14} /></span>{/if}
                   </span>
                 </figcaption>
               </figure>
@@ -194,13 +192,13 @@
         </section>
       {/each}
       {#if groups.length > limit}
-        <button class="more" onclick={() => (limit += PAGE)}>Weitere {formatNumber(Math.min(PAGE, groups.length - limit))} Gruppen anzeigen</button>
+        <button class="more" onclick={() => (limit += PAGE)}>{t('Weitere {n} Gruppen anzeigen', { n: formatNumber(Math.min(PAGE, groups.length - limit)) })}</button>
       {/if}
     {:else}
       <div class="empty">
         <Icon name="checkCircle" size={64} />
-        <h2>{tab === 'duplicates' ? 'Keine doppelten Fotos oder Videos gefunden' : 'Keine Serien gefunden'}</h2>
-        {#if analysing}<p>Die Analyse läuft noch – später erneut vorbeischauen.</p>{/if}
+        <h2>{tab === 'duplicates' ? t('Keine doppelten Fotos oder Videos gefunden') : t('Keine Serien gefunden')}</h2>
+        {#if analysing}<p>{t('Die Analyse läuft noch – später erneut vorbeischauen.')}</p>{/if}
       </div>
     {/if}
   {/if}
@@ -208,9 +206,9 @@
 
 {#if confirmAll}
   <Confirm
-    title="Alle Vorschläge übernehmen?"
-    text={`${formatNumber(extra)} ${extra === 1 ? 'Datei kommt' : 'Dateien kommen'} aus ${formatNumber(groups.length)} Gruppen in den Papierkorb.${transfer ? ' Metadaten werden vorher aufs behaltene Foto übertragen.' : ''}`}
-    confirmLabel="In den Papierkorb"
+    title={t('Alle Vorschläge übernehmen?')}
+    text={(extra === 1 ? t('{n} Datei kommt aus {groups} Gruppen in den Papierkorb.', { n: formatNumber(extra), groups: formatNumber(groups.length) }) : t('{n} Dateien kommen aus {groups} Gruppen in den Papierkorb.', { n: formatNumber(extra), groups: formatNumber(groups.length) })) + (transfer ? ' ' + t('Metadaten werden vorher aufs behaltene Foto übertragen.') : '')}
+    confirmLabel={t('In den Papierkorb')}
     danger
     oncancel={() => (confirmAll = false)}
     onconfirm={() => {

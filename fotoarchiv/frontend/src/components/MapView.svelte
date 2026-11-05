@@ -8,6 +8,7 @@
   import Supercluster from 'supercluster';
   import { api, thumbUrl } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { t } from '../lib/i18n.js';
   import { createMap, L } from '../lib/map.js';
   import { notifyError } from '../lib/notices.svelte.js';
   import LocationDialog from './LocationDialog.svelte';
@@ -293,7 +294,7 @@
     lat={editing.lat}
     lon={editing.lon}
     count={editing.mode === 'place' ? editing.ids.length : 1}
-    hint={editing.mode === 'shift' ? `Die Stecknadel steht in der Mitte der Gruppe (${formatNumber(editing.ids.length)} Fotos). Verschiebe sie an die richtige Stelle – alle Fotos wandern mit, ihre Anordnung bleibt.` : ''}
+    hint={editing.mode === 'shift' ? t('Die Stecknadel steht in der Mitte der Gruppe ({count} Fotos). Verschiebe sie an die richtige Stelle – alle Fotos wandern mit, ihre Anordnung bleibt.', { count: formatNumber(editing.ids.length) }) : ''}
     onsave={(location) => {
       if (editing.mode === 'shift') shiftGroup(editing.ids, location.lat - editing.lat, location.lon - editing.lon);
       else placeGroup(editing.ids, location);
@@ -310,20 +311,20 @@
     <div class="period">
       <MapTimeline {period} minYear={years.min} maxYear={years.max} count={shown.length} onchange={changePeriod} />
     </div>
-    {#if dropActive}<div class="drop-hint">Hier loslassen, um den Ort zu setzen</div>{/if}
+    {#if dropActive}<div class="drop-hint">{t('Hier loslassen, um den Ort zu setzen')}</div>{/if}
     {#if menu}
       <div class="menu" style:left="{menu.x}px" style:top="{menu.y}px" role="menu">
-        <div class="menu-title">{menu.ids.length === 1 ? '1 Foto' : `${formatNumber(menu.ids.length)} Fotos`}</div>
+        <div class="menu-title">{menu.ids.length === 1 ? t('1 Foto') : t('{n} Fotos', { n: formatNumber(menu.ids.length) })}</div>
         {#if canEdit}
           {#if menu.ids.length > 1}
-            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'shift' })}>Gruppe verschieben …</button>
-            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'place' })}>Alle auf einen Punkt …</button>
+            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'shift' })}>{t('Gruppe verschieben …')}</button>
+            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'place' })}>{t('Alle auf einen Punkt …')}</button>
           {:else}
-            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'place' })}>Ort ändern …</button>
+            <button role="menuitem" onclick={() => (editing = { ...menu, mode: 'place' })}>{t('Ort ändern …')}</button>
           {/if}
-          <button role="menuitem" onclick={() => removeLocation(menu.ids)}>Ort entfernen</button>
+          <button role="menuitem" onclick={() => removeLocation(menu.ids)}>{t('Ort entfernen')}</button>
         {/if}
-        <button role="menuitem" onclick={() => showGroup(menu)}>Ansehen</button>
+        <button role="menuitem" onclick={() => showGroup(menu)}>{t('Ansehen')}</button>
       </div>
     {/if}
   </div>

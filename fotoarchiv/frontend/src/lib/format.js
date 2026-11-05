@@ -1,5 +1,7 @@
-const number = new Intl.NumberFormat('de-DE');
-const dateTime = new Intl.DateTimeFormat('de-DE', {
+import { locale, t } from './i18n.js';
+
+const number = new Intl.NumberFormat(locale);
+const dateTime = new Intl.DateTimeFormat(locale, {
   weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
   timeZone: 'UTC',
 });
@@ -10,7 +12,7 @@ export function formatBytes(bytes) {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const k = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${(bytes / 1024 ** k).toLocaleString('de-DE', { maximumFractionDigits: k > 1 ? 1 : 0 })} ${units[k]}`;
+  return `${(bytes / 1024 ** k).toLocaleString(locale, { maximumFractionDigits: k > 1 ? 1 : 0 })} ${units[k]}`;
 }
 
 export function formatDuration(seconds) {
@@ -27,6 +29,6 @@ export const formatTaken = (takenAt) => dateTime.format(new Date(`${takenAt}Z`))
 
 export const DATE_SOURCES = {
   exif: '',
-  filename: 'aus dem Dateinamen',
-  mtime: 'Dateidatum – unsicher',
+  filename: t('aus dem Dateinamen'),
+  mtime: t('Dateidatum – unsicher'),
 };

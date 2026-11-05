@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.64.0
+
+- **Mehrsprachig:** Die Oberfläche gibt es jetzt auf Deutsch, Englisch und Italienisch (Issue #1). Die Sprache folgt dem Browser und lässt sich unter Einstellungen und auf der Anmeldeseite ändern; die Wahl gilt für dieses Gerät. Ohne passende Browsersprache erscheint Englisch. Auch Datums- und Zahlenformate, die Ortssuche und die Add-on-Einstellungen in Home Assistant folgen der Sprache. Schlagworte aus der Bilderkennung bleiben auf Deutsch, weil sie in den Fotos stehen und danach gesucht wird
+
 ## 0.63.0
 
 - **Zu Hause direkt ins Heimnetz:** Neue Option `public_home_url` (z. B. `http://192.168.178.37:8301`). Wer die Internetadresse von zu Hause öffnet, landet dort – große Videos laufen dann ohne den Umweg über den Cloudflare-Tunnel flüssig. Erkannt wird das an der öffentlichen IP, die das Add-on bei Cloudflare abfragt. Mit `?extern` bleibt man auf der Internetadresse

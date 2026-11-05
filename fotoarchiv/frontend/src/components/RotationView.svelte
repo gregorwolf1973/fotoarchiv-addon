@@ -1,6 +1,7 @@
 <script>
   import { api, thumbUrl } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { t } from '../lib/i18n.js';
   import { notifyError } from '../lib/notices.svelte.js';
   import Icon from './Icon.svelte';
 
@@ -61,10 +62,10 @@
     }
   }
 
-  const direction = (degrees) => (degrees === 90 ? 'nach rechts' : degrees === 270 ? 'nach links' : 'um 180°');
+  const direction = (degrees) => (degrees === 90 ? t('nach rechts') : degrees === 270 ? t('nach links') : t('um 180°'));
   function caption(item, isWrong) {
-    if (item.status === 'auto') return isWrong ? 'wird zurückgedreht' : `${direction(item.degrees)} gedreht`;
-    return isWrong ? 'bleibt, wie es war' : `${direction(item.degrees)} drehen`;
+    if (item.status === 'auto') return isWrong ? t('wird zurückgedreht') : t('{direction} gedreht', { direction: direction(item.degrees) });
+    return isWrong ? t('bleibt, wie es war') : t('{direction} drehen', { direction: direction(item.degrees) });
   }
 </script>
 
@@ -74,7 +75,7 @@
     <button
       class="thumb"
       onclick={() => toggle(item.id)}
-      title={isWrong ? 'Doch richtig – antippen zum Zurücknehmen' : 'Stimmt nicht – antippen'}
+      title={isWrong ? t('Doch richtig – antippen zum Zurücknehmen') : t('Stimmt nicht – antippen')}
       aria-pressed={isWrong}
     >
       <!-- Vorschläge zeigt die Seite schon gedreht; automatisch gedrehte sind es wirklich -->
@@ -88,50 +89,49 @@
     </button>
     <figcaption>
       <span>{caption(item, isWrong)}</span>
-      <button class="icon small" onclick={() => onopen(open.map(asItem), item.id)} title="Groß ansehen"><Icon name="search" size={16} /></button>
+      <button class="icon small" onclick={() => onopen(open.map(asItem), item.id)} title={t('Groß ansehen')}><Icon name="search" size={16} /></button>
     </figcaption>
   </figure>
 {/snippet}
 
 <div class="review">
   {#if items === null}
-    <p class="muted">Wird geladen …</p>
+    <p class="muted">{t('Wird geladen …')}</p>
   {:else if !open.length}
     <div class="empty">
       <Icon name="checkCircle" size={64} />
-      <h2>Nichts zu prüfen</h2>
-      <p>Die Bilderkennung hat keine falsch gedrehten Fotos gefunden – oder alle sind schon erledigt.</p>
+      <h2>{t('Nichts zu prüfen')}</h2>
+      <p>{t('Die Bilderkennung hat keine falsch gedrehten Fotos gefunden – oder alle sind schon erledigt.')}</p>
     </div>
   {:else}
     <div class="head">
       <p class="hint">
-        So sähen die Fotos richtig gedreht aus. <strong>Antippen, was nicht stimmt</strong> – dann „Übernehmen“.
-        Angetippte bleiben bzw. werden wie vorher.
+        {t('So sähen die Fotos richtig gedreht aus.')} <strong>{t('Antippen, was nicht stimmt')}</strong> {t('– dann „Übernehmen“. Angetippte bleiben bzw. werden wie vorher.')}
       </p>
       <button class="primary" disabled={busy} onclick={apply}>
         <Icon name="check" size={18} />
-        {formatNumber(shown.length)} übernehmen{#if wrong.size} ({formatNumber(wrong.size)} abgelehnt){/if}
+        {t('{n} übernehmen', { n: formatNumber(shown.length) })}{#if wrong.size} {t('({n} abgelehnt)', { n: formatNumber(wrong.size) })}{/if}
       </button>
     </div>
 
     {#if automatic.length}
-      <h3>Automatisch gedreht <span class="count">{formatNumber(automatic.length)}</span></h3>
-      <p class="hint">Mit Gesicht eindeutig erkannt und schon gedreht. Angetippte werden zurückgedreht.</p>
+      <h3>{t('Automatisch gedreht')} <span class="count">{formatNumber(automatic.length)}</span></h3>
+      <p class="hint">{t('Mit Gesicht eindeutig erkannt und schon gedreht. Angetippte werden zurückgedreht.')}</p>
       <div class="grid">
         {#each automatic as item (item.id)}{@render card(item)}{/each}
       </div>
     {/if}
 
     {#if suggested.length}
-      <h3>Vielleicht falsch gedreht <span class="count">{formatNumber(suggested.length)}</span></h3>
-      <p class="hint">Noch nicht gedreht – die Vorschau zeigt den Vorschlag. Etwa jeder vierte Vorschlag liegt daneben.</p>
+      <h3>{t('Vielleicht falsch gedreht')} <span class="count">{formatNumber(suggested.length)}</span></h3>
+      <p class="hint">{t('Noch nicht gedreht – die Vorschau zeigt den Vorschlag. Etwa jeder vierte Vorschlag liegt daneben.')}</p>
       <div class="grid">
         {#each suggested as item (item.id)}{@render card(item)}{/each}
       </div>
     {/if}
 
     {#if open.length > limit}
-      <button class="more" onclick={() => (limit += PAGE)}>Weitere {formatNumber(Math.min(PAGE, open.length - limit))} anzeigen</button>
+      <button class="more" onclick={() => (limit += PAGE)}>{t('Weitere {n} anzeigen', { n: formatNumber(Math.min(PAGE, open.length - limit)) })}</button>
     {/if}
   {/if}
 </div>

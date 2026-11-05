@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
 
   // Ausgewählte Fotos in einen Favoritenordner legen – auch für Touchscreens, wo Ziehen nicht geht.
@@ -13,10 +14,10 @@
 <div class="modal-backdrop" onclick={(e) => e.target === e.currentTarget && oncancel()} role="presentation">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="favorite-title">
     <header>
-      <h2 id="favorite-title">Zu Favoriten hinzufügen</h2>
-      <button class="icon" onclick={oncancel} title="Schließen"><Icon name="close" /></button>
+      <h2 id="favorite-title">{t('Zu Favoriten hinzufügen')}</h2>
+      <button class="icon" onclick={oncancel} title={t('Schließen')}><Icon name="close" /></button>
     </header>
-    <p>{count === 1 ? 'Das Foto wird' : `${count} Fotos werden`} im Ordner verlinkt; die Dateien bleiben, wo sie sind.</p>
+    <p>{count === 1 ? t('Das Foto wird im Ordner verlinkt; die Dateien bleiben, wo sie sind.') : t('{count} Fotos werden im Ordner verlinkt; die Dateien bleiben, wo sie sind.', { count })}</p>
     {#if folders.length}
       <ul>
         {#each folders as folder (folder.id)}
@@ -37,8 +38,8 @@
         if (name.trim()) onsave(null, name.trim());
       }}
     >
-      <input type="text" bind:value={name} maxlength="100" placeholder="Neuer Ordner" aria-label="Name des neuen Ordners" />
-      <button class="primary" type="submit" disabled={!name.trim()}><Icon name="folderPlus" size={20} /> Anlegen</button>
+      <input type="text" bind:value={name} maxlength="100" placeholder={t('Neuer Ordner')} aria-label={t('Name des neuen Ordners')} />
+      <button class="primary" type="submit" disabled={!name.trim()}><Icon name="folderPlus" size={20} /> {t('Anlegen')}</button>
     </form>
   </div>
 </div>

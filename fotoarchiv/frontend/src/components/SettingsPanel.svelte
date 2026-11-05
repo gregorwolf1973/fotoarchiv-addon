@@ -1,6 +1,7 @@
 <script>
   import { api } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
+  import { LANGUAGES, language, setLanguage, t, tServer } from '../lib/i18n.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import Confirm from './Confirm.svelte';
   import Icon from './Icon.svelte';
@@ -36,18 +37,24 @@
   const write = $derived(overview?.writeback);
   const pending = $derived(write?.files ?? 0);
   const n = (value) => formatNumber(value ?? 0);
-  const photos = (value) => (value === 1 ? '1 Foto' : `${n(value)} Fotos`);
+  const photos = (value) => (value === 1 ? t('1 Foto') : t('{n} Fotos', { n: n(value) }));
 
   const statusText = $derived.by(() => {
     if (!v) return '';
-    if (!v.enabled) return 'Ausgeschaltet (Add-on-Option image_recognition).';
+    if (!v.enabled) return t('Ausgeschaltet (Add-on-Option image_recognition).');
     if (v.status === 'downloading')
-      return `Modelle werden heruntergeladen: ${v.download_total ? Math.round((v.download_done / v.download_total) * 100) : 0} %`;
-    if (v.status === 'loading' || v.status === 'starting') return 'Wird vorbereitet …';
-    if (v.status === 'error') return `Gestört: ${v.message}`;
+      return t('Modelle werden heruntergeladen: {percent} %', {
+        percent: v.download_total ? Math.round((v.download_done / v.download_total) * 100) : 0,
+      });
+    if (v.status === 'loading' || v.status === 'starting') return t('Wird vorbereitet …');
+    if (v.status === 'error') return t('Gestört: {message}', { message: tServer(v.message) });
     if (v.done < v.total)
-      return `Läuft: ${n(v.done)} von ${n(v.total)} Dateien analysiert (${Math.floor((v.done / v.total) * 100)} %).`;
-    return `Alle ${n(v.total)} Dateien analysiert.`;
+      return t('Läuft: {done} von {total} Dateien analysiert ({percent} %).', {
+        done: n(v.done),
+        total: n(v.total),
+        percent: Math.floor((v.done / v.total) * 100),
+      });
+    return t('Alle {total} Dateien analysiert.', { total: n(v.total) });
   });
 
   async function recheck() {
@@ -55,7 +62,7 @@
     busy = true;
     try {
       const { count } = await api.recheckOrientation();
-      notify(`${photos(count)} werden noch einmal auf die Ausrichtung geprüft`);
+      notify(t('{photos} werden noch einmal auf die Ausrichtung geprüft', { photos: photos(count) }));
       onchanged();
       await load();
     } catch (e) {
@@ -84,66 +91,68 @@
 <div class="modal-backdrop" onclick={(e) => e.target === e.currentTarget && onclose()} role="presentation">
   <div class="modal panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <header>
-      <h2 id="settings-title"><Icon name="cog" size={22} /> Einstellungen</h2>
-      <button class="icon" onclick={onclose} title="Schließen"><Icon name="close" /></button>
+      <h2 id="settings-title"><Icon name="cog" size={22} /> {t('Einstellungen')}</h2>
+      <button class="icon" onclick={onclose} title={t('Schließen')}><Icon name="close" /></button>
     </header>
 
     {#if error}<p class="error">{error}</p>{/if}
 
     <section>
-      <h3><Icon name="sparkle" size={18} /> Bilderkennung</h3>
+      <h3>{t('Sprache')}</h3>
+      <select value={language} onchange={(e) => setLanguage(e.currentTarget.value)} aria-label={t('Sprache')}>
+        {#each LANGUAGES as l}<option value={l.code}>{l.label}</option>{/each}
+      </select>
+    </section>
+
+    <section>
+      <h3><Icon name="sparkle" size={18} /> {t('Bilderkennung')}</h3>
       <p class="status" class:running={v?.done < v?.total}>{statusText}</p>
       <p class="hint">
-        Sie läuft von selbst im Hintergrund: einmal über alle Fotos und Videos, die neuesten zuerst, danach jedes neue
-        Foto kurz nach dem Import oder Hochladen. Solange die Gesichtserkennung arbeitet, wartet sie. Die Ausrichtung
-        prüft sie je Foto nur einmal, beim ersten Durchgang. Bestätigt ein Gesicht die neue Lage, dreht sie das Foto dabei
-        sofort, sonst kommt es nach „Drehen prüfen“.
+        {t('Sie läuft von selbst im Hintergrund: einmal über alle Fotos und Videos, die neuesten zuerst, danach jedes neue Foto kurz nach dem Import oder Hochladen. Solange die Gesichtserkennung arbeitet, wartet sie. Die Ausrichtung prüft sie je Foto nur einmal, beim ersten Durchgang. Bestätigt ein Gesicht die neue Lage, dreht sie das Foto dabei sofort, sonst kommt es nach „Drehen prüfen“.')}
       </p>
       {#if details}
         <ul class="facts">
-          <li>Automatisch gedreht: <strong>{n((details.rotations.auto ?? 0) + (details.rotations.accepted ?? 0) + (details.rotations.undone ?? 0))}</strong>
-            {#if details.rotations.undone}<span class="muted">(davon {n(details.rotations.undone)} zurückgedreht)</span>{/if}</li>
-          <li>Noch zu prüfen: <strong>{n(details.review)}</strong></li>
-          <li>Offene Schlagwort-Vorschläge: <strong>{n(details.suggestions.tags)}</strong> bei {photos(details.suggestions.photos)}</li>
+          <li>{t('Automatisch gedreht:')} <strong>{n((details.rotations.auto ?? 0) + (details.rotations.accepted ?? 0) + (details.rotations.undone ?? 0))}</strong>
+            {#if details.rotations.undone}<span class="muted">{t('(davon {n} zurückgedreht)', { n: n(details.rotations.undone) })}</span>{/if}</li>
+          <li>{t('Noch zu prüfen:')} <strong>{n(details.review)}</strong></li>
+          <li>{t('Offene Schlagwort-Vorschläge:')} <strong>{n(details.suggestions.tags)}</strong> {t('bei {photos}', { photos: photos(details.suggestions.photos) })}</li>
         </ul>
       {/if}
     </section>
 
     <section>
-      <h3><Icon name="rotate" size={18} /> Manuell gedrehte Fotos</h3>
+      <h3><Icon name="rotate" size={18} /> {t('Manuell gedrehte Fotos')}</h3>
       <p class="hint">
-        Was du von Hand drehst, bleibt so – die Bilderkennung prüft es nicht mehr.
-        {#if details}Das betrifft zurzeit <strong>{photos(details.manual)}</strong>.{/if}
-        Bekannt sind alle Drehungen ab jetzt; von früher nur die Mehrfach-Drehungen der letzten Tage.
+        {t('Was du von Hand drehst, bleibt so – die Bilderkennung prüft es nicht mehr.')}
+        {#if details}{t('Das betrifft zurzeit')} <strong>{photos(details.manual)}</strong>.{/if}
+        {t('Bekannt sind alle Drehungen ab jetzt; von früher nur die Mehrfach-Drehungen der letzten Tage.')}
       </p>
       <button disabled={busy || !details?.manual || !v?.enabled} onclick={() => (confirm = 'recheck')}>
-        <Icon name="rotate" size={18} /> Alle prüfen, auch die manuell gedrehten
+        <Icon name="rotate" size={18} /> {t('Alle prüfen, auch die manuell gedrehten')}
       </button>
     </section>
 
     <section>
-      <h3><Icon name="download" size={18} /> Alle Informationen in die Bilder schreiben</h3>
-      <p class="hint">Schreibt in die Dateien, was bisher nur in der Datenbank steht:</p>
+      <h3><Icon name="download" size={18} /> {t('Alle Informationen in die Bilder schreiben')}</h3>
+      <p class="hint">{t('Schreibt in die Dateien, was bisher nur in der Datenbank steht:')}</p>
       {#if write}
         <ul class="facts">
-          <li><strong>{n(write.suggestion_tags)}</strong> erkannte Schlagworte bei {photos(write.suggestion_photos)} – abgelehnte nicht</li>
-          <li><strong>{photos(write.persons)}</strong> mit Personennamen, die noch nicht geschrieben sind</li>
-          <li><strong>{photos(write.sidecars)}</strong> mit Angaben aus Begleitdateien (Google-JSON, XMP)</li>
+          <li><strong>{n(write.suggestion_tags)}</strong> {t('erkannte Schlagworte bei {photos} – abgelehnte nicht', { photos: photos(write.suggestion_photos) })}</li>
+          <li><strong>{photos(write.persons)}</strong> {t('mit Personennamen, die noch nicht geschrieben sind')}</li>
+          <li><strong>{photos(write.sidecars)}</strong> {t('mit Angaben aus Begleitdateien (Google-JSON, XMP)')}</li>
         </ul>
         {#if write.unwritable}
-          <p class="hint">{n(write.unwritable)} Dateien können keine Metadaten speichern (z. B. AVI, GIF). Ihre Vorschläge bleiben in der Datenbank.</p>
+          <p class="hint">{t('{n} Dateien können keine Metadaten speichern (z. B. AVI, GIF). Ihre Vorschläge bleiben in der Datenbank.', { n: n(write.unwritable) })}</p>
         {/if}
         <p class="hint">
-          Drehvorschläge und Favoritenordner gehören nicht dazu. Etwa jedes zehnte erkannte Schlagwort liegt daneben –
-          wer mag, prüft vorher über das Suchfeld unter <em>Erkannt</em>.
-          {#if v?.done < v?.total}Die Bilderkennung ist noch nicht durch; später einfach noch einmal drücken, es wird nur
-            geschrieben, was fehlt.{/if}
+          {t('Drehvorschläge und Favoritenordner gehören nicht dazu. Etwa jedes zehnte erkannte Schlagwort liegt daneben – wer mag, prüft vorher über das Suchfeld unter')} <em>{t('Erkannt')}</em>.
+          {#if v?.done < v?.total}{t('Die Bilderkennung ist noch nicht durch; später einfach noch einmal drücken, es wird nur geschrieben, was fehlt.')}{/if}
         </p>
       {:else}
-        <p class="muted">Wird gezählt …</p>
+        <p class="muted">{t('Wird gezählt …')}</p>
       {/if}
       <button class="primary" disabled={busy || !pending} onclick={() => (confirm = 'writeback')}>
-        <Icon name="download" size={18} /> Alle Informationen in die Bilder schreiben
+        <Icon name="download" size={18} /> {t('Alle Informationen in die Bilder schreiben')}
       </button>
     </section>
   </div>
@@ -151,17 +160,19 @@
 
 {#if confirm === 'recheck'}
   <Confirm
-    title="Auch manuell gedrehte Fotos prüfen?"
-    text={`Die ${photos(details.manual)}, die von Hand gedreht wurden, werden noch einmal auf die Ausrichtung geprüft. Eindeutige Fälle (mit Gesicht) dreht das Add-on dabei selbst, die übrigen kommen nach „Drehen prüfen“. Beides lässt sich dort rückgängig machen.`}
-    confirmLabel="Prüfen"
+    title={t('Auch manuell gedrehte Fotos prüfen?')}
+    text={t('Die {photos}, die von Hand gedreht wurden, werden noch einmal auf die Ausrichtung geprüft. Eindeutige Fälle (mit Gesicht) dreht das Add-on dabei selbst, die übrigen kommen nach „Drehen prüfen“. Beides lässt sich dort rückgängig machen.', { photos: photos(details.manual) })}
+    confirmLabel={t('Prüfen')}
     oncancel={() => (confirm = null)}
     onconfirm={recheck}
   />
 {:else if confirm === 'writeback'}
   <Confirm
-    title="Alle Informationen in die Bilder schreiben?"
-    text={`${write.files === 1 ? '1 Datei wird' : `${n(write.files)} Dateien werden`} geändert. Die Angaben stehen danach in den Dateien selbst und bleiben auch ohne das Fotoarchiv erhalten. Das läuft als Hintergrundaufgabe.`}
-    confirmLabel="Schreiben"
+    title={t('Alle Informationen in die Bilder schreiben?')}
+    text={write.files === 1
+      ? t('1 Datei wird geändert. Die Angaben stehen danach in den Dateien selbst und bleiben auch ohne das Fotoarchiv erhalten. Das läuft als Hintergrundaufgabe.')
+      : t('{n} Dateien werden geändert. Die Angaben stehen danach in den Dateien selbst und bleiben auch ohne das Fotoarchiv erhalten. Das läuft als Hintergrundaufgabe.', { n: n(write.files) })}
+    confirmLabel={t('Schreiben')}
     oncancel={() => (confirm = null)}
     onconfirm={writeBack}
   />

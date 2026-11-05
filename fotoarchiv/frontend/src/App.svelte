@@ -7,6 +7,7 @@
   import { notify, notifyError } from './lib/notices.svelte.js';
   import { isIos, openedFromShare, registerServiceWorker, standalone, takeShared } from './lib/pwa.js';
   import { mapSettings } from './lib/map.js';
+  import { locale, t, tServer } from './lib/i18n.js';
   import AccessPanel from './components/AccessPanel.svelte';
   import PasswordDialog from './components/PasswordDialog.svelte';
   import ProposeDeleteDialog from './components/ProposeDeleteDialog.svelte';
@@ -161,17 +162,17 @@
 
   async function checkTasks() {
     const all = await api.tasks();
-    tasks = all.filter((t) => t.running);
+    tasks = all.filter((x) => x.running);
     for (const [id, { undo }] of pending) {
-      const task = all.find((t) => t.id === id);
+      const task = all.find((x) => x.id === id);
       if (!task) {
         pending.delete(id);
       } else if (!task.running) {
         pending.delete(id);
         if (task.failed.length) {
-          notify(`${task.label}: ${task.failed.length} fehlgeschlagen – ${task.failed[0].message}`, { kind: 'error', timeout: 10000 });
+          notify(t('{label}: {n} fehlgeschlagen – {message}', { label: tServer(task.label), n: task.failed.length, message: tServer(task.failed[0].message) }), { kind: 'error', timeout: 10000 });
         } else {
-          notify(`Erledigt: ${task.label}`, undo ? { actionLabel: 'Rückgängig', action: undo, timeout: 8000 } : {});
+          notify(t('Erledigt: {label}', { label: tServer(task.label) }), undo ? { actionLabel: t('Rückgängig'), action: undo, timeout: 8000 } : {});
         }
       }
     }
@@ -210,7 +211,7 @@
     const files = await takeShared().catch(() => []);
     if (!files.length) return;
     if (!canUpload) {
-      notify('Dein Konto darf keine Fotos hochladen.', { kind: 'error' });
+      notify(t('Dein Konto darf keine Fotos hochladen.'), { kind: 'error' });
       return;
     }
     uploader.add(files);
@@ -362,8 +363,8 @@
       }
       const { token, count, missing, bytes } = await api.createDownload(ids);
       save(`api/downloads/${token}`);
-      const gone = missing ? ` · ${formatNumber(missing)} fehlen auf dem Datenträger` : '';
-      notify(`${photoCount(count)} (${formatBytes(bytes)}) werden als ZIP heruntergeladen${gone}`);
+      const gone = missing ? t(' · {n} fehlen auf dem Datenträger', { n: formatNumber(missing) }) : '';
+      notify(t('{photos} ({size}) werden als ZIP heruntergeladen{gone}', { photos: photoCount(count), size: formatBytes(bytes), gone }));
     } catch (e) {
       notifyError(e);
     }
@@ -419,8 +420,8 @@
     try {
       await api.remove(id);
       openId = next;
-      notify('In den Papierkorb verschoben', {
-        actionLabel: 'Rückgängig',
+      notify(t('In den Papierkorb verschoben'), {
+        actionLabel: t('Rückgängig'),
         action: () => api.restore(id).then(kick, notifyError),
       });
       kick();
@@ -432,7 +433,7 @@
   async function sendProposal(ids, reason) {
     try {
       await api.requestDelete(ids, reason);
-      notify(ids.length === 1 ? 'Löschen vorgeschlagen – der Admin entscheidet' : `${ids.length} Fotos zum Löschen vorgeschlagen`);
+      notify(ids.length === 1 ? t('Löschen vorgeschlagen – der Admin entscheidet') : t('{n} Fotos zum Löschen vorgeschlagen', { n: ids.length }));
       selected.clear();
     } catch (e) {
       notifyError(e);
@@ -442,7 +443,7 @@
   async function dismissProposals(ids) {
     try {
       await api.dismissDeleteRequests(ids);
-      notify(ids.length === 1 ? 'Vorschlag abgelehnt – das Foto bleibt' : `${ids.length} Vorschläge abgelehnt`);
+      notify(ids.length === 1 ? t('Vorschlag abgelehnt – das Foto bleibt') : t('{n} Vorschläge abgelehnt', { n: ids.length }));
       selected.clear();
       kick();
     } catch (e) {
@@ -455,7 +456,7 @@
     try {
       await api.restore(id);
       openId = next;
-      notify('Wiederhergestellt');
+      notify(t('Wiederhergestellt'));
       kick();
     } catch (e) {
       notifyError(e);
@@ -465,9 +466,11 @@
   function confirmPurge(ids) {
     dialog = {
       type: 'confirm',
-      title: 'Endgültig löschen?',
-      text: `${ids.length === 1 ? 'Die Datei wird' : `${ids.length} Dateien werden`} unwiderruflich vom Datenträger gelöscht.`,
-      confirmLabel: 'Endgültig löschen',
+      title: t('Endgültig löschen?'),
+      text: ids.length === 1
+        ? t('Die Datei wird unwiderruflich vom Datenträger gelöscht.')
+        : t('{n} Dateien werden unwiderruflich vom Datenträger gelöscht.', { n: ids.length }),
+      confirmLabel: t('Endgültig löschen'),
       onconfirm: () => {
         if (openId !== null && ids.includes(openId)) openId = neighbour(openId);
         runBatch({ ids, action: 'purge' });
@@ -478,9 +481,9 @@
   function confirmEmptyTrash() {
     dialog = {
       type: 'confirm',
-      title: 'Papierkorb leeren?',
-      text: `Alle ${formatNumber(info.counts.trash)} Dateien im Papierkorb werden unwiderruflich gelöscht.`,
-      confirmLabel: 'Papierkorb leeren',
+      title: t('Papierkorb leeren?'),
+      text: t('Alle {n} Dateien im Papierkorb werden unwiderruflich gelöscht.', { n: formatNumber(info.counts.trash) }),
+      confirmLabel: t('Papierkorb leeren'),
       onconfirm: async () => {
         try {
           const task = await api.emptyTrash();
@@ -496,14 +499,13 @@
   function confirmConvert(ids, after = () => {}) {
     dialog = {
       type: 'confirm',
-      title: 'Umwandeln?',
+      title: t('Umwandeln?'),
       text:
-        (trash ? 'Die Dateien werden zuerst aus dem Papierkorb wiederhergestellt. ' : '') +
-        `HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann, zu MP4 (H.264). ` +
-        `Fotos, die fälschlich eine Video-Endung tragen, bekommen nur die richtige Endung. ` +
-        `Andere Dateien bleiben, wie sie sind. Die neue Datei ersetzt das Original; das Original kommt für ` +
-        `${info?.trash_days ?? 30} Tage in den Papierkorb. Ein Video braucht auf dem Pi etwa so lange, wie es dauert.`,
-      confirmLabel: `${ids.length === 1 ? '1 Datei' : `${formatNumber(ids.length)} Dateien`} umwandeln`,
+        (trash ? t('Die Dateien werden zuerst aus dem Papierkorb wiederhergestellt.') + ' ' : '') +
+        t('HEIC-Fotos werden zu JPEG, Videos, die der Browser nicht abspielen kann, zu MP4 (H.264).') + ' ' +
+        t('Fotos, die fälschlich eine Video-Endung tragen, bekommen nur die richtige Endung.') + ' ' +
+        t('Andere Dateien bleiben, wie sie sind. Die neue Datei ersetzt das Original; das Original kommt für {days} Tage in den Papierkorb. Ein Video braucht auf dem Pi etwa so lange, wie es dauert.', { days: info?.trash_days ?? 30 }),
+      confirmLabel: ids.length === 1 ? t('1 Datei umwandeln') : t('{n} Dateien umwandeln', { n: formatNumber(ids.length) }),
       onconfirm: () => {
         runBatch({ ids, action: 'convert' });
         after();
@@ -522,7 +524,7 @@
   }
 
   // ── Favoriten ──────────────────────────────────────────────────
-  const photoCount = (n) => (n === 1 ? '1 Foto' : `${formatNumber(n)} Fotos`);
+  const photoCount = (n) => (n === 1 ? t('1 Foto') : t('{n} Fotos', { n: formatNumber(n) }));
 
   function openFavorites(folder) {
     filters = NO_FILTERS; // die Suche der Fotoansicht gilt im Ordner nicht
@@ -537,7 +539,7 @@
   async function createFolder(name) {
     try {
       const folder = await api.createFolder(name);
-      folders = [...folders, folder].sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
+      folders = [...folders, folder].sort((a, b) => a.name.localeCompare(b.name, locale, { sensitivity: 'base' }));
       kick();
       return folder;
     } catch (e) {
@@ -560,14 +562,14 @@
   function confirmDeleteFolder(folder) {
     dialog = {
       type: 'confirm',
-      title: 'Ordner löschen?',
-      text: `Der Ordner „${folder.name}“ verschwindet. Die ${photoCount(folder.count)} darin bleiben im Archiv.`,
-      confirmLabel: 'Ordner löschen',
+      title: t('Ordner löschen?'),
+      text: t('Der Ordner „{name}“ verschwindet. Die {photos} darin bleiben im Archiv.', { name: folder.name, photos: photoCount(folder.count) }),
+      confirmLabel: t('Ordner löschen'),
       onconfirm: async () => {
         try {
           await api.deleteFolder(folder.id);
           setView('favorites');
-          notify(`Ordner „${folder.name}“ gelöscht`);
+          notify(t('Ordner „{name}“ gelöscht', { name: folder.name }));
         } catch (e) {
           notifyError(e);
         }
@@ -579,10 +581,11 @@
     try {
       const { added, already } = await api.addToFolder(folder.id, ids);
       const text = added
-        ? `${photoCount(added)} zu „${folder.name}“ hinzugefügt${already ? ` · ${already} waren schon drin` : ''}`
-        : `Schon alle in „${folder.name}“`;
+        ? t('{photos} zu „{name}“ hinzugefügt', { photos: photoCount(added), name: folder.name }) +
+          (already ? t(' · {n} waren schon drin', { n: already }) : '')
+        : t('Schon alle in „{name}“', { name: folder.name });
       // Rückgängig nur, wenn nichts schon vorher drin war – sonst verschwänden auch die
-      notify(text, added && !already ? { actionLabel: 'Rückgängig', action: () => removeIds(folder, ids, false) } : {});
+      notify(text, added && !already ? { actionLabel: t('Rückgängig'), action: () => removeIds(folder, ids, false) } : {});
       selected.clear();
       kick();
     } catch (e) {
@@ -594,8 +597,8 @@
     try {
       const { removed } = await api.removeFromFolder(folder.id, ids);
       if (offerUndo) {
-        notify(`${photoCount(removed)} aus „${folder.name}“ entfernt`, {
-          actionLabel: 'Rückgängig',
+        notify(t('{photos} aus „{name}“ entfernt', { photos: photoCount(removed), name: folder.name }), {
+          actionLabel: t('Rückgängig'),
           action: () => api.addToFolder(folder.id, ids).then(kick, notifyError),
         });
       }
@@ -620,7 +623,7 @@
     const ids = items.map((item) => item[0]);
     try {
       const { dismissed } = await api.dismissSuggestion(name, ids);
-      notify(`Vorschlag „${name}“ bei ${photoCount(dismissed)} abgelehnt`);
+      notify(t('Vorschlag „{name}“ bei {photos} abgelehnt', { name, photos: photoCount(dismissed) }));
       setFilters({ ...filters, auto: [] });
     } catch (e) {
       notifyError(e);
@@ -674,201 +677,201 @@
 <div class="app">
   {#if selected.size}
     <header class="topbar selection">
-      <button class="icon" onclick={() => selected.clear()} title="Auswahl aufheben (Esc)"><Icon name="close" /></button>
-      <strong class="title">{formatNumber(selected.size)} ausgewählt</strong>
+      <button class="icon" onclick={() => selected.clear()} title={t('Auswahl aufheben (Esc)')}><Icon name="close" /></button>
+      <strong class="title">{t('{n} ausgewählt', { n: formatNumber(selected.size) })}</strong>
       <span class="grow"></span>
       {#if trash}
-        <button onclick={() => runBatch({ ids: [...selected], action: 'restore' })} title="Wiederherstellen">
-          <Icon name="restore" size={20} /><span class="label">Wiederherstellen</span>
+        <button onclick={() => runBatch({ ids: [...selected], action: 'restore' })} title={t('Wiederherstellen')}>
+          <Icon name="restore" size={20} /><span class="label">{t('Wiederherstellen')}</span>
         </button>
         {#if isAdmin}
-          <button onclick={() => confirmConvert([...selected])} title="Wiederherstellen und umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4">
-            <Icon name="convert" size={20} /><span class="label">Umwandeln</span>
+          <button onclick={() => confirmConvert([...selected])} title={t('Wiederherstellen und umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4')}>
+            <Icon name="convert" size={20} /><span class="label">{t('Umwandeln')}</span>
           </button>
-          <button class="danger" onclick={() => confirmPurge([...selected])} title="Endgültig löschen">
-            <Icon name="deleteForever" size={20} /><span class="label">Endgültig löschen</span>
+          <button class="danger" onclick={() => confirmPurge([...selected])} title={t('Endgültig löschen')}>
+            <Icon name="deleteForever" size={20} /><span class="label">{t('Endgültig löschen')}</span>
           </button>
         {/if}
       {:else}
         {#if openFolder}
-          <button onclick={() => removeIds(openFolder, [...selected])} title="Aus diesem Ordner nehmen – die Fotos bleiben im Archiv (Entf)">
-            <Icon name="starOff" size={20} /><span class="label">Aus Ordner entfernen</span>
+          <button onclick={() => removeIds(openFolder, [...selected])} title={t('Aus diesem Ordner nehmen – die Fotos bleiben im Archiv (Entf)')}>
+            <Icon name="starOff" size={20} /><span class="label">{t('Aus Ordner entfernen')}</span>
           </button>
         {/if}
-        <button class="icon" onclick={downloadSelected} title={selected.size === 1 ? 'Original herunterladen' : 'Als ZIP herunterladen'}><Icon name="download" /></button>
-        <button class="icon" onclick={() => (dialog = { type: 'favorite' })} title="Zu Favoriten hinzufügen"><Icon name="star" /></button>
-        <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'persons' })} title="Personen ändern"><Icon name="person" /></button>
-        <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'tags' })} title="Schlagworte ändern"><Icon name="tag" /></button>
-        <button class="icon" onclick={() => (dialog = { type: 'date' })} title="Datum setzen"><Icon name="calendar" /></button>
-        <button class="icon" onclick={() => (dialog = { type: 'location' })} title="Aufnahmeort setzen"><Icon name="marker" /></button>
-        <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 270 })} title="Nach links drehen"><Icon name="rotate" /></button>
-        <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 90 })} title="Nach rechts drehen"><Icon name="rotate" flip /></button>
+        <button class="icon" onclick={downloadSelected} title={selected.size === 1 ? t('Original herunterladen') : t('Als ZIP herunterladen')}><Icon name="download" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'favorite' })} title={t('Zu Favoriten hinzufügen')}><Icon name="star" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'persons' })} title={t('Personen ändern')}><Icon name="person" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'labels', kind: 'tags' })} title={t('Schlagworte ändern')}><Icon name="tag" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'date' })} title={t('Datum setzen')}><Icon name="calendar" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'location' })} title={t('Aufnahmeort setzen')}><Icon name="marker" /></button>
+        <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 270 })} title={t('Nach links drehen')}><Icon name="rotate" /></button>
+        <button class="icon" onclick={() => runBatch({ ids: [...selected], action: 'rotate', degrees: 90 })} title={t('Nach rechts drehen')}><Icon name="rotate" flip /></button>
         {#if isAdmin}
-          <button class="icon" onclick={() => confirmConvert([...selected])} title="Umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4"><Icon name="convert" /></button>
+          <button class="icon" onclick={() => confirmConvert([...selected])} title={t('Umwandeln: HEIC → JPEG, nicht abspielbare Videos → MP4')}><Icon name="convert" /></button>
         {/if}
         {#if proposals && isAdmin}
-          <button onclick={() => dismissProposals([...selected])} title="Vorschläge ablehnen, die Fotos bleiben">
-            <Icon name="close" size={20} /><span class="label">Ablehnen</span>
+          <button onclick={() => dismissProposals([...selected])} title={t('Vorschläge ablehnen, die Fotos bleiben')}>
+            <Icon name="close" size={20} /><span class="label">{t('Ablehnen')}</span>
           </button>
         {/if}
         {#if canDelete}
-          <button class="icon" onclick={deleteSelected} title={openFolder ? 'In den Papierkorb' : 'In den Papierkorb (Entf)'}><Icon name="delete" /></button>
+          <button class="icon" onclick={deleteSelected} title={openFolder ? t('In den Papierkorb') : t('In den Papierkorb (Entf)')}><Icon name="delete" /></button>
         {:else if canPropose}
-          <button onclick={() => (dialog = { type: 'propose', ids: [...selected] })} title="Dem Admin zum Löschen vorschlagen">
-            <Icon name="delete" size={20} /><span class="label">Löschen vorschlagen</span>
+          <button onclick={() => (dialog = { type: 'propose', ids: [...selected] })} title={t('Dem Admin zum Löschen vorschlagen')}>
+            <Icon name="delete" size={20} /><span class="label">{t('Löschen vorschlagen')}</span>
           </button>
         {/if}
       {/if}
     </header>
   {:else if trash}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Papierkorb</strong>
-        {#if info}<span class="sub">Dateien werden nach {info.trash_days} Tagen endgültig gelöscht</span>{/if}
+        <strong class="title">{t('Papierkorb')}</strong>
+        {#if info}<span class="sub">{t('Dateien werden nach {days} Tagen endgültig gelöscht', { days: info.trash_days })}</span>{/if}
       </div>
       <span class="grow"></span>
       {#if info?.counts.trash && isAdmin}
-        <button class="danger" onclick={confirmEmptyTrash}><Icon name="deleteForever" size={20} /><span class="label">Papierkorb leeren</span></button>
+        <button class="danger" onclick={confirmEmptyTrash}><Icon name="deleteForever" size={20} /><span class="label">{t('Papierkorb leeren')}</span></button>
       {/if}
     </header>
   {:else if proposals}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Löschvorschläge</strong>
-        <span class="sub">Auswählen, dann in den Papierkorb legen oder ablehnen</span>
+        <strong class="title">{t('Löschvorschläge')}</strong>
+        <span class="sub">{t('Auswählen, dann in den Papierkorb legen oder ablehnen')}</span>
       </div>
       <span class="grow"></span>
     </header>
   {:else if recent}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Zuletzt eingelesen</strong>
-        <span class="sub">Nach dem Tag des Imports, das Neueste oben</span>
+        <strong class="title">{t('Zuletzt eingelesen')}</strong>
+        <span class="sub">{t('Nach dem Tag des Imports, das Neueste oben')}</span>
       </div>
       <span class="grow"></span>
     </header>
   {:else if folderOverview}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Favoriten</strong>
-        <span class="sub">Ordner mit Verweisen auf Fotos – die Dateien bleiben, wo sie sind</span>
+        <strong class="title">{t('Favoriten')}</strong>
+        <span class="sub">{t('Ordner mit Verweisen auf Fotos – die Dateien bleiben, wo sie sind')}</span>
       </div>
       <span class="grow"></span>
     </header>
   {:else if inFolder}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('favorites')} title="Zur Ordnerübersicht"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('favorites')} title={t('Zur Ordnerübersicht')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">{openFolder?.name ?? 'Favoriten'}</strong>
-        <span class="sub">{photoCount(items.length)} · Favoriten</span>
+        <strong class="title">{openFolder?.name ?? t('Favoriten')}</strong>
+        <span class="sub">{photoCount(items.length)} · {t('Favoriten')}</span>
       </div>
       <span class="grow"></span>
       {#if canEdit && openFolder}
-        <button class="icon" onclick={() => (dialog = { type: 'rename', folder: openFolder })} title="Ordner umbenennen"><Icon name="pencil" /></button>
-        <button class="icon" onclick={() => confirmDeleteFolder(openFolder)} title="Ordner löschen (die Fotos bleiben)"><Icon name="delete" /></button>
+        <button class="icon" onclick={() => (dialog = { type: 'rename', folder: openFolder })} title={t('Ordner umbenennen')}><Icon name="pencil" /></button>
+        <button class="icon" onclick={() => confirmDeleteFolder(openFolder)} title={t('Ordner löschen (die Fotos bleiben)')}><Icon name="delete" /></button>
       {/if}
       {#if wide && !showFolders}
-        <button class="icon" onclick={() => toggleFolders(true)} title="Ordnerleiste einblenden"><Icon name="folderStar" /></button>
+        <button class="icon" onclick={() => toggleFolders(true)} title={t('Ordnerleiste einblenden')}><Icon name="folderStar" /></button>
       {/if}
     </header>
   {:else if view === 'duplicates'}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Doppelte Fotos und Videos</strong>
-        <span class="sub">Gelöschte Fotos landen im Papierkorb</span>
+        <strong class="title">{t('Doppelte Fotos und Videos')}</strong>
+        <span class="sub">{t('Gelöschte Fotos landen im Papierkorb')}</span>
       </div>
       <span class="grow"></span>
     </header>
   {:else if view === 'rotation'}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Drehen prüfen</strong>
-        <span class="sub">Von der Bilderkennung gefunden</span>
+        <strong class="title">{t('Drehen prüfen')}</strong>
+        <span class="sub">{t('Von der Bilderkennung gefunden')}</span>
       </div>
       <span class="grow"></span>
     </header>
   {:else if view === 'storage'}
     <header class="topbar">
-      <button class="icon" onclick={() => setView('photos')} title="Zurück zu den Fotos"><Icon name="back" /></button>
+      <button class="icon" onclick={() => setView('photos')} title={t('Zurück zu den Fotos')}><Icon name="back" /></button>
       <div class="title-block">
-        <strong class="title">Speicherplatz</strong>
-        <span class="sub">Die größten Dateien zuerst · Gelöschtes landet im Papierkorb</span>
+        <strong class="title">{t('Speicherplatz')}</strong>
+        <span class="sub">{t('Die größten Dateien zuerst · Gelöschtes landet im Papierkorb')}</span>
       </div>
       <span class="grow"></span>
     </header>
   {:else}
     <header class="topbar">
-      <div class="brand" title={info ? `${formatNumber(info.counts.images)} Fotos · ${formatNumber(info.counts.videos)} Videos · ${formatBytes(info.counts.bytes)}` : ''}>
+      <div class="brand" title={info ? t('{photos} Fotos · {videos} Videos · {size}', { photos: formatNumber(info.counts.images), videos: formatNumber(info.counts.videos), size: formatBytes(info.counts.bytes) }) : ''}>
         <Icon name="images" size={26} />
         <h1>Fotoarchiv</h1>
       </div>
       <nav class="views">
-        <button class:active={view === 'photos'} onclick={() => setView('photos')} title="Fotos"><Icon name="images" size={20} /><span class="label">Fotos</span></button>
-        <button class:active={view === 'map'} onclick={() => setView('map')} title="Karte"><Icon name="map" size={20} /><span class="label">Karte</span></button>
-        <button class:active={view === 'people'} onclick={() => setView('people')} title="Personen"><Icon name="person" size={20} /><span class="label">Personen</span></button>
-        <button onclick={() => openFavorites(null)} title="Favoriten"><Icon name="star" size={20} /><span class="label">Favoriten</span></button>
-        <button onclick={openRecent} title="Zuletzt eingelesen"><Icon name="recent" size={20} /><span class="label">Neu</span></button>
+        <button class:active={view === 'photos'} onclick={() => setView('photos')} title={t('Fotos')}><Icon name="images" size={20} /><span class="label">{t('Fotos')}</span></button>
+        <button class:active={view === 'map'} onclick={() => setView('map')} title={t('Karte')}><Icon name="map" size={20} /><span class="label">{t('Karte')}</span></button>
+        <button class:active={view === 'people'} onclick={() => setView('people')} title={t('Personen')}><Icon name="person" size={20} /><span class="label">{t('Personen')}</span></button>
+        <button onclick={() => openFavorites(null)} title={t('Favoriten')}><Icon name="star" size={20} /><span class="label">{t('Favoriten')}</span></button>
+        <button onclick={openRecent} title={t('Zuletzt eingelesen')}><Icon name="recent" size={20} /><span class="label">{t('Neu')}</span></button>
       </nav>
       <div class="search-inline"><SearchBar {labels} {filters} vision={info?.vision} onchange={setFilters} /></div>
       <span class="grow"></span>
       <div class="actions">
-        {#if info?.importing}<span class="busy" title="Import läuft"></span>{/if}
+        {#if info?.importing}<span class="busy" title={t('Import läuft')}></span>{/if}
         {#if view === 'photos' && wide && !showFolders}
-          <button class="icon" onclick={() => toggleFolders(true)} title="Favoritenordner einblenden"><Icon name="folderStar" /></button>
+          <button class="icon" onclick={() => toggleFolders(true)} title={t('Favoritenordner einblenden')}><Icon name="folderStar" /></button>
         {/if}
-        <button class="icon search-toggle" class:on={searchOpen} onclick={() => (searchOpen = !searchOpen)} title="Suchen"><Icon name="search" /></button>
+        <button class="icon search-toggle" class:on={searchOpen} onclick={() => (searchOpen = !searchOpen)} title={t('Suchen')}><Icon name="search" /></button>
         {#if canUpload}
-          <button onclick={() => fileInput.click()} title="Dateien hochladen">
-            <Icon name="upload" size={20} /><span class="label">Hochladen</span>
+          <button onclick={() => fileInput.click()} title={t('Dateien hochladen')}>
+            <Icon name="upload" size={20} /><span class="label">{t('Hochladen')}</span>
           </button>
           {#if canPickFolder}
-            <button class="icon" onclick={() => folderInput.click()} title="Ordner hochladen (mit Unterordnern; Vorhandenes wird übersprungen)"><Icon name="folderUpload" /></button>
+            <button class="icon" onclick={() => folderInput.click()} title={t('Ordner hochladen (mit Unterordnern; Vorhandenes wird übersprungen)')}><Icon name="folderUpload" /></button>
           {/if}
-          <button class="icon" onclick={() => (showHilfe = true)} title="So kommen Fotos ins Archiv"><Icon name="info" /></button>
+          <button class="icon" onclick={() => (showHilfe = true)} title={t('So kommen Fotos ins Archiv')}><Icon name="info" /></button>
         {/if}
         {#if isAdmin}
-          <button onclick={() => (showImport = true)} title="Aus Ordner importieren">
-            <Icon name="import" size={20} /><span class="label">Importieren</span>
+          <button onclick={() => (showImport = true)} title={t('Aus Ordner importieren')}>
+            <Icon name="import" size={20} /><span class="label">{t('Importieren')}</span>
           </button>
         {/if}
         {#if canEdit && info?.vision?.review}
-          <button class="icon trash" onclick={() => setView('rotation')} title="Drehen prüfen – von der Bilderkennung gefunden">
+          <button class="icon trash" onclick={() => setView('rotation')} title={t('Drehen prüfen – von der Bilderkennung gefunden')}>
             <Icon name="rotate" />
             <span class="badge info">{info.vision.review > 99 ? '99+' : info.vision.review}</span>
           </button>
         {/if}
         {#if canDelete}
-          <button class="icon" onclick={() => setView('duplicates')} title="Doppelte Fotos und Videos"><Icon name="duplicate" /></button>
-          <button class="icon" onclick={() => setView('storage')} title="Speicherplatz – Dateien nach Größe"><Icon name="storage" /></button>
+          <button class="icon" onclick={() => setView('duplicates')} title={t('Doppelte Fotos und Videos')}><Icon name="duplicate" /></button>
+          <button class="icon" onclick={() => setView('storage')} title={t('Speicherplatz – Dateien nach Größe')}><Icon name="storage" /></button>
           {#if isAdmin && info?.delete_requests}
-            <button class="icon trash" onclick={() => setView('proposals')} title="Löschvorschläge der Familie">
+            <button class="icon trash" onclick={() => setView('proposals')} title={t('Löschvorschläge der Familie')}>
               <Icon name="alert" />
               <span class="badge">{info.delete_requests > 99 ? '99+' : info.delete_requests}</span>
             </button>
           {/if}
-          <button class="icon trash" onclick={() => setView('trash')} title="Papierkorb">
+          <button class="icon trash" onclick={() => setView('trash')} title={t('Papierkorb')}>
             <Icon name="delete" />
             {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
           </button>
         {/if}
         {#if isAdmin && !session.public}
-          <button class="icon" onclick={() => (showAccess = true)} title="Zugang übers Internet"><Icon name="shield" /></button>
-          <button class="icon" onclick={() => (showSettings = true)} title="Einstellungen"><Icon name="cog" /></button>
+          <button class="icon" onclick={() => (showAccess = true)} title={t('Zugang übers Internet')}><Icon name="shield" /></button>
+          <button class="icon" onclick={() => (showSettings = true)} title={t('Einstellungen')}><Icon name="cog" /></button>
         {/if}
         {#if session.public && installPrompt}
-          <button onclick={installApp} title="Als App auf diesem Gerät installieren">
-            <Icon name="download" size={20} /><span class="label">App installieren</span>
+          <button onclick={installApp} title={t('Als App auf diesem Gerät installieren')}>
+            <Icon name="download" size={20} /><span class="label">{t('App installieren')}</span>
           </button>
         {/if}
         {#if session.public}
-          <button class="icon" onclick={() => (showPassword = true)} title="Passwort ändern"><Icon name="lock" /></button>
-          <button class="icon" onclick={logout} title="Abmelden ({session.user?.display_name || session.user?.username})"><Icon name="logout" /></button>
+          <button class="icon" onclick={() => (showPassword = true)} title={t('Passwort ändern')}><Icon name="lock" /></button>
+          <button class="icon" onclick={logout} title={t('Abmelden ({name})', { name: session.user?.display_name || session.user?.username })}><Icon name="logout" /></button>
         {/if}
         <input bind:this={fileInput} type="file" multiple accept="image/*,video/*,.heic,.heif" hidden onchange={pickFiles} />
         <input bind:this={folderInput} type="file" webkitdirectory hidden onchange={pickFolder} />
@@ -880,47 +883,47 @@
   {/if}
 
   {#if failure}
-    <div class="banner error"><Icon name="alert" size={18} /> Server nicht erreichbar: {failure}</div>
+    <div class="banner error"><Icon name="alert" size={18} /> {t('Server nicht erreichbar: {message}', { message: failure })}</div>
   {/if}
   {#if info?.converting?.pending}
-    <div class="banner"><span class="busy"></span> {`Umwandeln läuft: noch ${formatNumber(info.converting.pending)}${info.converting.current ? ` · gerade ${info.converting.current}` : ''}${info.converting.progress != null ? ` · ${info.converting.progress} %` : ''}`}</div>
+    <div class="banner"><span class="busy"></span> {t('Umwandeln läuft: noch {n}', { n: formatNumber(info.converting.pending) })}{info.converting.current ? t(' · gerade {name}', { name: info.converting.current }) : ''}{info.converting.progress != null ? ` · ${info.converting.progress} %` : ''}</div>
   {:else if info?.converting?.failed && isAdmin}
     <div class="banner error">
       <Icon name="alert" size={18} />
       <span class="banner-text">
-        {formatNumber(info.converting.failed)} {info.converting.failed === 1 ? 'Datei ließ' : 'Dateien ließen'} sich nicht umwandeln. Die Originale sind unverändert.
+        {info.converting.failed === 1 ? t('1 Datei ließ sich nicht umwandeln. Die Originale sind unverändert.') : t('{n} Dateien ließen sich nicht umwandeln. Die Originale sind unverändert.', { n: formatNumber(info.converting.failed) })}
         {#each info.converting.errors ?? [] as error (error.id)}
-          <br /><span class="reason">{error.name}: {error.reason}</span>
+          <br /><span class="reason">{error.name}: {tServer(error.reason)}</span>
         {/each}
       </span>
-      <button class="icon small" onclick={dismissConvertErrors} title="Hinweis ausblenden"><Icon name="close" size={16} /></button>
+      <button class="icon small" onclick={dismissConvertErrors} title={t('Hinweis ausblenden')}><Icon name="close" size={16} /></button>
     </div>
   {/if}
   {#if iosHint && session?.authenticated}
     <div class="banner">
       <Icon name="info" size={18} />
-      <span class="banner-text">Als App aufs iPhone: unten auf <strong>Teilen</strong> tippen, dann <strong>„Zum Home-Bildschirm“</strong>.</span>
-      <button class="icon small" onclick={hideIosHint} title="Hinweis ausblenden"><Icon name="close" size={16} /></button>
+      <span class="banner-text">{t('Als App aufs iPhone: unten auf Teilen tippen, dann „Zum Home-Bildschirm“.')}</span>
+      <button class="icon small" onclick={hideIosHint} title={t('Hinweis ausblenden')}><Icon name="close" size={16} /></button>
     </div>
   {/if}
   {#if isAdmin && info?.vision?.status === 'error'}
-    <div class="banner error"><Icon name="alert" size={18} /> <span class="banner-text">Bilderkennung: {info.vision.message}</span></div>
+    <div class="banner error"><Icon name="alert" size={18} /> <span class="banner-text">{t('Bilderkennung: {message}', { message: tServer(info.vision.message) })}</span></div>
   {/if}
   {#if missingTools.length}
-    <div class="banner"><Icon name="alert" size={18} /> Fehlende Programme im Add-on: {missingTools.join(', ')}</div>
+    <div class="banner"><Icon name="alert" size={18} /> {t('Fehlende Programme im Add-on: {list}', { list: missingTools.join(', ') })}</div>
   {/if}
   {#if filtered && view !== 'people' && view !== 'duplicates' && view !== 'storage' && view !== 'rotation'}
     <div class="resultbar">
-      <span>{formatNumber(items.length)} Treffer</span>
-      {#if filters.ai && items.length >= SEARCH_LIMIT}<span class="muted-note">nur die {formatNumber(SEARCH_LIMIT)} ähnlichsten – genauer beschreiben</span>{/if}
-      <button class="link" onclick={() => setFilters(NO_FILTERS)}>Filter zurücksetzen</button>
+      <span>{t('{n} Treffer', { n: formatNumber(items.length) })}</span>
+      {#if filters.ai && items.length >= SEARCH_LIMIT}<span class="muted-note">{t('nur die {n} ähnlichsten – genauer beschreiben', { n: formatNumber(SEARCH_LIMIT) })}</span>{/if}
+      <button class="link" onclick={() => setFilters(NO_FILTERS)}>{t('Filter zurücksetzen')}</button>
       {#if suggestion && items.length}
         <span class="grow"></span>
-        <button onclick={() => acceptSuggestion(suggestion)} title="Schlagwort in alle diese Fotos schreiben">
-          <Icon name="check" size={18} /><span class="label">„{suggestion}“ übernehmen</span>
+        <button onclick={() => acceptSuggestion(suggestion)} title={t('Schlagwort in alle diese Fotos schreiben')}>
+          <Icon name="check" size={18} /><span class="label">{t('„{name}“ übernehmen', { name: suggestion })}</span>
         </button>
-        <button onclick={() => dismissSuggestion(suggestion)} title="Vorschlag bei allen diesen Fotos verwerfen">
-          <Icon name="close" size={18} /><span class="label">Ablehnen</span>
+        <button onclick={() => dismissSuggestion(suggestion)} title={t('Vorschlag bei allen diesen Fotos verwerfen')}>
+          <Icon name="close" size={18} /><span class="label">{t('Ablehnen')}</span>
         </button>
       {/if}
     </div>
@@ -987,34 +990,35 @@
     <div class="empty">
       {#if trash}
         <Icon name="delete" size={64} />
-        <h2>Der Papierkorb ist leer</h2>
+        <h2>{t('Der Papierkorb ist leer')}</h2>
       {:else if proposals}
         <Icon name="checkCircle" size={64} />
-        <h2>Keine offenen Löschvorschläge</h2>
+        <h2>{t('Keine offenen Löschvorschläge')}</h2>
       {:else if inFolder}
         <Icon name="folderStar" size={64} />
-        <h2>Der Ordner ist leer</h2>
+        <h2>{t('Der Ordner ist leer')}</h2>
         {#if canEdit}
           <p>
-            {sideFolders ? 'Fotos aus der Galerie auf den Ordner links ziehen' : 'In der Fotoansicht Fotos auswählen und auf den Stern tippen'}
-            – sie werden hier verlinkt, nicht kopiert.
+            {sideFolders
+              ? t('Fotos aus der Galerie auf den Ordner links ziehen – sie werden hier verlinkt, nicht kopiert.')
+              : t('In der Fotoansicht Fotos auswählen und auf den Stern tippen – sie werden hier verlinkt, nicht kopiert.')}
           </p>
-          <button class="primary" onclick={() => setView('photos')}><Icon name="images" size={20} /> Zu den Fotos</button>
+          <button class="primary" onclick={() => setView('photos')}><Icon name="images" size={20} /> {t('Zu den Fotos')}</button>
         {/if}
       {:else if recent}
         <Icon name="recent" size={64} />
-        <h2>Noch nichts eingelesen</h2>
+        <h2>{t('Noch nichts eingelesen')}</h2>
       {:else if filtered}
         <Icon name="search" size={64} />
-        <h2>Keine Treffer</h2>
-        <p>Für diese Suche gibt es keine Fotos oder Videos.</p>
+        <h2>{t('Keine Treffer')}</h2>
+        <p>{t('Für diese Suche gibt es keine Fotos oder Videos.')}</p>
       {:else}
         <Icon name="images" size={64} />
-        <h2>Noch keine Fotos</h2>
+        <h2>{t('Noch keine Fotos')}</h2>
         {#if isAdmin}
-          <p>Dateien einfach hierher ziehen, über <strong>Hochladen</strong> auswählen oder in den Import-Ordner legen:</p>
+          <p>{t('Dateien einfach hierher ziehen, über Hochladen auswählen oder in den Import-Ordner legen:')}</p>
           <code>{info.import_dir}</code>
-          <button class="primary" onclick={() => (showImport = true)}><Icon name="import" size={20} /> Import öffnen</button>
+          <button class="primary" onclick={() => (showImport = true)}><Icon name="import" size={20} /> {t('Import öffnen')}</button>
         {/if}
       {/if}
     </div>
@@ -1097,9 +1101,9 @@
   <FavoriteDialog count={selected.size} {folders} oncancel={() => (dialog = null)} onsave={saveFavorite} />
 {:else if dialog?.type === 'rename'}
   <NameDialog
-    title="Ordner umbenennen"
+    title={t('Ordner umbenennen')}
     value={dialog.folder.name}
-    label="Name des Ordners"
+    label={t('Name des Ordners')}
     oncancel={() => (dialog = null)}
     onsave={async (name) => {
       await renameFolder(dialog.folder, name);

@@ -3,6 +3,7 @@
   import { buildLayout, dayLabel, monthLabel, rowAt, rowOfItem, ZOOM_LEVELS } from '../lib/layout.js';
   import { thumbUrl } from '../lib/api.js';
   import { canDrag, startPhotoDrag } from '../lib/dragphotos.js';
+  import { t } from '../lib/i18n.js';
   import Icon from './Icon.svelte';
   import Timeline from './Timeline.svelte';
 
@@ -154,7 +155,7 @@
       {#each visible.headers as header (header.top)}
         {@const all = selecting && daySelected(header)}
         <div class="day" style:top="{header.top}px" style:left="{pad}px" style:height="{header.height}px">
-          {#if selectable}<button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title={header.group === 'month' ? 'Ganzen Monat auswählen' : 'Ganzen Tag auswählen'}>
+          {#if selectable}<button class="daycheck" class:on={all} onclick={() => ontoggleday(header.first, header.last, !all)} title={header.group === 'month' ? t('Ganzen Monat auswählen') : t('Ganzen Tag auswählen')}>
             <Icon name="checkCircle" size={20} />
           </button>{/if}
           <h2>{header.group === 'month' ? monthLabel(header.ts) : dayLabel(header.ts)}</h2>
@@ -181,23 +182,23 @@
             onpointermove={cancelPress}
             onpointercancel={cancelPress}
             oncontextmenu={(e) => e.pointerType !== 'mouse' && e.preventDefault()}
-            aria-label={isSelected ? 'Ausgewählt' : 'Öffnen'}
+            aria-label={isSelected ? t('Ausgewählt') : t('Öffnen')}
           >
             <img src={thumbUrl(cell.item, small)} alt="" loading="lazy" decoding="async" draggable="false" onerror={broken} />
           </button>
           {#if cell.item[4]}<span class="badge"><Icon name="play" size={compact ? 14 : 18} /></span>{/if}
-          {#if selectable}<button class="check" onclick={(e) => ontoggle(cell.index, e)} title="Auswählen" aria-pressed={isSelected}>
+          {#if selectable}<button class="check" onclick={(e) => ontoggle(cell.index, e)} title={t('Auswählen')} aria-pressed={isSelected}>
             <Icon name="checkCircle" size={level.rowHeight <= 120 ? 18 : 24} />
           </button>{/if}
         </div>
       {/each}
     </div>
   </div>
-  <div class="zoom" role="group" aria-label="Vorschaugröße">
-    <button class="icon small" disabled={zoom <= 0} onclick={() => onzoom(-1)} title="Kleiner – mehr Fotos (Strg + Mausrad)">
+  <div class="zoom" role="group" aria-label={t('Vorschaugröße')}>
+    <button class="icon small" disabled={zoom <= 0} onclick={() => onzoom(-1)} title={t('Kleiner – mehr Fotos (Strg + Mausrad)')}>
       <Icon name="minus" size={20} />
     </button>
-    <button class="icon small" disabled={zoom >= ZOOM_LEVELS.length - 1} onclick={() => onzoom(1)} title="Größer – weniger Fotos (Strg + Mausrad)">
+    <button class="icon small" disabled={zoom >= ZOOM_LEVELS.length - 1} onclick={() => onzoom(1)} title={t('Größer – weniger Fotos (Strg + Mausrad)')}>
       <Icon name="plus" size={20} />
     </button>
   </div>
