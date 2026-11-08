@@ -1,0 +1,100 @@
+configuration:
+  library_folder:
+    name: Biblioteca
+    description: >-
+      Carpeta que contiene el archivo. Los archivos nuevos se ordenan en subcarpetas AAAA/MM según la fecha de captura.
+      Debe estar dentro de /media o /share.
+  import_folder:
+    name: Carpeta de importación
+    description: >-
+      Carpeta de entrada, p. ej. accesible por Samba como \\homeassistant\share\fotoarchiv-import.
+      Los archivos importados se mueven desde aquí a la biblioteca.
+  face_recognition:
+    name: Reconocimiento facial
+    description: >-
+      Busca caras en las fotos en segundo plano y agrupa las caras parecidas. Descarga los modelos de InsightFace
+      (unos 280 MB, solo uso no comercial) en el primer arranque. Unos 1 segundo por foto en una Raspberry Pi 5.
+  face_threads:
+    name: Núcleos para el reconocimiento facial
+    description: >-
+      Cuántos núcleos del procesador puede usar el reconocimiento facial. Con más núcleos se procesan las fotos más
+      deprisa, pero la carga en la Pi es mayor. En una Raspberry Pi 5 (4 núcleos), 3 es un buen valor si Home Assistant
+      debe seguir respondiendo bien. Se aplica tras reiniciar el complemento.
+  image_recognition:
+    name: Reconocimiento de imágenes
+    description: >-
+      Búsqueda en lenguaje natural («perro en la playa», también funciona en alemán), propuestas de etiquetas y detección
+      de fotos giradas incorrectamente. Descarga los modelos (unos 1,6 GB) en el primer arranque y después revisa todas las
+      fotos. Las propuestas se quedan en la base de datos hasta que alguien las acepte. Usa tantos núcleos como el
+      reconocimiento facial.
+  auto_rotate:
+    name: Girar automáticamente las fotos claramente mal orientadas
+    description: >-
+      Solo cuando el modelo está seguro y una cara confirma la nueva orientación; se puede deshacer en
+      «Revisar giros». Si está desactivado, todos los casos sospechosos solo van a esa lista de revisión.
+  duplicate_detection:
+    name: Detectar fotos duplicadas
+    description: >-
+      Compara fotos en segundo plano para encontrar versiones duplicadas (reducidas, guardadas de nuevo, otro formato) y
+      ráfagas de tomas parecidas. Las importaciones señalan las fotos existentes muy parecidas. Muy rápido: unos
+      milisegundos por foto.
+  duplicate_bits:
+    name: Rigor para duplicados
+    description: >-
+      Cuántos de los 64 bits de la huella de la imagen pueden diferir para que dos fotos cuenten como duplicadas.
+      Cuanto más bajo, más estricto: 6 es el valor por defecto y también detecta versiones aclaradas o editadas; 4 solo
+      deja copias verdaderas; 7 es el ajuste más permisivo. Si aparecen demasiadas fotos solo parecidas en la lista,
+      baja el valor. Se aplica tras reiniciar el complemento.
+  series_bits:
+    name: Rigor para ráfagas
+    description: >-
+      Cuántos de los 64 bits pueden diferir para que dos fotos tomadas con 30 segundos de diferencia como máximo cuenten
+      como ráfaga. Por defecto 12. Cuanto más bajo, más estricto; cuanto más alto, también agrupa tomas con más movimiento.
+      Se aplica tras reiniciar el complemento.
+  convert_on_import:
+    name: Convertir al importar
+    description: >-
+      Las fotos HEIC se convierten a JPEG y los vídeos que el navegador no puede reproducir (p. ej. H.265/HEVC) a MP4 H.264.
+      Los archivos MOV H.264 solo se reempaquetan sin pérdida. El original va a la papelera. En la Raspberry Pi, un vídeo
+      tarda aproximadamente lo que dura. Convierte los archivos existentes desde la selección.
+  auto_import:
+    name: Importar automáticamente
+    description: >-
+      Revisa la carpeta de importación cada minuto e importa por sí mismo los archivos nuevos y completamente copiados,
+      p. ej. de un móvil que sube fotos al recurso compartido Samba con FolderSync o PhotoSync por Wi-Fi. Solo en un
+      sentido: nunca se escribe nada de vuelta en el móvil. Los archivos que ya están en el archivo o en la papelera se
+      eliminan en lugar de moverlos a _duplikate.
+  map_language:
+    name: Rótulos del mapa
+    description: >-
+      de: estilo de mapa en alemán (openstreetmap.de): países y lugares en alemán, nombres locales entre paréntesis.
+      local: openstreetmap.org: cada país en su propio idioma y escritura. Se aplica al recargar la página.
+  public_enabled:
+    name: Acceso por Internet
+    description: >-
+      Activa el acceso por Internet en el puerto 8301 con inicio de sesión (cuentas en Fotoarchiv → icono del escudo).
+      No lo expongas directamente; publícalo solo a través de un proxy inverso con TLS (Nginx Proxy Manager, Cloudflare Tunnel).
+  public_trusted_proxies:
+    name: Proxies de confianza
+    description: >-
+      Direcciones o redes de tus proxies inversos. Solo se confía en sus cabeceras de dirección de cliente
+      (X-Forwarded-For, CF-Connecting-IP). 172.30.32.0/23 es la red interna de Home Assistant.
+  public_cookie_secure:
+    name: Cookie de sesión solo por HTTPS
+    description: Desactívalo solo para pruebas en tu red local sin TLS.
+  public_session_hours:
+    name: Duración de la sesión (horas)
+    description: Pasado este tiempo, los usuarios tienen que volver a iniciar sesión.
+  public_home_url:
+    name: Dirección de la red doméstica
+    description: >-
+      Por ejemplo http://192.168.178.37:8301. Los visitantes que abran la dirección de Internet desde casa (misma IP pública
+      que Home Assistant) son redirigidos allí, así los vídeos grandes no pasan por el túnel. Vacío = desactivado.
+      Añade ?extern a la dirección de Internet para quedarte en ella.
+  public_log_export_path:
+    name: Archivo de registro adicional
+    description: >-
+      Copia opcional del registro de acceso. No es necesaria para CrowdSec; el botón de configuración se encarga de ello.
+  trash_days:
+    name: Papelera (días)
+    description: Los archivos eliminados permanecen en la papelera este número de días antes de borrarse definitivamente del disco.

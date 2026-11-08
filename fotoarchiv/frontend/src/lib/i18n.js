@@ -3,15 +3,17 @@
 // deshalb muss t() nicht reaktiv sein.
 import en from './i18n/en.js';
 import it from './i18n/it.js';
+import es from './i18n/es.js';
 
 export const LANGUAGES = [
   { code: 'de', label: 'Deutsch', locale: 'de-DE' },
   { code: 'en', label: 'English', locale: 'en-GB' },
   { code: 'it', label: 'Italiano', locale: 'it-IT' },
+  { code: 'es', label: 'Español', locale: 'es-ES' },
 ];
 
 const STORAGE_KEY = 'fotoarchiv.language';
-const DICTIONARIES = { en, it };
+const DICTIONARIES = { en, it, es };
 
 /** Gespeicherte Wahl, sonst die erste passende Browsersprache, sonst Englisch. */
 export function detectLanguage(saved, browserLanguages = []) {

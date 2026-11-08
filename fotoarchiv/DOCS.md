@@ -87,7 +87,9 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 
 ## Sprache
 
-Die Oberfläche gibt es auf Deutsch, Englisch und Italienisch. Sie richtet sich nach der Browsersprache; passt keine, erscheint Englisch. Ändern lässt sie sich unter **Einstellungen** und auf der Anmeldeseite, die Wahl gilt für das jeweilige Gerät. Schlagworte aus der Bilderkennung bleiben auf Deutsch, weil sie in den Fotos stehen und danach gesucht wird. Die Add-on-Option `map_language` steuert nur die Kartenbeschriftung.
+Die Oberfläche gibt es auf Deutsch, Englisch, Italienisch und Spanisch. Sie richtet sich nach der Browsersprache; passt keine, erscheint Englisch. Ändern lässt sie sich unter **Einstellungen** und auf der Anmeldeseite, die Wahl gilt für das jeweilige Gerät. Schlagworte aus der Bilderkennung bleiben auf Deutsch, weil sie in den Fotos stehen und danach gesucht wird. Die Add-on-Option `map_language` steuert nur die Kartenbeschriftung.
+
+Oben rechts wechselt ein Knopf das Farbschema: **automatisch** (wie das Gerät), **hell** oder **dunkel**. Auch diese Wahl gilt für das jeweilige Gerät.
 
 ## Als App aufs Handy (Familie)
 

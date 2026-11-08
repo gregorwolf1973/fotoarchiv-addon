@@ -765,5 +765,8 @@ export default {
   "{n} Dateien wiederherstellen": "Ripristina {n} file",
   "{n} Dateien zum Umwandeln vormerken": "Segna {n} file per la conversione",
   "{n} doppelte Dateien": "{n} file doppi",
-  "{n} fehlende Einträge entfernen": "Rimuovi {n} voci mancanti"
+  "{n} fehlende Einträge entfernen": "Rimuovi {n} voci mancanti",
+  "hell": "chiaro",
+  "dunkel": "scuro",
+  "Farbschema: {mode} – klicken zum Wechseln": "Tema: {mode} – clicca per cambiare"
 };

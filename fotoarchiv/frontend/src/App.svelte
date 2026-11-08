@@ -30,6 +30,7 @@
   import Notices from './components/Notices.svelte';
   import SearchBar from './components/SearchBar.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
+  import { nextTheme, readTheme, saveTheme } from './lib/theme.js';
   import StorageView from './components/StorageView.svelte';
   import Uploader from './components/Uploader.svelte';
   import Viewer from './components/Viewer.svelte';
@@ -63,6 +64,13 @@
   let showAccess = $state(false);
   let showPassword = $state(false);
   let showSettings = $state(false);
+  let theme = $state(readTheme());
+  const THEME_ICON = { auto: 'themeAuto', light: 'themeLight', dark: 'themeDark' };
+  const themeName = (mode) => ({ auto: t('automatisch'), light: t('hell'), dark: t('dunkel') })[mode];
+  function switchTheme() {
+    theme = nextTheme(theme);
+    saveTheme(theme);
+  }
   let installPrompt = $state(null); // Android/Chrome: "App installieren" anbieten
   let iosHint = $state(false);
   const IOS_HINT_KEY = 'fotoarchiv.iosHint';
@@ -860,6 +868,9 @@
             {#if info?.counts.trash}<span class="badge">{info.counts.trash > 99 ? '99+' : info.counts.trash}</span>{/if}
           </button>
         {/if}
+        <button class="icon" onclick={switchTheme} title={t('Farbschema: {mode} – klicken zum Wechseln', { mode: themeName(theme) })}>
+          <Icon name={THEME_ICON[theme]} />
+        </button>
         {#if isAdmin && !session.public}
           <button class="icon" onclick={() => (showAccess = true)} title={t('Zugang übers Internet')}><Icon name="shield" /></button>
           <button class="icon" onclick={() => (showSettings = true)} title={t('Einstellungen')}><Icon name="cog" /></button>

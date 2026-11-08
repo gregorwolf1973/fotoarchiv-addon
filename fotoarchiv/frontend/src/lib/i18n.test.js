@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import en from './i18n/en.js';
 import it from './i18n/it.js';
+import es from './i18n/es.js';
 import { detectLanguage, translate, translateServer } from './i18n.js';
 
 test('gespeicherte Wahl geht vor', () => {
@@ -39,13 +40,18 @@ test('Platzhalter werden in der Übersetzung ersetzt', () => {
 
 test('Übersetzungen enthalten dieselben Platzhalter wie der deutsche Text', () => {
   const placeholders = (text) => (text.match(/\{\w+\}/g) ?? []).sort();
-  for (const dictionary of [en, it]) {
+  for (const dictionary of [en, it, es]) {
     for (const [german, translated] of Object.entries(dictionary)) {
       assert.deepEqual(placeholders(translated), placeholders(german), german);
     }
   }
 });
 
-test('Englisch und Italienisch haben dieselben Schlüssel', () => {
+test('Englisch, Italienisch und Spanisch haben dieselben Schlüssel', () => {
   assert.deepEqual(Object.keys(en).sort(), Object.keys(it).sort());
+  assert.deepEqual(Object.keys(en).sort(), Object.keys(es).sort());
+});
+
+test('Spanische Browser bekommen Spanisch', () => {
+  assert.equal(detectLanguage(null, ['es-MX', 'en']), 'es');
 });

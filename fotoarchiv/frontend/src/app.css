@@ -19,8 +19,9 @@
   --danger-bg: #fde0e0;
 }
 
+/* Dunkel: folgt dem Gerät, außer der Umschalter erzwingt hell (data-theme="light") oder dunkel. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     color-scheme: dark;
     --bg: #111111;
     --surface: #1c1c1c;
@@ -40,6 +41,27 @@
     --on-danger: #2a0b0b;
     --danger-bg: #3d1a1a;
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #111111;
+  --surface: #1c1c1c;
+  --text: #e1e1e1;
+  --text-secondary: #c4c4c4;
+  --muted: #9b9b9b;
+  --border: #2f2f2f;
+  --chip: #2c2c2c;
+  --placeholder: #262626;
+  --timeline-bg: rgb(17 17 17 / 0.92);
+  --accent: #29b6f6;
+  --on-accent: #0b1d26;
+  --success: #81c784;
+  --warning: #ffb74d;
+  --warning-bg: #3d2e10;
+  --danger: #ef9a9a;
+  --on-danger: #2a0b0b;
+  --danger-bg: #3d1a1a;
 }
 
 html,

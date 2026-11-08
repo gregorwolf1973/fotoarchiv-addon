@@ -765,5 +765,8 @@ export default {
   "{n} Dateien wiederherstellen": "Restore {n} files",
   "{n} Dateien zum Umwandeln vormerken": "Mark {n} files for conversion",
   "{n} doppelte Dateien": "{n} duplicate files",
-  "{n} fehlende Einträge entfernen": "Remove {n} missing entries"
+  "{n} fehlende Einträge entfernen": "Remove {n} missing entries",
+  "hell": "light",
+  "dunkel": "dark",
+  "Farbschema: {mode} – klicken zum Wechseln": "Colour scheme: {mode} – click to change"
 };

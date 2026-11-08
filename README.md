@@ -58,7 +58,8 @@ Open Source (MIT). Keine Abos, kein Tracking, keine Werbung. Die Gesichtserkennu
 
 | | |
 |---|---|
-| 🌍 **Languages** | Interface in English, German and Italian; follows the browser language and can be changed in the settings |
+| 🌍 **Languages** | Interface in English, German, Italian and Spanish; follows the browser language and can be changed in the settings |
+| 🌗 **Light and dark** | Follows the device, or switch between light and dark using the button at the top |
 | 🖼️ **Gallery** | Justified layout grouped by day, 5 zoom levels, smooth scrolling through tens of thousands of photos, draggable year timeline |
 | 🗺️ **World map** | Photos clustered by location, **time slider** to show only one year (or 2, 5, 10), drag photos without GPS onto the map to place them |
 | 🙂 **Face recognition** | Runs locally (InsightFace), groups faces, names are written into the files and are searchable |

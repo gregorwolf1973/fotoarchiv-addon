@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.65.0
+
+- **Spanisch:** Die Oberfläche gibt es jetzt auch auf Spanisch (Issue #2), ebenso die Add-on-Einstellungen in Home Assistant. Wie bei den anderen Sprachen folgt sie dem Browser und lässt sich unter Einstellungen und auf der Anmeldeseite ändern.
+- **Hell/Dunkel-Umschalter:** Ein Knopf oben rechts wechselt zwischen automatisch (wie das Gerät), hell und dunkel (Issue #2). Die Wahl gilt für das jeweilige Gerät und steht allen Nutzern zur Verfügung, auch über den Internetzugang.
+
 ## 0.64.0
 
 - **Mehrsprachig:** Die Oberfläche gibt es jetzt auf Deutsch, Englisch und Italienisch (Issue #1). Die Sprache folgt dem Browser und lässt sich unter Einstellungen und auf der Anmeldeseite ändern; die Wahl gilt für dieses Gerät. Ohne passende Browsersprache erscheint Englisch. Auch Datums- und Zahlenformate, die Ortssuche und die Add-on-Einstellungen in Home Assistant folgen der Sprache. Schlagworte aus der Bilderkennung bleiben auf Deutsch, weil sie in den Fotos stehen und danach gesucht wird
