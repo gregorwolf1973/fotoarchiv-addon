@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.1
+
+- **Kopfleiste:** Mit dem neuen Hell/Dunkel-Knopf rutschte das Zahnrad bei mittleren Fensterbreiten (um 1300–1400 px) über den rechten Rand. Die Ansichten (Fotos, Karte, Personen …) zeigen dort jetzt nur noch Symbole, die Namen stehen im Tooltip.
+
 ## 0.65.0
 
 - **Spanisch:** Die Oberfläche gibt es jetzt auch auf Spanisch (Issue #2), ebenso die Add-on-Einstellungen in Home Assistant. Wie bei den anderen Sprachen folgt sie dem Browser und lässt sich unter Einstellungen und auf der Anmeldeseite ändern.

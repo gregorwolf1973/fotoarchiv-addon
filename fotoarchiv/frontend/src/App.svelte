@@ -1383,8 +1383,9 @@
       display: none;
     }
   }
-  /* Ansichten nur als Symbole, damit die Suche breit bleibt (Namen stehen im Tooltip) */
-  @media (max-width: 1299px) {
+  /* Ansichten nur als Symbole, damit die Suche breit bleibt und rechts nichts über den Rand rutscht
+     (Namen stehen im Tooltip) */
+  @media (max-width: 1399px) {
     .views .label {
       display: none;
     }
