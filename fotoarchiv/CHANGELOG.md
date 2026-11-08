@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.2
+
+- **Kopfleiste passt sich an:** Die Leiste misst jetzt selbst, ob alle Knöpfe hineinpassen, und spart nur so viel Platz wie nötig: erst zeigen die Ansichten nur Symbole, dann fällt der Titel weg, dann wandert die Suche hinter einen Knopf, dann zeigen auch Hochladen/Importieren nur Symbole, und auf schmalen Handys lassen sich die Knöpfe zuletzt seitlich wischen statt abgeschnitten zu werden. Vorher ragte bei Admins mit allen Knöpfen das Zahnrad je nach Fensterbreite über den rechten Rand (schon vor 0.65, mit dem Hell/Dunkel-Knopf häufiger); 0.65.1 hatte das nur für einen Teil der Breiten behoben.
+
 ## 0.65.1
 
 - **Kopfleiste:** Mit dem neuen Hell/Dunkel-Knopf rutschte das Zahnrad bei mittleren Fensterbreiten (um 1300–1400 px) über den rechten Rand. Die Ansichten (Fotos, Karte, Personen …) zeigen dort jetzt nur noch Symbole, die Namen stehen im Tooltip.

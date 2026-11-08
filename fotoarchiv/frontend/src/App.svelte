@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick as svelteTick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { api, auth, cache, filterQuery, originalUrl } from './lib/api.js';
   import { ZOOM_LEVELS } from './lib/layout.js';
@@ -65,6 +65,47 @@
   let showPassword = $state(false);
   let showSettings = $state(false);
   let theme = $state(readTheme());
+
+  // Kopfleiste: Wie viele Knöpfe sie hat, hängt von Rolle und Lage ab. Statt fester Fensterbreiten
+  // misst sie selbst und spart stufenweise Platz, bis nichts mehr über den Rand ragt:
+  // 1 Ansichten nur als Symbole, 2 ohne Titel, 3 Suche hinter einem Knopf, 4 Aktionen nur als Symbole,
+  // 5 ohne Logo, die Aktionen lassen sich seitlich wischen (schmale Handys mit allen Admin-Knöpfen).
+  let topbar = $state(null);
+  let compact = $state(0);
+  let fitting = false;
+  let refit = false;
+  async function fitTopbar() {
+    if (!topbar) return;
+    if (fitting) {
+      refit = true; // Größe hat sich während des Messens geändert: danach noch einmal messen
+      return;
+    }
+    fitting = true;
+    try {
+      do {
+        refit = false;
+        compact = 0;
+        await svelteTick();
+        while (compact < 5 && topbar && topbar.scrollWidth > topbar.clientWidth + 1) {
+          compact += 1;
+          await svelteTick();
+        }
+      } while (refit);
+    } finally {
+      fitting = false;
+    }
+  }
+  $effect(() => {
+    if (!topbar || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => fitTopbar());
+    observer.observe(topbar);
+    return () => observer.disconnect();
+  });
+  $effect(() => {
+    // Knöpfe kommen und gehen mit Rolle, Anmeldung und Zählern
+    void [session?.role, session?.public, info?.importing, info?.delete_requests, info?.counts?.trash, installPrompt, view];
+    fitTopbar();
+  });
   const THEME_ICON = { auto: 'themeAuto', light: 'themeLight', dark: 'themeDark' };
   const themeName = (mode) => ({ auto: t('automatisch'), light: t('hell'), dark: t('dunkel') })[mode];
   function switchTheme() {
@@ -814,7 +855,7 @@
       <span class="grow"></span>
     </header>
   {:else}
-    <header class="topbar">
+    <header class="topbar" bind:this={topbar} class:c1={compact >= 1} class:c2={compact >= 2} class:c3={compact >= 3} class:c4={compact >= 4} class:c5={compact >= 5}>
       <div class="brand" title={info ? t('{photos} Fotos · {videos} Videos · {size}', { photos: formatNumber(info.counts.images), videos: formatNumber(info.counts.videos), size: formatBytes(info.counts.bytes) }) : ''}>
         <Icon name="images" size={26} />
         <h1>Fotoarchiv</h1>
@@ -1367,6 +1408,29 @@
     background: var(--chip);
     color: var(--text);
   }
+  /* Stufen aus fitTopbar(): greifen, wenn die Knöpfe trotz der Breitenregeln nicht hineinpassen */
+  .topbar.c1 .views .label,
+  .topbar.c4 .actions .label {
+    display: none;
+  }
+  .topbar.c2 h1,
+  .topbar.c3 .search-inline {
+    display: none;
+  }
+  .topbar.c3 .search-toggle {
+    display: inline-flex;
+  }
+  .topbar.c5 .brand {
+    display: none;
+  }
+  .topbar.c5 .actions {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar.c5 .actions > * {
+    flex: none;
+  }
   @media (max-width: 899px) {
     .search-inline {
       display: none;
@@ -1383,9 +1447,8 @@
       display: none;
     }
   }
-  /* Ansichten nur als Symbole, damit die Suche breit bleibt und rechts nichts über den Rand rutscht
-     (Namen stehen im Tooltip) */
-  @media (max-width: 1399px) {
+  /* Ansichten nur als Symbole, damit die Suche breit bleibt (Namen stehen im Tooltip) */
+  @media (max-width: 1299px) {
     .views .label {
       display: none;
     }
