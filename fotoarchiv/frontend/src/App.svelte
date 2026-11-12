@@ -154,7 +154,8 @@
         filters.auto.length),
   );
   // Genau ein Vorschlag der Bilderkennung gefiltert: für alle Treffer übernehmen oder ablehnen
-  const suggestion = $derived(filters.auto.length === 1 && canEdit && !trash ? filters.auto[0].name : null);
+  // { id: interner Name, name: in der Sprache der Oberfläche }
+  const suggestion = $derived(filters.auto.length === 1 && canEdit && !trash ? filters.auto[0] : null);
   const SEARCH_LIMIT = 2000; // höchstens so viele Treffer liefert die Bildsuche
   const indexById = $derived(new Map(items.map((item, i) => [item[0], i])));
   const viewerItems = $derived(
@@ -668,10 +669,10 @@
     }
   }
 
-  async function dismissSuggestion(name) {
+  async function dismissSuggestion({ id, name }) {
     const ids = items.map((item) => item[0]);
     try {
-      const { dismissed } = await api.dismissSuggestion(name, ids);
+      const { dismissed } = await api.dismissSuggestion(id ?? name, ids);
       notify(t('Vorschlag „{name}“ bei {photos} abgelehnt', { name, photos: photoCount(dismissed) }));
       setFilters({ ...filters, auto: [] });
     } catch (e) {
@@ -679,7 +680,8 @@
     }
   }
 
-  function acceptSuggestion(name) {
+  function acceptSuggestion({ name }) {
+    // in der Sprache der Oberfläche ins Foto; der Server erkennt es als den Vorschlag wieder
     runBatch({ ids: items.map((item) => item[0]), action: 'tags', add: [name] });
     setFilters({ ...filters, auto: [] });
   }
@@ -972,7 +974,7 @@
       {#if suggestion && items.length}
         <span class="grow"></span>
         <button onclick={() => acceptSuggestion(suggestion)} title={t('Schlagwort in alle diese Fotos schreiben')}>
-          <Icon name="check" size={18} /><span class="label">{t('„{name}“ übernehmen', { name: suggestion })}</span>
+          <Icon name="check" size={18} /><span class="label">{t('„{name}“ übernehmen', { name: suggestion.name })}</span>
         </button>
         <button onclick={() => dismissSuggestion(suggestion)} title={t('Vorschlag bei allen diesen Fotos verwerfen')}>
           <Icon name="close" size={18} /><span class="label">{t('Ablehnen')}</span>

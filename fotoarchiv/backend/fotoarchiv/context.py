@@ -118,7 +118,7 @@ def register_task_actions(tasks: TaskRunner, editor: Editor, faces: FaceService,
     # Drehen prüfen: Vorschlag übernehmen/verwerfen, automatische Drehung lassen/rückgängig machen
     tasks.register("orient", lambda p: lambda i: vision.decide(i, p["accept"]), repeatable=False)
     # Alle Informationen in die Bilder schreiben; schreibt nur, was fehlt – Wiederholen schadet nicht
-    tasks.register("writeback", lambda p: lambda i: writeback.write_one(editor, faces, vision, i), tolerate_on_resume=True)
+    tasks.register("writeback", lambda p: lambda i: writeback.write_one(editor, faces, vision, i, (p or {}).get("language")), tolerate_on_resume=True)
 
 
 def build(settings: config.Settings) -> Context:

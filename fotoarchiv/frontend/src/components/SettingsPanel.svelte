@@ -76,7 +76,7 @@
     confirm = null;
     busy = true;
     try {
-      ontask(await api.writeBack());
+      ontask(await api.writeBack(language));
       await load();
     } catch (e) {
       notifyError(e);

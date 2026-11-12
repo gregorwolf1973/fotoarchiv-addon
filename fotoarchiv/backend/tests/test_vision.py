@@ -206,7 +206,7 @@ def test_suggestions_dismiss_and_accept(service, importer, editor, make_jpeg, tm
     assert [s["name"] for s in service.suggestions(dog)] == ["Hund"]
     assert service.suggestions(beach) == []  # hat das Schlagwort schon
     assert service.suggestions(other) == []
-    assert service.suggestion_labels() == [{"name": "Hund", "count": 1}]
+    assert service.suggestion_labels() == [{"name": "Hund", "count": 1, "names": {"de": "Hund", "en": "Dog", "it": "Cane", "es": "Perro"}}]
 
     assert service.dismiss("Hund", [dog]) == 1
     assert service.suggestions(dog) == []
@@ -222,6 +222,38 @@ def test_suggestions_dismiss_and_accept(service, importer, editor, make_jpeg, tm
     editor.change_labels(other, "tags", ["Katze"], [])
     editor.change_labels(other, "tags", [], ["Katze"])
     assert service.suggestions(other) == []
+
+    # übernommen in einer anderen Sprache der Oberfläche: „Comida“ erledigt den Vorschlag „Essen“
+    food = imported(importer, make_jpeg, tmp_path, "essen.jpg")
+    service.image.vectors[food] = tag_vector(service, "Essen")
+    service.work_once()
+    assert [s["names"]["es"] for s in service.suggestions(food)] == ["Comida"]
+    editor.change_labels(food, "tags", ["comida"], [])
+    assert service.suggestions(food) == []
+
+
+def test_accept_suggestions_in_the_language_of_the_interface(service, importer, editor, exiftool, make_jpeg, tmp_path):
+    dog = imported(importer, make_jpeg, tmp_path, "hund.jpg")
+    service.image.vectors = {dog: tag_vector(service, "Hund")}
+    service.work_once()
+    assert service.accept_suggestions(dog, "en") == ["Dog"]
+    path = importer.db.one("SELECT path FROM assets WHERE id = ?", (dog,))["path"]
+    assert exiftool.read(service.settings.library / path)["XMP-dc:Subject"] in ("Dog", ["Dog"])
+    assert service.suggestions(dog) == []
+
+
+def test_vocabulary_names_in_every_language():
+    from fotoarchiv import vocab
+
+    assert set(vocab.NAMES) == set(vocab.VOCAB)
+    assert vocab.localized("Essen", "es") == "Comida" and vocab.localized("Essen", None) == "Essen"
+    assert vocab.internal(" FOOD ") == vocab.internal("Cibo") == "Essen"
+    assert vocab.internal("Urlaub") is None
+    # kein Name darf in irgendeiner Sprache zwei Schlagworte meinen
+    seen = {}
+    for key in vocab.VOCAB:
+        for name in vocab.translations(key).values():
+            assert seen.setdefault(name.casefold(), key) == key
 
 
 def test_orientation_suggested_without_face_confirmation(service, importer, editor, make_jpeg, tmp_path):
@@ -332,7 +364,7 @@ def test_api_search_suggestions_and_review(client, make_jpeg, tmp_path):
     assert ids(ai="mein Hund") == [dog]
     assert client.get("/api/geo", params={"ai": "mein Hund"}).json()["items"] == []  # ohne Ort
     assert ids(auto=["Hund"]) == [dog]
-    assert client.get("/api/labels").json()["auto"] == [{"name": "Hund", "count": 1}]
+    assert client.get("/api/labels").json()["auto"] == [{"name": "Hund", "count": 1, "names": {"de": "Hund", "en": "Dog", "it": "Cane", "es": "Perro"}}]
     state = client.get("/api/state").json()["vision"]
     assert (state["search"], state["done"], state["total"], state["review"]) == (True, 2, 2, 1)
 

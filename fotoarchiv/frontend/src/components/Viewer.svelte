@@ -3,7 +3,7 @@
   import { DATE_SOURCES, formatBytes, formatDuration, formatTaken } from '../lib/format.js';
   import { notify, notifyError } from '../lib/notices.svelte.js';
   import { clampView, RESET, zoomAt } from '../lib/zoom.js';
-  import { locale, t } from '../lib/i18n.js';
+  import { autoName, locale, t } from '../lib/i18n.js';
   import ChipInput from './ChipInput.svelte';
   import Confirm from './Confirm.svelte';
   import ProposeDeleteDialog from './ProposeDeleteDialog.svelte';
@@ -231,7 +231,10 @@
   // ── Bilderkennung ──────────────────────────────────────────────
   // Vorschläge, die nicht schon (auch im ungespeicherten Entwurf) als Schlagwort dastehen
   const suggested = $derived(
-    (detail?.suggestions ?? []).filter((s) => !tags.some((x) => x.toLocaleLowerCase() === s.name.toLocaleLowerCase())),
+    (detail?.suggestions ?? []).filter((s) => {
+      const names = Object.values(s.names ?? { de: s.name }).map((n) => n.toLocaleLowerCase());
+      return !tags.some((x) => names.includes(x.toLocaleLowerCase()));
+    }),
   );
   const takeSuggestion = (name) => (draft.tags = [...tags, name]); // gespeichert wird mit "Speichern"
   const dismissSuggestion = (name) => save(async () => (await api.dismissSuggestion(name, [itemId]), api.asset(itemId)));
@@ -600,8 +603,8 @@
                 <span class="muted"><Icon name="sparkle" size={14} /> {t('Erkannt:')}</span>
                 {#each suggested as s (s.name)}
                   <span class="suggestion">
-                    {s.name}
-                    <button class="icon small" disabled={busy} onclick={() => takeSuggestion(s.name)} title={t('Als Schlagwort übernehmen')}>
+                    {autoName(s)}
+                    <button class="icon small" disabled={busy} onclick={() => takeSuggestion(autoName(s))} title={t('Als Schlagwort übernehmen')}>
                       <Icon name="check" size={16} />
                     </button>
                     <button class="icon small" disabled={busy} onclick={() => dismissSuggestion(s.name)} title={t('Passt nicht – nicht mehr vorschlagen')}>

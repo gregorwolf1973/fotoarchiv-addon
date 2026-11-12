@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.66.0
+
+- **Schlagwort-Vorschläge in der eigenen Sprache:** Die Bilderkennung schlägt ihre 57 Schlagworte jetzt auf Englisch, Italienisch und Spanisch vor, wenn die Oberfläche so eingestellt ist – in der Suche, in der Einzelansicht und beim Übernehmen für viele Fotos (Issue #3). Übernommen wird das Schlagwort in dieser Sprache, z. B. „Comida“ statt „Essen“; auch „Alle Informationen in die Bilder schreiben“ schreibt in der Sprache dessen, der es auslöst. Bereits gespeicherte Schlagworte ändern sich nicht, und ein Vorschlag gilt als erledigt, wenn das Foto das Schlagwort in irgendeiner dieser Sprachen schon hat. Auf Deutsch bleibt alles wie bisher.
+
 ## 0.65.2
 
 - **Kopfleiste passt sich an:** Die Leiste misst jetzt selbst, ob alle Knöpfe hineinpassen, und spart nur so viel Platz wie nötig: erst zeigen die Ansichten nur Symbole, dann fällt der Titel weg, dann wandert die Suche hinter einen Knopf, dann zeigen auch Hochladen/Importieren nur Symbole, und auf schmalen Handys lassen sich die Knöpfe zuletzt seitlich wischen statt abgeschnitten zu werden. Vorher ragte bei Admins mit allen Knöpfen das Zahnrad je nach Fensterbreite über den rechten Rand (schon vor 0.65, mit dem Hell/Dunkel-Knopf häufiger); 0.65.1 hatte das nur für einen Teil der Breiten behoben.

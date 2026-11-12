@@ -76,6 +76,87 @@ BACKGROUND = [
 ]
 
 
+# Anzeige- und Schreibnamen der Schlagworte in den Sprachen der Oberfläche (en, it, es). Intern bleibt der deutsche
+# Name der Schlüssel; die Liste gehört nicht zum Fingerabdruck, eine neue Übersetzung rechnet also nichts neu.
+LANGUAGES = ("en", "it", "es")
+NAMES = {
+    "Strand": ("Beach", "Spiaggia", "Playa"),
+    "Meer": ("Sea", "Mare", "Mar"),
+    "See": ("Lake", "Lago", "Lago"),
+    "Fluss": ("River", "Fiume", "Río"),
+    "Berge": ("Mountains", "Montagne", "Montañas"),
+    "Wald": ("Forest", "Bosco", "Bosque"),
+    "Schnee": ("Snow", "Neve", "Nieve"),
+    "Sonnenuntergang": ("Sunset", "Tramonto", "Puesta de sol"),
+    "Nacht": ("Night", "Notte", "Noche"),
+    "Feuerwerk": ("Fireworks", "Fuochi d'artificio", "Fuegos artificiales"),
+    "Stadt": ("City", "Città", "Ciudad"),
+    "Kirche": ("Church", "Chiesa", "Iglesia"),
+    "Burg": ("Castle", "Castello", "Castillo"),
+    "Garten": ("Garden", "Giardino", "Jardín"),
+    "Blumen": ("Flowers", "Fiori", "Flores"),
+    "Hund": ("Dog", "Cane", "Perro"),
+    "Katze": ("Cat", "Gatto", "Gato"),
+    "Pferd": ("Horse", "Cavallo", "Caballo"),
+    "Vogel": ("Bird", "Uccello", "Pájaro"),
+    "Fisch": ("Fish", "Pesce", "Pez"),
+    "Angeln": ("Fishing", "Pesca", "Pesca"),
+    "Aquarium": ("Aquarium", "Acquario", "Acuario"),
+    "Unterwasser": ("Underwater", "Sott'acqua", "Bajo el agua"),
+    "Insekt": ("Insect", "Insetto", "Insecto"),
+    "Motorrad": ("Motorcycle", "Moto", "Moto"),
+    "Auto": ("Car", "Auto", "Coche"),
+    "Fahrrad": ("Bicycle", "Bicicletta", "Bicicleta"),
+    "Boot": ("Boat", "Barca", "Barco"),
+    "Flugzeug": ("Plane", "Aereo", "Avión"),
+    "Zug": ("Train", "Treno", "Tren"),
+    "Essen": ("Food", "Cibo", "Comida"),
+    "Kuchen": ("Cake", "Torta", "Pastel"),
+    "Grillen": ("Barbecue", "Grigliata", "Barbacoa"),
+    "Geburtstag": ("Birthday", "Compleanno", "Cumpleaños"),
+    "Weihnachten": ("Christmas", "Natale", "Navidad"),
+    "Ostern": ("Easter", "Pasqua", "Pascua"),
+    "Hochzeit": ("Wedding", "Matrimonio", "Boda"),
+    "Baby": ("Baby", "Bebè", "Bebé"),
+    "Kinder": ("Children", "Bambini", "Niños"),
+    "Gruppenfoto": ("Group photo", "Foto di gruppo", "Foto de grupo"),
+    "Schwimmbad": ("Swimming pool", "Piscina", "Piscina"),
+    "Spielplatz": ("Playground", "Parco giochi", "Parque infantil"),
+    "Camping": ("Camping", "Campeggio", "Camping"),
+    "Lagerfeuer": ("Campfire", "Falò", "Hoguera"),
+    "Sport": ("Sport", "Sport", "Deporte"),
+    "Skifahren": ("Skiing", "Sci", "Esquí"),
+    "Party": ("Party", "Festa", "Fiesta"),
+    "Dokument": ("Document", "Documento", "Documento"),
+    "Bildschirmfoto": ("Screenshot", "Screenshot", "Captura de pantalla"),
+    "Landkarte": ("Map", "Mappa", "Mapa"),
+    "Solaranlage": ("Solar panels", "Pannelli solari", "Paneles solares"),
+    "Baustelle": ("Construction site", "Cantiere", "Construcción"),
+    "Wohnung": ("Home", "Casa", "Casa"),
+    "Wasserfall": ("Waterfall", "Cascata", "Cascada"),
+    "Palmen": ("Palm trees", "Palme", "Palmeras"),
+    "Kerzen": ("Candles", "Candele", "Velas"),
+    "Tiere": ("Animals", "Animali", "Animales"),
+}
+
+
+def translations(name: str) -> dict:
+    """Name des Schlagworts je Sprache, z. B. {"de": "Essen", "en": "Food", …}; unbekannte Namen bleiben, wie sie sind."""
+    return {"de": name, **dict(zip(LANGUAGES, NAMES.get(name, (name,) * len(LANGUAGES))))}
+
+
+def localized(name: str, language: str | None) -> str:
+    return translations(name).get(language or "de", name)
+
+
+_BY_ANY_NAME = {variant.casefold(): key for key in VOCAB for variant in translations(key).values()}
+
+
+def internal(name: str) -> str | None:
+    """Schlagwort in irgendeiner Sprache -> interner (deutscher) Name, oder None."""
+    return _BY_ANY_NAME.get(str(name).strip().casefold())
+
+
 def fingerprint() -> str:
     """Ändert sich mit jeder Änderung an Schlagworten oder Beschreibungen."""
     text = json.dumps([VOCAB, BACKGROUND], ensure_ascii=False, sort_keys=True)

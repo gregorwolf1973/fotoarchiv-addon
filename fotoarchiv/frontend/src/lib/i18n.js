@@ -50,6 +50,9 @@ if (typeof document !== 'undefined') document.documentElement.lang = language;
 
 export const t = (text, params) => translate(DICTIONARIES[language], text, params);
 
+/** Schlagwort der Bilderkennung in der Sprache der Oberfläche; der Server liefert es je Sprache in "names". */
+export const autoName = (entry) => entry?.names?.[language] ?? entry?.name;
+
 /** Text vom Server: wie t(), aber Zahlen im Text gelten als {n} ("12 Dateien …" trifft "{n} Dateien …"). */
 export function translateServer(dictionary, text) {
   if (typeof text !== 'string') return text;

@@ -390,13 +390,14 @@ class VisionService:
 
     # ── Schlagwort-Vorschläge ──────────────────────────────────────
     def suggestions(self, asset_id: int) -> list[dict]:
-        return [dict(r) for r in self.db.query(
+        """Offene Vorschläge eines Fotos; "names" trägt den Namen in jeder Sprache der Oberfläche."""
+        return [{**dict(r), "names": vocab.translations(r["name"])} for r in self.db.query(
             f"SELECT s.name, s.score FROM auto_tags s WHERE s.asset_id = ? AND {VISIBLE} ORDER BY s.score DESC",
             (asset_id,))]
 
     def suggestion_labels(self) -> list[dict]:
         """Wie /api/labels: Name und Zahl der Fotos, bei denen das Schlagwort noch vorgeschlagen ist."""
-        return [dict(r) for r in self.db.query(
+        return [{**dict(r), "names": vocab.translations(r["name"])} for r in self.db.query(
             f"""SELECT s.name, COUNT(*) AS count FROM auto_tags s JOIN assets a ON a.id = s.asset_id AND a.deleted_at IS NULL
                 WHERE {VISIBLE} GROUP BY s.name ORDER BY s.name COLLATE NOCASE""")]
 
@@ -460,9 +461,9 @@ class VisionService:
         self.wake()
         return count
 
-    def accept_suggestions(self, asset_id: int) -> list[str]:
-        """Alle offenen Vorschläge eines Fotos als Schlagworte in die Datei schreiben."""
-        names = [s["name"] for s in self.suggestions(asset_id)]
+    def accept_suggestions(self, asset_id: int, language: str | None = None) -> list[str]:
+        """Alle offenen Vorschläge eines Fotos als Schlagworte in die Datei schreiben, in der Sprache der Oberfläche."""
+        names = [vocab.localized(s["name"], language) for s in self.suggestions(asset_id)]
         row = self.db.one("SELECT path FROM assets WHERE id = ? AND deleted_at IS NULL", (asset_id,))
         if names and row and Path(row["path"]).suffix.lower() in WRITABLE:
             self.editor.change_labels(asset_id, "tags", names, [])  # der Haken "tags" markiert sie als übernommen
@@ -470,11 +471,14 @@ class VisionService:
         return []
 
     def _after_tags(self, asset_id: int):
-        """Schlagwort von Hand gesetzt: passender Vorschlag gilt als übernommen und kommt nicht wieder."""
-        self.db.execute(
-            """UPDATE auto_tags SET state = 1 WHERE asset_id = ? AND state = 0 AND name IN (
-                   SELECT t.name FROM asset_tags l JOIN tags t ON t.id = l.tag_id WHERE l.asset_id = ?)""",
-            (asset_id, asset_id))
+        """Schlagwort von Hand gesetzt: passender Vorschlag gilt als übernommen und kommt nicht wieder –
+        in jeder Sprache, „Food“ erledigt also auch den Vorschlag „Essen“."""
+        rows = self.db.query("SELECT t.name FROM asset_tags l JOIN tags t ON t.id = l.tag_id WHERE l.asset_id = ?", (asset_id,))
+        names = {vocab.internal(r["name"]) or r["name"] for r in rows}
+        if names:
+            marks = ",".join("?" * len(names))
+            self.db.execute(f"UPDATE auto_tags SET state = 1 WHERE asset_id = ? AND state = 0 AND name IN ({marks})",
+                            (asset_id, *names))
 
     def _after_import(self, _asset_id: int):
         self.wake()

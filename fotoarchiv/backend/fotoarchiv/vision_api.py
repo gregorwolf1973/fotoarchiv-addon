@@ -7,13 +7,17 @@ Vorschläge übernehmen über die normalen Schlagwort-Wege (Einzelansicht, Mehrf
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from . import writeback
+from . import vocab, writeback
 from .context import Context
 
 
 class ReviewDecision(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=5000)
     accept: bool
+
+
+class WritebackBody(BaseModel):
+    language: str | None = Field(default=None, max_length=8)
 
 
 class SuggestionDismiss(BaseModel):
@@ -62,9 +66,11 @@ def register(app: FastAPI, ctx: Context, *, public: bool):
         return {"count": vision.recheck_manual()}
 
     @app.post("/api/settings/writeback")
-    def settings_writeback():
+    def settings_writeback(body: WritebackBody | None = None):
         ids = writeback.plan(ctx.db, ctx.settings.library)["ids"]
         if not ids:
             raise HTTPException(400, "Es steht schon alles in den Dateien")
         label = "Informationen in 1 Datei schreiben" if len(ids) == 1 else f"Informationen in {len(ids)} Dateien schreiben"
-        return tasks.submit("writeback", label, ids)
+        # erkannte Schlagworte in der Sprache der Oberfläche dessen, der schreiben lässt
+        language = body.language if body and body.language in vocab.LANGUAGES else None
+        return tasks.submit("writeback", label, ids, {"language": language})

@@ -1,7 +1,7 @@
 <script>
   import { api } from '../lib/api.js';
   import { formatNumber } from '../lib/format.js';
-  import { locale, t, tServer } from '../lib/i18n.js';
+  import { autoName, locale, t, tServer } from '../lib/i18n.js';
   import { matchAll, splitPlus } from '../lib/suche.js';
   import Icon from './Icon.svelte';
 
@@ -58,7 +58,8 @@
   const lists = $derived([
     ['persons', narrowed(labels.persons, 'persons')],
     ['tags', narrowed(labels.tags, 'tags')],
-    ['auto', narrowed((labels.auto ?? []).map((l) => ({ ...l, id: l.name })), 'auto')],
+    // id: interner Name für Server und Zahlen, name: in der Sprache der Oberfläche
+    ['auto', narrowed((labels.auto ?? []).map((l) => ({ ...l, id: l.name, name: autoName(l) })), 'auto')],
   ]);
   const plusParts = $derived(splitPlus(text));
 

@@ -45,7 +45,7 @@ export function filterQuery({ tags = [], persons = [], start = '', end = '', q =
   const params = new URLSearchParams();
   for (const t of tags) params.append('tag', t.id);
   for (const p of persons) params.append('person', p.id);
-  for (const a of auto) params.append('auto', a.name); // Schlagwort-Vorschläge der Bilderkennung
+  for (const a of auto) params.append('auto', a.id ?? a.name); // Schlagwort-Vorschläge der Bilderkennung (interner Name)
   if (ai) params.set('ai', ai); // Bildinhalt in normaler Sprache
   if (start) params.set('start', start);
   if (end) params.set('end', end);
@@ -103,7 +103,7 @@ export const api = {
   ignoreDuplicates: (ids) => request('api/duplicates/ignore', send('POST', { ids })),
   settingsOverview: () => request('api/settings/overview'),
   recheckOrientation: () => request('api/vision/orientation/recheck', { method: 'POST' }),
-  writeBack: () => request('api/settings/writeback', { method: 'POST' }),
+  writeBack: (language) => request('api/settings/writeback', send('POST', { language })),
   rotationReview: () => request('api/vision/review'),
   decideRotations: (ids, accept) => request('api/vision/review', send('POST', { ids, accept })),
   dismissSuggestion: (name, ids) => request('api/vision/suggestions/dismiss', send('POST', { name, ids })),

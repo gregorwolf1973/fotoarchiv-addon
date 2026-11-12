@@ -87,7 +87,7 @@ Beide Ordner sollten auf demselben Datenträger liegen. Dann ist das Einsortiere
 
 ## Sprache
 
-Die Oberfläche gibt es auf Deutsch, Englisch, Italienisch und Spanisch. Sie richtet sich nach der Browsersprache; passt keine, erscheint Englisch. Ändern lässt sie sich unter **Einstellungen** und auf der Anmeldeseite, die Wahl gilt für das jeweilige Gerät. Schlagworte aus der Bilderkennung bleiben auf Deutsch, weil sie in den Fotos stehen und danach gesucht wird. Die Add-on-Option `map_language` steuert nur die Kartenbeschriftung.
+Die Oberfläche gibt es auf Deutsch, Englisch, Italienisch und Spanisch. Sie richtet sich nach der Browsersprache; passt keine, erscheint Englisch. Ändern lässt sie sich unter **Einstellungen** und auf der Anmeldeseite, die Wahl gilt für das jeweilige Gerät. Auch die Schlagwort-Vorschläge der Bilderkennung erscheinen in der gewählten Sprache und landen beim Übernehmen in dieser Sprache im Foto (aus „Essen“ wird auf Englisch „Food“, auf Spanisch „Comida“). Schon gespeicherte Schlagworte bleiben, wie sie sind; ein Vorschlag gilt in jeder Sprache als erledigt, wenn das Foto das Schlagwort schon hat. Die Add-on-Option `map_language` steuert nur die Kartenbeschriftung.
 
 Oben rechts wechselt ein Knopf das Farbschema: **automatisch** (wie das Gerät), **hell** oder **dunkel**. Auch diese Wahl gilt für das jeweilige Gerät.
 

@@ -63,7 +63,7 @@ def plan(db: Database, library: Path) -> dict:
     }
 
 
-def write_one(editor: Editor, faces: FaceService, vision: VisionService, asset_id: int):
+def write_one(editor: Editor, faces: FaceService, vision: VisionService, asset_id: int, language: str | None = None):
     editor.absorb_sidecar(asset_id)  # zuerst: dann stehen auch Personen und Schlagworte der Begleitdatei drin
     faces.sync_asset(asset_id)
-    vision.accept_suggestions(asset_id)
+    vision.accept_suggestions(asset_id, language)
